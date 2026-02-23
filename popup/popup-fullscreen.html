@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoTest Recorder - Fullscreen Mode</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    body {
+      width: 100% !important;
+      min-height: 100vh !important;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .fullscreen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    
+    .fullscreen-header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    
+    .fullscreen-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .fullscreen-close {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .fullscreen-close:hover {
+      background: #c82333;
+    }
+    
+    .tests-section {
+      margin-top: 30px;
+    }
+    
+    .tests-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+    }
+    
+    .test-item {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.dark-theme {
+      background-color: #2c2c2c;
+      color: #e0e0e0;
+    }
+    
+    body.dark-theme .test-item {
+      background-color: #3a3a3a;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    body.dark-theme .fullscreen-header {
+      border-bottom-color: #444;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="fullscreen-header">
+      <h1 data-i18n="fullscreenPopup.title">🎯 AutoTest Recorder — Full Screen</h1>
+      <div class="fullscreen-header-actions">
+        <button id="selectorInspectorButton" class="btn-icon" data-i18n-title="popup.selectorInspector">
+          🔍
+        </button>
+        <button id="settingsButton" class="btn-icon settings-btn" data-i18n-title="popup.settings">
+          ⚙️
+        </button>
+        <button id="closeFullscreen" class="fullscreen-close" data-i18n="common.close">✕ Close</button>
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="header-top">
+      </div>
+      <div class="header-row">
+        <div class="status" id="status">
+          <span class="status-indicator" id="statusIndicator"></span>
+          <span id="statusText" data-i18n="popup.ready">Ready</span>
+        </div>
+        <div class="header-row-right">
+          <a id="analyticsDashboardButton" class="btn-icon analytics-dashboard-btn hidden" href="#" target="_blank" rel="noopener" data-i18n-title="popup.analyticsDashboard">📊</a>
+          <button id="helpButton" class="btn-icon" data-i18n-title="popup.help">❓</button>
+        </div>
+      </div>
+      <div class="step-progress" id="stepProgress" style="display: none;">
+        <div class="step-info">
+          <span id="stepText">Step 0 of 0</span>
+          <span class="step-type" id="stepType"></span>
+        </div>
+        <div class="step-bar">
+          <div class="step-bar-fill" id="stepBarFill"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="control-group">
+        <button id="startRecording" class="btn btn-primary">
+          <span class="rec-btn-icon">🔴</span><span class="rec-btn-text" data-i18n="popup.startRecording">Start recording</span>
+        </button>
+        <button id="stopRecording" class="btn btn-danger" disabled>
+          <span class="rec-btn-icon">⏹️</span><span class="rec-btn-text" data-i18n="popup.stopRecording">Stop recording</span>
+        </button>
+        <button id="forceStop" class="btn btn-gray" disabled>
+          <span class="rec-btn-icon">⏹️</span><span class="rec-btn-text" data-i18n="popup.stop">Stop</span>
+        </button>
+      </div>
+
+      <div class="control-group">
+        <input 
+          type="text" 
+          id="testName" 
+          data-i18n-placeholder="popup.testNamePlaceholder"
+          placeholder="Test name..." 
+          class="input"
+        >
+      </div>
+
+      <div class="control-group">
+        <button id="advancedSelectorSearch" class="btn btn-info" style="width: 100%;" data-i18n="popup.advancedSelectorSearch">
+          🔍 Advanced selector search
+        </button>
+      </div>
+    </div>
+
+    <div class="tests-section">
+      <div class="section-header">
+        <h2 data-i18n="popup.testsSection">📋 Tests</h2>
+        <div style="display: flex; gap: 8px;">
+          <button id="importTest" class="btn-icon" data-i18n-title="popup.importTest">
+            📥
+          </button>
+          <button id="refreshTests" class="btn-icon" data-i18n-title="popup.refresh">
+            🔄
+          </button>
+        </div>
+      </div>
+      
+      <div id="testsList" class="tests-list">
+        <div class="empty-state" data-i18n="popup.noTests">No saved tests</div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+  <script src="../i18n/i18n.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="excel-export.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

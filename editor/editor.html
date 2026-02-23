@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Editor — AutoTest Recorder</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h1 style="margin: 0;">✏️ Test Editor</h1>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="variablesBtn" class="variables-btn" title="Manage variables">
+            📊 Variables
+          </button>
+          <button id="toggleTheme" class="btn btn-small" title="Toggle theme">
+            🌙 Dark theme
+          </button>
+        </div>
+      </div>
+      <div class="header-actions">
+        <input 
+          type="text" 
+          id="testName" 
+          placeholder="Test name..." 
+          class="input test-name-input"
+        >
+        <button id="saveTest" class="btn btn-primary" title="Save test (Ctrl+S)">💾 Save</button>
+        <button id="startRecordIntoTest" class="btn btn-record" title="Start recording into this test — then switch to the site tab and perform actions">🔴 Start recording</button>
+        <button id="exportTest" class="btn btn-secondary">📥 Export JSON</button>
+        <button id="importTest" class="btn btn-secondary">📤 Import JSON</button>
+        <button id="importApiTest" class="btn btn-secondary">🌐 API Import</button>
+        <div class="run-mode-buttons">
+          <button id="fullRun" class="btn btn-small btn-run-full" title="Run all steps including hidden (F10)">
+            🧪 Full run
+          </button>
+          <button id="optimizedRun" class="btn btn-small btn-run-optimized hidden" title="Appears after successful optimization" disabled>
+            ⚡ Optimized run
+          </button>
+          <button id="debugRun" class="btn btn-small btn-run-debug" title="Run in debug mode - step by step (F9)">
+            🐛 Debug mode
+          </button>
+          <button id="parallelRun" class="btn btn-small btn-run-parallel" title="Run in parallel in multiple tabs">
+            ⚡ Parallel run
+          </button>
+        </div>
+      </div>
+      <div id="testMetadata" class="test-metadata"></div>
+      <div id="optimizationStatus" class="optimization-status hidden"></div>
+    </header>
+
+    <!-- Scenario Variables Panel -->
+    <div class="variables-panel" id="variablesPanel">
+      <div class="variables-header">
+        <h3>📦 Scenario Variables</h3>
+        <div class="variables-actions">
+          <select id="variablesFilter" class="variables-filter-select" title="Filter variables">
+            <option value="all">All</option>
+            <option value="empty">Empty</option>
+            <option value="scenario">For this scenario</option>
+            <option value="global">Global</option>
+            <option value="input">Input (in steps)</option>
+            <option value="output">Output (results)</option>
+            <option value="body">In request body</option>
+          </select>
+          <button id="extractFromUrl" class="btn btn-small" title="Extract variables from page URLs saved in steps">
+            🔗 From URL
+          </button>
+          <button id="grabFromPage" class="btn btn-small" title="Select text on page to save as variable" disabled>
+            🎯 From page
+          </button>
+          <button id="getFromLocalStorage" class="btn btn-small" title="Get variables from page localStorage">
+            🌐 From localStorage
+          </button>
+          <button id="addVariable" class="btn btn-small" title="Add variable manually">
+            ➕ Add
+          </button>
+          <button id="toggleVariablesPanel" class="btn btn-small btn-icon" title="Collapse/expand">
+            ▼
+          </button>
+        </div>
+      </div>
+      <div class="variables-content" id="variablesContent">
+        <div class="variables-list" id="variablesList">
+          <!-- Variable list will be added dynamically -->
+          <div class="no-variables">No variables. Add a variable or use an API step to extract data.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions-section">
+      <div class="section-header">
+        <h2>📋 Test Actions</h2>
+        <div class="section-actions">
+          <button id="toggleGrouping" class="btn btn-small" title="Group/ungroup by pages">
+            📑 Group
+          </button>
+          <button id="toggleCollapseAll" class="btn btn-small" title="Collapse/expand all steps">
+            📦 Collapse all
+          </button>
+          <button id="toggleShowUrls" class="btn btn-small" title="Show/hide page URLs">
+            🔗 Show URL
+          </button>
+          <button id="toggleShowFieldLabels" class="btn btn-small" title="Show/hide field labels">
+            🏷️ Show field labels
+          </button>
+          <div class="dropdown">
+            <button id="addMainAction" class="btn btn-small dropdown-toggle" title="Add">
+              ➕ Add ▼
+            </button>
+            <div class="dropdown-menu" id="mainActionsMenu">
+              <a href="#" data-action="add-action">➕ Add action</a>
+              <a href="#" data-action="add-condition">🔀 Condition</a>
+              <a href="#" data-action="add-loop">🔁 Loop</a>
+            </div>
+          </div>
+          <div class="dropdown">
+          <div class="dropdown">
+            <button id="addQuickAction" class="btn btn-small btn-success dropdown-toggle" title="Quick step add">
+              ⚡ Quick steps ▼
+            </button>
+            <div class="quick-steps-compact" id="quickActionsMenu">
+              <div class="quick-search">
+                <input type="text" id="quickStepsSearch" placeholder="🔍 Search operations...">
+              </div>
+              <div class="quick-groups">
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🌐</span> API Templates <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="telegram" data-type="api" data-subtype="telegram"><span class="op-icon">📱</span> Telegram</a><a href="#" class="quick-operation" data-template="webhook" data-type="api" data-subtype="webhook"><span class="op-icon">🔗</span> Webhook</a><a href="#" class="quick-operation" data-template="rest-get" data-type="api" data-subtype="rest-get"><span class="op-icon">📥</span> REST GET</a><a href="#" class="quick-operation" data-template="rest-post" data-type="api" data-subtype="rest-post"><span class="op-icon">📤</span> REST POST</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Dropdown operations are not yet implemented in Player. Coming in a future version."><span><span class="icon">🔽</span> Dropdown <span class="ops-count">(11)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="dropdown-select" data-type="click" data-subtype="dropdown-select" data-disabled-reason="Not implemented">Select Option</a><a href="#" class="quick-operation disabled" data-template="dropdown-multiselect" data-type="click" data-subtype="dropdown-multiselect" data-disabled-reason="Not implemented">Select Multiple</a><a href="#" class="quick-operation disabled" data-template="dropdown-deselect" data-type="click" data-subtype="dropdown-deselect" data-disabled-reason="Not implemented">Deselect</a><a href="#" class="quick-operation disabled" data-template="dropdown-select-all" data-type="click" data-subtype="dropdown-select-all" data-disabled-reason="Not implemented">Select All</a><a href="#" class="quick-operation disabled" data-template="dropdown-clear-all" data-type="click" data-subtype="dropdown-clear-all" data-disabled-reason="Not implemented">Clear All</a><a href="#" class="quick-operation disabled" data-template="dropdown-toggle-all" data-type="click" data-subtype="dropdown-toggle-all" data-disabled-reason="Not implemented">Toggle All</a><a href="#" class="quick-operation disabled" data-template="dropdown-datalist" data-type="input" data-subtype="dropdown-datalist" data-disabled-reason="Not implemented">Datalist</a><a href="#" class="quick-operation disabled" data-template="dropdown-combobox" data-type="input" data-subtype="dropdown-combobox" data-disabled-reason="Not implemented">With Search</a><a href="#" class="quick-operation disabled" data-template="dropdown-copy" data-type="click" data-subtype="dropdown-copy" data-disabled-reason="Not implemented">Copy</a><a href="#" class="quick-operation disabled" data-template="dropdown-paste" data-type="click" data-subtype="dropdown-paste" data-disabled-reason="Not implemented">Paste</a><a href="#" class="quick-operation disabled" data-template="dropdown-reorder" data-type="click" data-subtype="dropdown-reorder" data-disabled-reason="Not implemented">Reorder</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Keyboard navigation operations are not yet implemented in Player. Coming in a future version."><span><span class="icon">⌨️</span> Keyboard <span class="ops-count">(3)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="keyboard-navigate" data-type="keyboard" data-subtype="keyboard-navigate" data-disabled-reason="Not implemented">Arrows</a><a href="#" class="quick-operation disabled" data-template="keyboard-typeahead" data-type="keyboard" data-subtype="keyboard-typeahead" data-disabled-reason="Not implemented">Type-ahead</a><a href="#" class="quick-operation disabled" data-template="keyboard-escape" data-type="keyboard" data-subtype="keyboard-escape" data-disabled-reason="Not implemented">Escape</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">⏱️</span> Waits <span class="ops-count">(5)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="wait-option" data-type="wait" data-subtype="wait-option">Option</a><a href="#" class="quick-operation" data-template="wait-options-count" data-type="wait" data-subtype="wait-options-count">Count</a><a href="#" class="quick-operation" data-template="wait-enabled" data-type="wait" data-subtype="wait-enabled">Enabled</a><a href="#" class="quick-operation" data-template="wait-value" data-type="wait" data-subtype="wait-value">Value</a><a href="#" class="quick-operation" data-template="wait-until" data-type="wait" data-subtype="wait-until">Condition</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">✅</span> Assertions <span class="ops-count">(5)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="assert-value" data-type="assertion" data-subtype="assert-value">Value</a><a href="#" class="quick-operation" data-template="assert-contains" data-type="assertion" data-subtype="assert-contains">Contains</a><a href="#" class="quick-operation" data-template="assert-count" data-type="assertion" data-subtype="assert-count">Count</a><a href="#" class="quick-operation" data-template="assert-disabled" data-type="assertion" data-subtype="assert-disabled">State</a><a href="#" class="quick-operation" data-template="assert-multiselect" data-type="assertion" data-subtype="assert-multiselect">Multiselect</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">📸</span> Visual <span class="ops-count">(6)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="visual-screenshot" data-type="screenshot" data-subtype="visual-screenshot">Screenshot</a><a href="#" class="quick-operation disabled" data-template="visual-compare" data-type="screenshot" data-subtype="visual-compare" data-disabled-reason="Visual comparison requires additional infrastructure">Compare <span class="disabled-mark">soon</span></a><a href="#" class="quick-operation disabled" data-template="visual-baseline" data-type="screenshot" data-subtype="visual-baseline" data-disabled-reason="Visual comparison requires additional infrastructure">Baseline <span class="disabled-mark">soon</span></a><a href="#" class="quick-operation disabled" data-template="visual-compare-baseline" data-type="screenshot" data-subtype="visual-compare-baseline" data-disabled-reason="Visual comparison requires additional infrastructure">vs Baseline <span class="disabled-mark">soon</span></a><a href="#" class="quick-operation disabled" data-template="visual-record-start" data-type="screenshot" data-subtype="visual-record-start" data-disabled-reason="Visual recording requires additional infrastructure">▶ Record <span class="disabled-mark">soon</span></a><a href="#" class="quick-operation disabled" data-template="visual-record-stop" data-type="screenshot" data-subtype="visual-record-stop" data-disabled-reason="Visual recording requires additional infrastructure">⏹ Stop <span class="disabled-mark">soon</span></a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="AI features are planned for a future release. Requires AI service integration."><span><span class="icon">🤖</span> AI <span class="ops-count">(6)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="ai-smart-selector" data-type="ai" data-subtype="ai-smart-selector" data-disabled-reason="AI feature - coming soon">Smart Selector</a><a href="#" class="quick-operation disabled" data-template="ai-analyze-stability" data-type="ai" data-subtype="ai-analyze-stability" data-disabled-reason="AI feature - coming soon">Analyze</a><a href="#" class="quick-operation disabled" data-template="ai-suggest-alternatives" data-type="ai" data-subtype="ai-suggest-alternatives" data-disabled-reason="AI feature - coming soon">Alternatives</a><a href="#" class="quick-operation disabled" data-template="ai-find-healing" data-type="ai" data-subtype="ai-find-healing" data-disabled-reason="AI feature - coming soon">With Healing</a><a href="#" class="quick-operation disabled" data-template="ai-heal-selector" data-type="ai" data-subtype="ai-heal-selector" data-disabled-reason="AI feature - coming soon">Heal Selector</a><a href="#" class="quick-operation disabled" data-template="ai-learn-failures" data-type="ai" data-subtype="ai-learn-failures" data-disabled-reason="AI feature - coming soon">Learn</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Cloud features require backend infrastructure. Coming in a future version."><span><span class="icon">☁️</span> Cloud <span class="ops-count">(4)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="cloud-upload" data-type="cloud" data-subtype="cloud-upload" data-disabled-reason="Requires backend">Upload</a><a href="#" class="quick-operation disabled" data-template="cloud-execute" data-type="cloud" data-subtype="cloud-execute" data-disabled-reason="Requires backend">Execute</a><a href="#" class="quick-operation disabled" data-template="cloud-results" data-type="cloud" data-subtype="cloud-results" data-disabled-reason="Requires backend">Results</a><a href="#" class="quick-operation disabled" data-template="cloud-schedule" data-type="cloud" data-subtype="cloud-schedule" data-disabled-reason="Requires backend">Schedule</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Suite management features are not yet implemented. Coming in a future version."><span><span class="icon">📦</span> Suite <span class="ops-count">(5)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="export-suite" data-type="suite" data-subtype="export-suite" data-disabled-reason="Not implemented">Export</a><a href="#" class="quick-operation disabled" data-template="import-suite" data-type="suite" data-subtype="import-suite" data-disabled-reason="Not implemented">Import</a><a href="#" class="quick-operation disabled" data-template="validate-suite" data-type="suite" data-subtype="validate-suite" data-disabled-reason="Not implemented">Validate</a><a href="#" class="quick-operation disabled" data-template="save-file" data-type="suite" data-subtype="save-file" data-disabled-reason="Not implemented">Save File</a><a href="#" class="quick-operation disabled" data-template="load-file" data-type="suite" data-subtype="load-file" data-disabled-reason="Not implemented">Load File</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🧭</span> Navigation <span class="ops-count">(7)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="nav-url" data-type="navigation" data-subtype="nav-url">URL</a><a href="#" class="quick-operation" data-template="nav-refresh" data-type="navigation" data-subtype="nav-refresh">Refresh</a><a href="#" class="quick-operation" data-template="nav-back" data-type="navigation" data-subtype="nav-back">Back</a><a href="#" class="quick-operation" data-template="nav-forward" data-type="navigation" data-subtype="nav-forward">Forward</a><a href="#" class="quick-operation" data-template="scroll-element" data-type="scroll" data-subtype="scroll-element">To Element</a><a href="#" class="quick-operation" data-template="scroll-top" data-type="scroll" data-subtype="scroll-top">To Top</a><a href="#" class="quick-operation" data-template="scroll-bottom" data-type="scroll" data-subtype="scroll-bottom">To Bottom</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🖱️</span> Interactions <span class="ops-count">(6)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="click" data-type="click" data-subtype="click">Click</a><a href="#" class="quick-operation" data-template="double-click" data-type="dblclick" data-subtype="double-click">2× Click</a><a href="#" class="quick-operation" data-template="right-click" data-type="click" data-subtype="right-click">Right Click</a><a href="#" class="quick-operation" data-template="hover" data-type="hover" data-subtype="hover">Hover</a><a href="#" class="quick-operation" data-template="focus" data-type="focus" data-subtype="focus">Focus</a><a href="#" class="quick-operation" data-template="blur" data-type="blur" data-subtype="blur">Blur</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">✏️</span> Input <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="input-text" data-type="input" data-subtype="input-text">Text</a><a href="#" class="quick-operation" data-template="clear-field" data-type="clear" data-subtype="clear-field">Clear</a><a href="#" class="quick-operation" data-template="press-key" data-type="keyboard" data-subtype="press-key">Key</a><a href="#" class="quick-operation" data-template="upload-file" data-type="upload" data-subtype="upload-file">File</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">📊</span> Variables <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="var-set" data-type="setVariable" data-subtype="var-set">Set</a><a href="#" class="quick-operation" data-template="var-from-element" data-type="variable" data-subtype="var-from-element">From Element</a><a href="#" class="quick-operation" data-template="var-from-url" data-type="variable" data-subtype="var-from-url">From URL</a><a href="#" class="quick-operation" data-template="var-from-localstorage" data-type="variable" data-subtype="var-from-localstorage">From localStorage</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">💻</span> Advanced <span class="ops-count">(7)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="execute-js" data-type="javascript" data-subtype="execute-js">JavaScript</a><a href="#" class="quick-operation" data-template="new-tab" data-type="navigation" data-subtype="new-tab">New Tab</a><a href="#" class="quick-operation disabled" data-template="switch-tab" data-type="navigation" data-subtype="switch-tab" data-disabled-reason="Tab switching is not yet implemented">Switch Tab <span class="disabled-mark">soon</span></a><a href="#" class="quick-operation" data-template="close-tab" data-type="navigation" data-subtype="close-tab">Close Tab</a><a href="#" class="quick-operation" data-template="page-screenshot" data-type="screenshot" data-subtype="page-screenshot">Page Screenshot</a><a href="#" class="quick-operation" data-template="set-cookie" data-type="cookie" data-subtype="set-cookie">Set Cookie</a><a href="#" class="quick-operation" data-template="get-cookies" data-type="cookie" data-subtype="get-cookies">Get Cookies</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Mobile gestures require device emulation. Coming in a future version."><span><span class="icon">📱</span> Mobile <span class="ops-count">(6)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="swipe-up" data-type="mobile" data-subtype="swipe-up" data-disabled-reason="Requires device emulation">↑ Swipe</a><a href="#" class="quick-operation disabled" data-template="swipe-down" data-type="mobile" data-subtype="swipe-down" data-disabled-reason="Requires device emulation">↓ Swipe</a><a href="#" class="quick-operation disabled" data-template="swipe-left" data-type="mobile" data-subtype="swipe-left" data-disabled-reason="Requires device emulation">← Swipe</a><a href="#" class="quick-operation disabled" data-template="swipe-right" data-type="mobile" data-subtype="swipe-right" data-disabled-reason="Requires device emulation">→ Swipe</a><a href="#" class="quick-operation disabled" data-template="pinch-in" data-type="mobile" data-subtype="pinch-in" data-disabled-reason="Requires device emulation">🤏 In</a><a href="#" class="quick-operation disabled" data-template="pinch-out" data-type="mobile" data-subtype="pinch-out" data-disabled-reason="Requires device emulation">🤏 Out</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Special operations (iframe, alerts) are not yet implemented. Coming in a future version."><span><span class="icon">🎯</span> Special <span class="ops-count">(5)</span><span class="soon-badge">Soon</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="switch-iframe" data-type="navigation" data-subtype="switch-iframe" data-disabled-reason="Not implemented">→ iframe</a><a href="#" class="quick-operation disabled" data-template="switch-parent" data-type="navigation" data-subtype="switch-parent" data-disabled-reason="Not implemented">← Parent</a><a href="#" class="quick-operation disabled" data-template="accept-alert" data-type="navigation" data-subtype="accept-alert" data-disabled-reason="Not implemented">✓ Alert</a><a href="#" class="quick-operation disabled" data-template="dismiss-alert" data-type="navigation" data-subtype="dismiss-alert" data-disabled-reason="Not implemented">✗ Alert</a><a href="#" class="quick-operation disabled" data-template="get-alert-text" data-type="navigation" data-subtype="get-alert-text" data-disabled-reason="Not implemented">Alert Text</a></div></div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="actionsList" class="actions-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for editing action -->
+  <div id="actionModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit action</h3>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Content will be added dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveAction" class="btn btn-primary">Save</button>
+        <button type="button" id="cancelAction" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for adding variable -->
+  <div id="variableModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3 id="variableModalTitle">Add variable</h3>
+        <button class="modal-close" id="closeVariableModal">&times;</button>
+      </div>
+      <div class="modal-body" id="variableModalBody">
+        <div class="form-group">
+          <label>Variable name</label>
+          <input type="text" id="newVarName" placeholder="myVariable" pattern="[a-zA-Z_][a-zA-Z0-9_]*">
+          <small>Latin letters, digits and underscore. Must start with a letter.</small>
+        </div>
+        <div class="form-group">
+          <label>Value</label>
+          <input type="text" id="newVarValue" placeholder="Variable value">
+        </div>
+        
+        <!-- Fields for page variables (shown only for source='page' variables) -->
+        <div class="form-group" id="pageVariableInfoGroup" style="display: none;">
+          <label>Element info:</label>
+          <div style="padding: 8px; background: #f0f7ff; border-radius: 4px; margin-bottom: 8px;">
+            <div><strong>Selector:</strong> <span id="pageVarSelector" style="font-family: monospace; font-size: 12px;"></span></div>
+            <div id="pageVarTextSelectionInfo" style="margin-top: 8px; display: none;">
+              <strong>Selected part:</strong> <span id="pageVarSelectedText" style="background: #fff3cd; padding: 2px 4px; border-radius: 2px;"></span><br>
+              <strong>Position:</strong> chars <span id="pageVarStartIndex"></span>-<span id="pageVarEndIndex"></span>
+              <small style="display: block; margin-top: 4px; color: #666; font-style: italic;">
+                Note: positions apply to the actual element text during test execution
+              </small>
+            </div>
+          </div>
+          <div class="form-group" id="pageVarTextSelectionGroup" style="display: none;">
+            <label>Edit selected part:</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <label style="font-size: 12px; min-width: 80px;">Start:</label>
+              <input type="number" id="pageVarStartIndexInput" min="0" style="width: 80px;" class="form-control">
+              <label style="font-size: 12px; min-width: 80px;">End:</label>
+              <input type="number" id="pageVarEndIndexInput" min="0" style="width: 80px;" class="form-control">
+              <button type="button" id="pageVarApplySelection" class="btn btn-small">Apply</button>
+            </div>
+            <small style="display: block; margin-top: 4px; color: #666;">
+              Specify character positions to extract part of text from element
+            </small>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="newVarGlobal">
+            <span>Global variable (available in other scenarios)</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="newVarSensitive">
+            <span>Sensitive data (password, token)</span>
+          </label>
+          <small>Export will require confirmation</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveVariable" class="btn btn-primary">Save</button>
+        <button type="button" id="cancelVariable" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for extracting variables from URL -->
+  <div id="urlExtractModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🔗 Extract variables from URL</h3>
+        <button class="modal-close" id="closeUrlExtractModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Select URL from test steps:</label>
+          <select id="urlExtractSource" class="form-control">
+            <option value="current">Current page URL</option>
+            <!-- Options will be added dynamically from test steps -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Extraction type:</label>
+          <select id="urlExtractType" class="form-control">
+            <option value="query">Query parameters (?key=value)</option>
+            <option value="path">Path segments (/path/to/resource)</option>
+            <option value="regex">Regular expression</option>
+          </select>
+        </div>
+        <div class="form-group" id="urlExtractPatternGroup">
+          <label>Pattern:</label>
+          <input type="text" id="urlExtractPattern" class="form-control" placeholder="id or regular expression">
+          <small>For query: parameter name. For path: segment number. For regex: regular expression with capture group.</small>
+        </div>
+        <div id="urlExtractPreview" class="form-group" style="display: none;">
+          <label>Preview:</label>
+          <div id="urlExtractPreviewContent" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveUrlExtract" class="btn btn-primary">Extract</button>
+        <button type="button" id="cancelUrlExtract" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for quick Telegram addition -->
+  <div id="telegramModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📱 Send message to Telegram</h3>
+        <button class="modal-close" id="closeTelegramModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Bot token</label>
+          <input type="text" id="telegramBotToken" class="input" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Your Telegram bot token (can be obtained from @BotFather)
+          </small>
+        </div>
+        <div class="form-group">
+          <label>User ID (chat_id)</label>
+          <input type="text" id="telegramUserId" class="input" placeholder="123456789">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            User or chat ID (can be found via @userinfobot)
+          </small>
+        </div>
+        <div class="form-group">
+          <label>Message text</label>
+          <textarea id="telegramMessage" class="input" rows="4" placeholder="Enter message text..."></textarea>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            You can use variables: {var:name}, {date}, {time}, {datetime}, {counter:name}
+          </small>
+        </div>
+        <div class="form-group" style="padding: 12px; background: #f0f7ff; border-radius: 6px; border-left: 3px solid #2196F3;">
+          <small style="color: #1976D2;">
+            💡 <strong>Variables will be saved automatically:</strong><br>
+            • <code>telegramBotToken</code> (bot token, sensitive data)<br>
+            • <code>telegramChatId</code> (chat/user ID)
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveTelegramAction" class="btn btn-primary">💾 Add</button>
+        <button type="button" id="cancelTelegramAction" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for extracting variable from page -->
+  <div id="pageGrabberModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🎯 Extract variable from page</h3>
+        <button class="modal-close" id="closePageGrabberModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>1. Select browser tab:</label>
+          <select id="pageGrabberTabSelect" class="form-control">
+            <option value="">Loading tabs...</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Select the tab containing the needed element
+          </small>
+        </div>
+        
+        <div class="form-group" id="pageGrabberUrlGroup" style="display: none;">
+          <label>Tab URL:</label>
+          <div id="pageGrabberUrl" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all;"></div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberSelectorGroup" style="display: none;">
+          <label>2. Select element on page:</label>
+          <button type="button" id="pageGrabberSelectBtn" class="btn btn-secondary" style="width: 100%;">
+            🎯 Click to select element on page
+          </button>
+          <div id="pageGrabberSelectorInfo" style="margin-top: 8px; padding: 8px; background: #f0f7ff; border-radius: 4px; display: none;">
+            <strong>Selected element:</strong>
+            <div id="pageGrabberSelectorValue" style="font-family: monospace; font-size: 12px; margin-top: 4px;"></div>
+            <div id="pageGrabberElementPreview" style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; border: 1px solid #ddd;"></div>
+          </div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberVariableGroup" style="display: none;">
+          <label>3. Variable settings:</label>
+          <input type="text" id="pageGrabberVarName" class="form-control" placeholder="Variable name (e.g.: orderId)">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Variable name to save the value
+          </small>
+        </div>
+        
+        <div class="form-group" id="pageGrabberExtractGroup" style="display: none;">
+          <label>4. Value extraction (optional):</label>
+          <select id="pageGrabberExtractType" class="form-control">
+            <option value="full">Full value</option>
+            <option value="number">Extract number (digits only)</option>
+            <option value="regex">Regular expression</option>
+          </select>
+          <div id="pageGrabberRegexGroup" style="display: none; margin-top: 8px;">
+            <input type="text" id="pageGrabberRegex" class="form-control" placeholder="Regular expression (e.g.: \\d+ for number)">
+            <small style="display: block; margin-top: 4px; color: #666;">
+              Use capture group to extract part of value (e.g.: <code>ID: (\\d+)</code>)
+            </small>
+          </div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberPreviewGroup" style="display: none;">
+          <label>Value preview:</label>
+          <div id="pageGrabberPreview" style="padding: 12px; background: #e8f5e9; border-radius: 4px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2e7d32;"></div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberUrlMatchGroup" style="display: none; padding: 12px; background: #fff3cd; border-radius: 4px; border-left: 3px solid #ffc107;">
+          <label>
+            <input type="checkbox" id="pageGrabberUrlMatch" style="margin-right: 8px;">
+            Match by URL and extract automatically
+          </label>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            If page URL matches URL in test steps, value will be extracted automatically during execution
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="savePageGrabber" class="btn btn-primary" disabled>💾 Save variable</button>
+        <button type="button" id="cancelPageGrabber" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for getting variables from page localStorage -->
+  <div id="localStorageVariablesModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🌐 Variables from page localStorage</h3>
+        <button class="modal-close" id="closeLocalStorageVariablesModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>1. Select browser tab:</label>
+          <select id="localStorageTabSelect" class="form-control">
+            <option value="">Loading tabs...</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Select the tab to get localStorage variables from
+          </small>
+        </div>
+        
+        <div class="form-group" id="localStorageUrlGroup" style="display: none;">
+          <label>Tab URL:</label>
+          <div id="localStorageUrl" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all;"></div>
+        </div>
+        
+        <div class="form-group" id="localStorageVariablesGroup" style="display: none;">
+          <label>2. Select variable from localStorage:</label>
+          <div id="localStorageVariablesList" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+            <div style="text-align: center; padding: 20px; color: #666;">
+              Click "Load variables" to get the list
+            </div>
+          </div>
+          <button type="button" id="loadLocalStorageBtn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;">
+            📥 Load variables from localStorage
+          </button>
+        </div>
+        
+        <div class="form-group" id="localStorageVariableInfo" style="display: none;">
+          <label>Selected variable info:</label>
+          <div id="localStorageVariableDetails" style="padding: 12px; background: #f0f7ff; border-radius: 4px; border-left: 3px solid #2196F3;">
+            <div><strong>Key:</strong> <span id="localStorageVarKey" style="font-family: monospace;"></span></div>
+            <div style="margin-top: 8px;"><strong>Value:</strong> <span id="localStorageVarValue" style="font-family: monospace; word-break: break-all;"></span></div>
+            <div style="margin-top: 8px;"><strong>Type:</strong> <span id="localStorageVarType"></span></div>
+          </div>
+        </div>
+        
+        <div class="form-group" id="localStorageVariableNameGroup" style="display: none;">
+          <label>3. Variable name in test:</label>
+          <input type="text" id="localStorageVariableName" class="form-control" placeholder="Variable name (e.g.: orderId)">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Name under which the variable will be saved in the test
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveLocalStorageVariable" class="btn btn-primary" disabled>💾 Save variable</button>
+        <button type="button" id="cancelLocalStorageVariable" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Variables modal -->
+  <div id="variablesModal" class="variables-modal">
+    <div class="variables-modal-content">
+      <div class="variables-modal-header">
+        <h3>📊 Manage variables</h3>
+        <button class="variables-modal-close" id="closeVariablesModal">&times;</button>
+      </div>
+      <div class="variables-modal-body">
+        <div class="variables-tabs">
+          <button class="variables-tab active" data-tab="scenario">📄 Scenario</button>
+          <button class="variables-tab" data-tab="loop">🔁 Loops</button>
+          <button class="variables-tab" data-tab="condition">🔀 Conditions</button>
+          <button class="variables-tab" data-tab="global">🌐 Global</button>
+        </div>
+        
+        <div class="variables-tab-content active" data-tab-content="scenario">
+          <h4>Variables from all scenarios</h4>
+          <p style="color: #666; margin-bottom: 16px;">Variables from all scenarios. Current scenario variables have priority during execution.</p>
+          <div class="variables-list" id="scenarioVariables"></div>
+          <button class="add-variable-btn" data-add-variable="scenario">➕ Add variable to current scenario</button>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="loop">
+          <h4>Loop variables</h4>
+          <p style="color: #666; margin-bottom: 16px;">
+            💡 Loop variables are created automatically when adding a loop.<br>
+            At the start of the loop, the variable is initialized to 0 and incremented by 1 after each iteration.<br>
+            After the loop completes, the variable equals the number of iterations performed.
+          </p>
+          <div class="variables-list" id="loopVariables"></div>
+          <small style="color: #999; font-style: italic;">Loop variables are managed automatically, no need to declare them manually.</small>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="condition">
+          <h4>Condition variables</h4>
+          <p style="color: #666; margin-bottom: 16px;">Variables for use in conditions</p>
+          <div class="variables-list" id="conditionVariables"></div>
+          <button class="add-variable-btn" data-add-variable="condition">➕ Add condition variable</button>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="global">
+          <h4>Global variables</h4>
+          <p style="color: #666; margin-bottom: 16px;">Variables available in all scenarios</p>
+          <div class="variables-list" id="globalVariables"></div>
+          <button class="add-variable-btn" data-add-variable="global">➕ Add global variable</button>
+        </div>
+        
+        <div class="variable-recommendations" id="variableRecommendations" style="display: none;">
+          <h4>💡 Recommendations</h4>
+          <div id="recommendationsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for undefined variables dialog -->
+  <div id="missingVariablesDialog" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>⚠️ Undefined variables</h3>
+        <button class="modal-close" id="closeMissingVarsDialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 16px;">
+          <p>Undefined variables found that are used in the test:</p>
+          <ul id="missingVarsList" style="margin: 12px 0; padding-left: 24px;">
+            <!-- Variable list will be added dynamically -->
+          </ul>
+          <p>Continue running the test?</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="setMissingVarsBtn" class="btn btn-primary">📝 Set variables</button>
+        <button type="button" id="continueWithoutVarsBtn" class="btn btn-secondary">▶️ Continue</button>
+        <button type="button" id="cancelMissingVarsBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for editing undefined variables -->
+  <div id="setMissingVariablesModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>📝 Set variable values</h3>
+        <button class="modal-close" id="closeSetMissingVarsModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="missingVarsForm" style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Variable fields will be added dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveMissingVarsBtn" class="btn btn-primary">💾 Save</button>
+        <button type="button" id="cancelSetMissingVarsBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for API test import -->
+  <div id="importApiModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🌐 API Import from OpenAPI/Swagger</h3>
+        <button class="modal-close" id="closeImportApiModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Select specification file (YAML/JSON)</label>
+          <input type="file" id="apiSpecFile" accept=".yaml,.yml,.json" style="margin-bottom: 12px;">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            OpenAPI 3.0.x and Swagger 2.0 formats are supported
+          </small>
+        </div>
+        
+        <div id="apiImportInfo" style="display: none; margin: 16px 0; padding: 12px; background: #f5f5f5; border-radius: 4px;">
+          <h4>Specification info:</h4>
+          <div id="apiSpecInfo" style="word-wrap: break-word; overflow-wrap: break-word; white-space: normal;"></div>
+        </div>
+
+        <div id="apiEndpointsList" style="display: none; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 style="margin: 0;">Available endpoints:</h4>
+            <button type="button" id="selectAllEndpoints" class="btn btn-small">✅ Select all</button>
+          </div>
+          <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+            <div id="apiEndpointsContainer"></div>
+          </div>
+        </div>
+
+        <div id="apiImportOptions" style="display: none; margin-top: 16px;">
+          <h4>Import parameters:</h4>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiGenerateTestData" checked>
+              Generate test data automatically
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiValidateResponse" checked>
+              Enable response validation by schema
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiSaveResponse" checked>
+              Save responses to variables
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Base URL (if not specified in spec):</label>
+            <input type="text" id="apiBaseUrl" placeholder="https://api.example.com" style="width: 100%;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="importApiBtn" class="btn btn-primary" disabled>📥 Import selected</button>
+        <button type="button" id="cancelImportApiBtn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../i18n/i18n.js"></script>
+  <script src="../shared/action-types.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="openapi-parser.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

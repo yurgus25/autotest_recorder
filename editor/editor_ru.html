@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактор теста - AutoTest Recorder</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h1 style="margin: 0;">✏️ Редактор теста</h1>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="variablesBtn" class="variables-btn" title="Управление переменными">
+            📊 Переменные
+          </button>
+          <button id="toggleTheme" class="btn btn-small" title="Переключить тему">
+            🌙 Темная тема
+          </button>
+        </div>
+      </div>
+      <div class="header-actions">
+        <input 
+          type="text" 
+          id="testName" 
+          placeholder="Название теста..." 
+          class="input test-name-input"
+        >
+        <button id="saveTest" class="btn btn-primary" title="Сохранить тест (Ctrl+S)">💾 Сохранить</button>
+        <button id="startRecordIntoTest" class="btn btn-record" title="Начать запись в этот тест — затем перейдите на вкладку с сайтом и выполняйте действия">🔴 Начать запись</button>
+        <button id="exportTest" class="btn btn-secondary">📥 Экспорт JSON</button>
+        <button id="importTest" class="btn btn-secondary">📤 Импорт JSON</button>
+        <button id="importApiTest" class="btn btn-secondary">🌐 Импорт API</button>
+        <div class="run-mode-buttons">
+          <button id="fullRun" class="btn btn-small btn-run-full" title="Запустить все шаги, включая скрытые (F10)">
+            🧪 Полный прогон
+          </button>
+          <button id="optimizedRun" class="btn btn-small btn-run-optimized hidden" title="Появится после успешной оптимизации" disabled>
+            ⚡ Оптимизированный прогон
+          </button>
+          <button id="debugRun" class="btn btn-small btn-run-debug" title="Запустить в режиме отладки - пошагово (F9)">
+            🐛 Режим отладки
+          </button>
+          <button id="parallelRun" class="btn btn-small btn-run-parallel" title="Запустить параллельно в нескольких вкладках">
+            ⚡ Параллельный прогон
+          </button>
+        </div>
+      </div>
+      <div id="testMetadata" class="test-metadata"></div>
+      <div id="optimizationStatus" class="optimization-status hidden"></div>
+    </header>
+
+    <!-- Панель переменных сценария -->
+    <div class="variables-panel" id="variablesPanel">
+      <div class="variables-header">
+        <h3>📦 Переменные сценария</h3>
+        <div class="variables-actions">
+          <select id="variablesFilter" class="variables-filter-select" title="Фильтр переменных">
+            <option value="all">Все</option>
+            <option value="empty">Пустые</option>
+            <option value="scenario">Для данного сценария</option>
+            <option value="global">Глобальные</option>
+            <option value="input">Входные (в шагах)</option>
+            <option value="output">Выходные (результаты)</option>
+            <option value="body">В теле запроса</option>
+          </select>
+          <button id="extractFromUrl" class="btn btn-small" title="Извлечь переменные из URL страниц, сохранённых в шагах">
+            🔗 Из URL
+          </button>
+          <button id="grabFromPage" class="btn btn-small" title="Выбрать текст на странице для сохранения в переменную" disabled>
+            🎯 Со страницы
+          </button>
+          <button id="getFromLocalStorage" class="btn btn-small" title="Получить переменные из localStorage страницы">
+            🌐 Из localStorage страницы
+          </button>
+          <button id="addVariable" class="btn btn-small" title="Добавить переменную вручную">
+            ➕ Добавить
+          </button>
+          <button id="toggleVariablesPanel" class="btn btn-small btn-icon" title="Свернуть/развернуть">
+            ▼
+          </button>
+        </div>
+      </div>
+      <div class="variables-content" id="variablesContent">
+        <div class="variables-list" id="variablesList">
+          <!-- Список переменных будет добавлен динамически -->
+          <div class="no-variables">Нет переменных. Добавьте переменную или используйте API-шаг для извлечения данных.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions-section">
+      <div class="section-header">
+        <h2>📋 Действия теста</h2>
+        <div class="section-actions">
+          <button id="toggleGrouping" class="btn btn-small" title="Группировать/отменить группировку по страницам">
+            📑 Группировать
+          </button>
+          <button id="toggleCollapseAll" class="btn btn-small" title="Свернуть/развернуть все шаги">
+            📦 Свернуть все
+          </button>
+          <button id="toggleShowUrls" class="btn btn-small" title="Показать/скрыть URL страниц">
+            🔗 Показать URL
+          </button>
+          <button id="toggleShowFieldLabels" class="btn btn-small" title="Показать/скрыть наименования полей">
+            🏷️ Показать наименование поля
+          </button>
+          <div class="dropdown">
+            <button id="addMainAction" class="btn btn-small dropdown-toggle" title="Добавить">
+              ➕ Добавить ▼
+            </button>
+            <div class="dropdown-menu" id="mainActionsMenu">
+              <a href="#" data-action="add-action">➕ Добавить действие</a>
+              <a href="#" data-action="add-condition">🔀 Условие</a>
+              <a href="#" data-action="add-loop">🔁 Цикл</a>
+            </div>
+          </div>
+          <div class="dropdown">
+          <div class="dropdown">
+            <button id="addQuickAction" class="btn btn-small btn-success dropdown-toggle" title="Быстрое добавление шага">
+              ⚡ Быстрые шаги ▼
+            </button>
+            <div class="quick-steps-compact" id="quickActionsMenu">
+              <div class="quick-search">
+                <input type="text" id="quickStepsSearch" placeholder="🔍 Поиск операций...">
+              </div>
+              <div class="quick-groups">
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🌐</span> API Шаблоны <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="telegram" data-type="api" data-subtype="telegram"><span class="op-icon">📱</span> Telegram</a><a href="#" class="quick-operation" data-template="webhook" data-type="api" data-subtype="webhook"><span class="op-icon">🔗</span> Webhook</a><a href="#" class="quick-operation" data-template="rest-get" data-type="api" data-subtype="rest-get"><span class="op-icon">📥</span> REST GET</a><a href="#" class="quick-operation" data-template="rest-post" data-type="api" data-subtype="rest-post"><span class="op-icon">📤</span> REST POST</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Операции с dropdown не реализованы в Player. Будут добавлены в следующей версии."><span><span class="icon">🔽</span> Dropdown <span class="ops-count">(11)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="dropdown-select" data-type="click" data-subtype="dropdown-select" data-disabled-reason="Не реализовано">Выбрать опцию</a><a href="#" class="quick-operation disabled" data-template="dropdown-multiselect" data-type="click" data-subtype="dropdown-multiselect" data-disabled-reason="Не реализовано">Выбрать несколько</a><a href="#" class="quick-operation disabled" data-template="dropdown-deselect" data-type="click" data-subtype="dropdown-deselect" data-disabled-reason="Не реализовано">Отменить</a><a href="#" class="quick-operation disabled" data-template="dropdown-select-all" data-type="click" data-subtype="dropdown-select-all" data-disabled-reason="Не реализовано">Выбрать все</a><a href="#" class="quick-operation disabled" data-template="dropdown-clear-all" data-type="click" data-subtype="dropdown-clear-all" data-disabled-reason="Не реализовано">Очистить</a><a href="#" class="quick-operation disabled" data-template="dropdown-toggle-all" data-type="click" data-subtype="dropdown-toggle-all" data-disabled-reason="Не реализовано">Инвертировать</a><a href="#" class="quick-operation disabled" data-template="dropdown-datalist" data-type="input" data-subtype="dropdown-datalist" data-disabled-reason="Не реализовано">Datalist</a><a href="#" class="quick-operation disabled" data-template="dropdown-combobox" data-type="input" data-subtype="dropdown-combobox" data-disabled-reason="Не реализовано">С поиском</a><a href="#" class="quick-operation disabled" data-template="dropdown-copy" data-type="click" data-subtype="dropdown-copy" data-disabled-reason="Не реализовано">Копировать</a><a href="#" class="quick-operation disabled" data-template="dropdown-paste" data-type="click" data-subtype="dropdown-paste" data-disabled-reason="Не реализовано">Вставить</a><a href="#" class="quick-operation disabled" data-template="dropdown-reorder" data-type="click" data-subtype="dropdown-reorder" data-disabled-reason="Не реализовано">Изменить порядок</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Операции клавиатурной навигации не реализованы в Player. Будут добавлены в следующей версии."><span><span class="icon">⌨️</span> Клавиатура <span class="ops-count">(3)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="keyboard-navigate" data-type="keyboard" data-subtype="keyboard-navigate" data-disabled-reason="Не реализовано">Стрелки</a><a href="#" class="quick-operation disabled" data-template="keyboard-typeahead" data-type="keyboard" data-subtype="keyboard-typeahead" data-disabled-reason="Не реализовано">Type-ahead</a><a href="#" class="quick-operation disabled" data-template="keyboard-escape" data-type="keyboard" data-subtype="keyboard-escape" data-disabled-reason="Не реализовано">Escape</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">⏱️</span> Ожидания <span class="ops-count">(5)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="wait-option" data-type="wait" data-subtype="wait-option">Опцию</a><a href="#" class="quick-operation" data-template="wait-options-count" data-type="wait" data-subtype="wait-options-count">Количество</a><a href="#" class="quick-operation" data-template="wait-enabled" data-type="wait" data-subtype="wait-enabled">Enabled</a><a href="#" class="quick-operation" data-template="wait-value" data-type="wait" data-subtype="wait-value">Значение</a><a href="#" class="quick-operation" data-template="wait-until" data-type="wait" data-subtype="wait-until">Условие</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">✅</span> Проверки <span class="ops-count">(5)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="assert-value" data-type="assertion" data-subtype="assert-value">Значение</a><a href="#" class="quick-operation" data-template="assert-contains" data-type="assertion" data-subtype="assert-contains">Наличие</a><a href="#" class="quick-operation" data-template="assert-count" data-type="assertion" data-subtype="assert-count">Количество</a><a href="#" class="quick-operation" data-template="assert-disabled" data-type="assertion" data-subtype="assert-disabled">Состояние</a><a href="#" class="quick-operation" data-template="assert-multiselect" data-type="assertion" data-subtype="assert-multiselect">Multiselect</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">📸</span> Визуальное <span class="ops-count">(6)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="visual-screenshot" data-type="screenshot" data-subtype="visual-screenshot">Скриншот</a><a href="#" class="quick-operation disabled" data-template="visual-compare" data-type="screenshot" data-subtype="visual-compare" data-disabled-reason="Требует дополнительной инфраструктуры">Сравнить <span class="disabled-mark">скоро</span></a><a href="#" class="quick-operation disabled" data-template="visual-baseline" data-type="screenshot" data-subtype="visual-baseline" data-disabled-reason="Требует дополнительной инфраструктуры">Baseline <span class="disabled-mark">скоро</span></a><a href="#" class="quick-operation disabled" data-template="visual-compare-baseline" data-type="screenshot" data-subtype="visual-compare-baseline" data-disabled-reason="Требует дополнительной инфраструктуры">С baseline <span class="disabled-mark">скоро</span></a><a href="#" class="quick-operation disabled" data-template="visual-record-start" data-type="screenshot" data-subtype="visual-record-start" data-disabled-reason="Требует дополнительной инфраструктуры">▶ Запись <span class="disabled-mark">скоро</span></a><a href="#" class="quick-operation disabled" data-template="visual-record-stop" data-type="screenshot" data-subtype="visual-record-stop" data-disabled-reason="Требует дополнительной инфраструктуры">⏹ Стоп <span class="disabled-mark">скоро</span></a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="AI функции планируются в будущей версии. Требуется интеграция с AI сервисом."><span><span class="icon">🤖</span> AI <span class="ops-count">(6)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="ai-smart-selector" data-type="ai" data-subtype="ai-smart-selector" data-disabled-reason="AI функция - скоро">Умный селектор</a><a href="#" class="quick-operation disabled" data-template="ai-analyze-stability" data-type="ai" data-subtype="ai-analyze-stability" data-disabled-reason="AI функция - скоро">Анализ</a><a href="#" class="quick-operation disabled" data-template="ai-suggest-alternatives" data-type="ai" data-subtype="ai-suggest-alternatives" data-disabled-reason="AI функция - скоро">Альтернативы</a><a href="#" class="quick-operation disabled" data-template="ai-find-healing" data-type="ai" data-subtype="ai-find-healing" data-disabled-reason="AI функция - скоро">С healing</a><a href="#" class="quick-operation disabled" data-template="ai-heal-selector" data-type="ai" data-subtype="ai-heal-selector" data-disabled-reason="AI функция - скоро">Восстановить</a><a href="#" class="quick-operation disabled" data-template="ai-learn-failures" data-type="ai" data-subtype="ai-learn-failures" data-disabled-reason="AI функция - скоро">Учиться</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Облачные функции требуют backend инфраструктуры. Будут добавлены в следующей версии."><span><span class="icon">☁️</span> Облако <span class="ops-count">(4)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="cloud-upload" data-type="cloud" data-subtype="cloud-upload" data-disabled-reason="Требует backend">Загрузить</a><a href="#" class="quick-operation disabled" data-template="cloud-execute" data-type="cloud" data-subtype="cloud-execute" data-disabled-reason="Требует backend">Выполнить</a><a href="#" class="quick-operation disabled" data-template="cloud-results" data-type="cloud" data-subtype="cloud-results" data-disabled-reason="Требует backend">Результаты</a><a href="#" class="quick-operation disabled" data-template="cloud-schedule" data-type="cloud" data-subtype="cloud-schedule" data-disabled-reason="Требует backend">Запланировать</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Управление тест-сьютами не реализовано. Будет добавлено в следующей версии."><span><span class="icon">📦</span> Тесты <span class="ops-count">(5)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="export-suite" data-type="suite" data-subtype="export-suite" data-disabled-reason="Не реализовано">Экспорт</a><a href="#" class="quick-operation disabled" data-template="import-suite" data-type="suite" data-subtype="import-suite" data-disabled-reason="Не реализовано">Импорт</a><a href="#" class="quick-operation disabled" data-template="validate-suite" data-type="suite" data-subtype="validate-suite" data-disabled-reason="Не реализовано">Валидация</a><a href="#" class="quick-operation disabled" data-template="save-file" data-type="suite" data-subtype="save-file" data-disabled-reason="Не реализовано">В файл</a><a href="#" class="quick-operation disabled" data-template="load-file" data-type="suite" data-subtype="load-file" data-disabled-reason="Не реализовано">Из файла</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🧭</span> Навигация <span class="ops-count">(7)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="nav-url" data-type="navigation" data-subtype="nav-url">URL</a><a href="#" class="quick-operation" data-template="nav-refresh" data-type="navigation" data-subtype="nav-refresh">Обновить</a><a href="#" class="quick-operation" data-template="nav-back" data-type="navigation" data-subtype="nav-back">Назад</a><a href="#" class="quick-operation" data-template="nav-forward" data-type="navigation" data-subtype="nav-forward">Вперед</a><a href="#" class="quick-operation" data-template="scroll-element" data-type="scroll" data-subtype="scroll-element">К элементу</a><a href="#" class="quick-operation" data-template="scroll-top" data-type="scroll" data-subtype="scroll-top">Вверх</a><a href="#" class="quick-operation" data-template="scroll-bottom" data-type="scroll" data-subtype="scroll-bottom">Вниз</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">🖱️</span> Взаимодействие <span class="ops-count">(6)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="click" data-type="click" data-subtype="click">Клик</a><a href="#" class="quick-operation" data-template="double-click" data-type="dblclick" data-subtype="double-click">2× Клик</a><a href="#" class="quick-operation" data-template="right-click" data-type="click" data-subtype="right-click">Правый клик</a><a href="#" class="quick-operation" data-template="hover" data-type="hover" data-subtype="hover">Навести</a><a href="#" class="quick-operation" data-template="focus" data-type="focus" data-subtype="focus">Фокус</a><a href="#" class="quick-operation" data-template="blur" data-type="blur" data-subtype="blur">Снять фокус</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">✏️</span> Ввод <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="input-text" data-type="input" data-subtype="input-text">Текст</a><a href="#" class="quick-operation" data-template="clear-field" data-type="clear" data-subtype="clear-field">Очистить</a><a href="#" class="quick-operation" data-template="press-key" data-type="keyboard" data-subtype="press-key">Клавиша</a><a href="#" class="quick-operation" data-template="upload-file" data-type="upload" data-subtype="upload-file">Файл</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">📊</span> Переменные <span class="ops-count">(4)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="var-set" data-type="setVariable" data-subtype="var-set">Установить</a><a href="#" class="quick-operation" data-template="var-from-element" data-type="variable" data-subtype="var-from-element">Из элемента</a><a href="#" class="quick-operation" data-template="var-from-url" data-type="variable" data-subtype="var-from-url">Из URL</a><a href="#" class="quick-operation" data-template="var-from-localstorage" data-type="variable" data-subtype="var-from-localstorage">Из localStorage</a></div></div>
+                <div class="quick-group"><div class="quick-group-header"><span><span class="icon">💻</span> Расширенные <span class="ops-count">(7)</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation" data-template="execute-js" data-type="javascript" data-subtype="execute-js">JavaScript</a><a href="#" class="quick-operation" data-template="new-tab" data-type="navigation" data-subtype="new-tab">Новая вкладка</a><a href="#" class="quick-operation disabled" data-template="switch-tab" data-type="navigation" data-subtype="switch-tab" data-disabled-reason="Переключение вкладок не реализовано">Переключить <span class="disabled-mark">скоро</span></a><a href="#" class="quick-operation" data-template="close-tab" data-type="navigation" data-subtype="close-tab">Закрыть</a><a href="#" class="quick-operation" data-template="page-screenshot" data-type="screenshot" data-subtype="page-screenshot">Скриншот страницы</a><a href="#" class="quick-operation" data-template="set-cookie" data-type="cookie" data-subtype="set-cookie">Set cookie</a><a href="#" class="quick-operation" data-template="get-cookies" data-type="cookie" data-subtype="get-cookies">Get cookies</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Мобильные жесты требуют эмуляции устройства. Будут добавлены в следующей версии."><span><span class="icon">📱</span> Мобильные <span class="ops-count">(6)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="swipe-up" data-type="mobile" data-subtype="swipe-up" data-disabled-reason="Требует эмуляцию устройства">↑ Свайп</a><a href="#" class="quick-operation disabled" data-template="swipe-down" data-type="mobile" data-subtype="swipe-down" data-disabled-reason="Требует эмуляцию устройства">↓ Свайп</a><a href="#" class="quick-operation disabled" data-template="swipe-left" data-type="mobile" data-subtype="swipe-left" data-disabled-reason="Требует эмуляцию устройства">← Свайп</a><a href="#" class="quick-operation disabled" data-template="swipe-right" data-type="mobile" data-subtype="swipe-right" data-disabled-reason="Требует эмуляцию устройства">→ Свайп</a><a href="#" class="quick-operation disabled" data-template="pinch-in" data-type="mobile" data-subtype="pinch-in" data-disabled-reason="Требует эмуляцию устройства">🤏 In</a><a href="#" class="quick-operation disabled" data-template="pinch-out" data-type="mobile" data-subtype="pinch-out" data-disabled-reason="Требует эмуляцию устройства">🤏 Out</a></div></div>
+                <div class="quick-group disabled"><div class="quick-group-header" data-disabled-reason="Специальные операции (iframe, alerts) не реализованы. Будут добавлены в следующей версии."><span><span class="icon">🎯</span> Специальные <span class="ops-count">(5)</span><span class="soon-badge">Скоро</span></span><span class="arrow">▶</span></div><div class="quick-operations"><a href="#" class="quick-operation disabled" data-template="switch-iframe" data-type="navigation" data-subtype="switch-iframe" data-disabled-reason="Не реализовано">→ iframe</a><a href="#" class="quick-operation disabled" data-template="switch-parent" data-type="navigation" data-subtype="switch-parent" data-disabled-reason="Не реализовано">← Parent</a><a href="#" class="quick-operation disabled" data-template="accept-alert" data-type="navigation" data-subtype="accept-alert" data-disabled-reason="Не реализовано">✓ Alert</a><a href="#" class="quick-operation disabled" data-template="dismiss-alert" data-type="navigation" data-subtype="dismiss-alert" data-disabled-reason="Не реализовано">✗ Alert</a><a href="#" class="quick-operation disabled" data-template="get-alert-text" data-type="navigation" data-subtype="get-alert-text" data-disabled-reason="Не реализовано">Текст alert</a></div></div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="actionsList" class="actions-list">
+        <div class="loading">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для редактирования действия -->
+  <div id="actionModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Редактирование действия</h3>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Контент будет добавлен динамически -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveAction" class="btn btn-primary">Сохранить</button>
+        <button type="button" id="cancelAction" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для добавления переменной -->
+  <div id="variableModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3 id="variableModalTitle">Добавить переменную</h3>
+        <button class="modal-close" id="closeVariableModal">&times;</button>
+      </div>
+      <div class="modal-body" id="variableModalBody">
+        <div class="form-group">
+          <label>Имя переменной</label>
+          <input type="text" id="newVarName" placeholder="myVariable" pattern="[a-zA-Z_][a-zA-Z0-9_]*">
+          <small>Латинские буквы, цифры и подчёркивание. Начинается с буквы.</small>
+        </div>
+        <div class="form-group">
+          <label>Значение</label>
+          <input type="text" id="newVarValue" placeholder="Значение переменной">
+        </div>
+        
+        <!-- Поля для переменных со страницы (отображаются только для переменных source='page') -->
+        <div class="form-group" id="pageVariableInfoGroup" style="display: none;">
+          <label>Информация об элементе:</label>
+          <div style="padding: 8px; background: #f0f7ff; border-radius: 4px; margin-bottom: 8px;">
+            <div><strong>Селектор:</strong> <span id="pageVarSelector" style="font-family: monospace; font-size: 12px;"></span></div>
+            <div id="pageVarTextSelectionInfo" style="margin-top: 8px; display: none;">
+              <strong>Выделенная часть:</strong> <span id="pageVarSelectedText" style="background: #fff3cd; padding: 2px 4px; border-radius: 2px;"></span><br>
+              <strong>Позиция:</strong> символы <span id="pageVarStartIndex"></span>-<span id="pageVarEndIndex"></span>
+              <small style="display: block; margin-top: 4px; color: #666; font-style: italic;">
+                Примечание: позиции применяются к актуальному тексту элемента во время выполнения теста
+              </small>
+            </div>
+          </div>
+          <div class="form-group" id="pageVarTextSelectionGroup" style="display: none;">
+            <label>Редактировать выделенную часть:</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <label style="font-size: 12px; min-width: 80px;">Начало:</label>
+              <input type="number" id="pageVarStartIndexInput" min="0" style="width: 80px;" class="form-control">
+              <label style="font-size: 12px; min-width: 80px;">Конец:</label>
+              <input type="number" id="pageVarEndIndexInput" min="0" style="width: 80px;" class="form-control">
+              <button type="button" id="pageVarApplySelection" class="btn btn-small">Применить</button>
+            </div>
+            <small style="display: block; margin-top: 4px; color: #666;">
+              Укажите позиции символов для извлечения части текста из элемента
+            </small>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="newVarGlobal">
+            <span>Глобальная переменная (доступна в других сценариях)</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="newVarSensitive">
+            <span>Чувствительные данные (пароль, токен)</span>
+          </label>
+          <small>При экспорте будет запрошено подтверждение</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveVariable" class="btn btn-primary">Сохранить</button>
+        <button type="button" id="cancelVariable" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для извлечения переменных из URL -->
+  <div id="urlExtractModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🔗 Извлечь переменные из URL</h3>
+        <button class="modal-close" id="closeUrlExtractModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Выберите URL из шагов теста:</label>
+          <select id="urlExtractSource" class="form-control">
+            <option value="current">Текущий URL страницы</option>
+            <!-- Опции будут добавлены динамически из шагов теста -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Тип извлечения:</label>
+          <select id="urlExtractType" class="form-control">
+            <option value="query">Query параметры (?key=value)</option>
+            <option value="path">Сегменты пути (/path/to/resource)</option>
+            <option value="regex">Регулярное выражение</option>
+          </select>
+        </div>
+        <div class="form-group" id="urlExtractPatternGroup">
+          <label>Паттерн:</label>
+          <input type="text" id="urlExtractPattern" class="form-control" placeholder="id или регулярное выражение">
+          <small>Для query: имя параметра. Для path: номер сегмента. Для regex: регулярное выражение с группой захвата.</small>
+        </div>
+        <div id="urlExtractPreview" class="form-group" style="display: none;">
+          <label>Предпросмотр:</label>
+          <div id="urlExtractPreviewContent" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveUrlExtract" class="btn btn-primary">Извлечь</button>
+        <button type="button" id="cancelUrlExtract" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для быстрого добавления Telegram -->
+  <div id="telegramModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📱 Отправка сообщения в Telegram</h3>
+        <button class="modal-close" id="closeTelegramModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Токен бота</label>
+          <input type="text" id="telegramBotToken" class="input" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Токен вашего Telegram бота (можно получить у @BotFather)
+          </small>
+        </div>
+        <div class="form-group">
+          <label>User ID (chat_id)</label>
+          <input type="text" id="telegramUserId" class="input" placeholder="123456789">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            ID пользователя или чата (можно узнать у @userinfobot)
+          </small>
+        </div>
+        <div class="form-group">
+          <label>Текст сообщения</label>
+          <textarea id="telegramMessage" class="input" rows="4" placeholder="Введите текст сообщения..."></textarea>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Можно использовать переменные: {var:имя}, {date}, {time}, {datetime}, {counter:имя}
+          </small>
+        </div>
+        <div class="form-group" style="padding: 12px; background: #f0f7ff; border-radius: 6px; border-left: 3px solid #2196F3;">
+          <small style="color: #1976D2;">
+            💡 <strong>Переменные будут автоматически сохранены:</strong><br>
+            • <code>telegramBotToken</code> (токен бота, чувствительные данные)<br>
+            • <code>telegramChatId</code> (ID чата/пользователя)
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveTelegramAction" class="btn btn-primary">💾 Добавить</button>
+        <button type="button" id="cancelTelegramAction" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для извлечения переменной со страницы -->
+  <div id="pageGrabberModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🎯 Извлечение переменной со страницы</h3>
+        <button class="modal-close" id="closePageGrabberModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>1. Выберите вкладку браузера:</label>
+          <select id="pageGrabberTabSelect" class="form-control">
+            <option value="">Загрузка вкладок...</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Выберите вкладку, на которой находится нужный элемент
+          </small>
+        </div>
+        
+        <div class="form-group" id="pageGrabberUrlGroup" style="display: none;">
+          <label>URL вкладки:</label>
+          <div id="pageGrabberUrl" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all;"></div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberSelectorGroup" style="display: none;">
+          <label>2. Выберите элемент на странице:</label>
+          <button type="button" id="pageGrabberSelectBtn" class="btn btn-secondary" style="width: 100%;">
+            🎯 Нажмите, чтобы выбрать элемент на странице
+          </button>
+          <div id="pageGrabberSelectorInfo" style="margin-top: 8px; padding: 8px; background: #f0f7ff; border-radius: 4px; display: none;">
+            <strong>Выбранный элемент:</strong>
+            <div id="pageGrabberSelectorValue" style="font-family: monospace; font-size: 12px; margin-top: 4px;"></div>
+            <div id="pageGrabberElementPreview" style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; border: 1px solid #ddd;"></div>
+          </div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberVariableGroup" style="display: none;">
+          <label>3. Настройка переменной:</label>
+          <input type="text" id="pageGrabberVarName" class="form-control" placeholder="Имя переменной (например: orderId)">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Имя переменной для сохранения значения
+          </small>
+        </div>
+        
+        <div class="form-group" id="pageGrabberExtractGroup" style="display: none;">
+          <label>4. Извлечение значения (опционально):</label>
+          <select id="pageGrabberExtractType" class="form-control">
+            <option value="full">Полное значение</option>
+            <option value="number">Извлечь номер (только цифры)</option>
+            <option value="regex">Регулярное выражение</option>
+          </select>
+          <div id="pageGrabberRegexGroup" style="display: none; margin-top: 8px;">
+            <input type="text" id="pageGrabberRegex" class="form-control" placeholder="Регулярное выражение (например: \\d+ для номера)">
+            <small style="display: block; margin-top: 4px; color: #666;">
+              Используйте группу захвата для извлечения части значения (например: <code>ID: (\\d+)</code>)
+            </small>
+          </div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberPreviewGroup" style="display: none;">
+          <label>Предпросмотр значения:</label>
+          <div id="pageGrabberPreview" style="padding: 12px; background: #e8f5e9; border-radius: 4px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2e7d32;"></div>
+        </div>
+        
+        <div class="form-group" id="pageGrabberUrlMatchGroup" style="display: none; padding: 12px; background: #fff3cd; border-radius: 4px; border-left: 3px solid #ffc107;">
+          <label>
+            <input type="checkbox" id="pageGrabberUrlMatch" style="margin-right: 8px;">
+            Сравнивать по URL и извлекать автоматически
+          </label>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Если URL страницы совпадает с URL в шагах теста, значение будет извлекаться автоматически при выполнении
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="savePageGrabber" class="btn btn-primary" disabled>💾 Сохранить переменную</button>
+        <button type="button" id="cancelPageGrabber" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для получения переменных из localStorage страницы -->
+  <div id="localStorageVariablesModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🌐 Переменные из localStorage страницы</h3>
+        <button class="modal-close" id="closeLocalStorageVariablesModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>1. Выберите вкладку браузера:</label>
+          <select id="localStorageTabSelect" class="form-control">
+            <option value="">Загрузка вкладок...</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Выберите вкладку, из localStorage которой нужно получить переменные
+          </small>
+        </div>
+        
+        <div class="form-group" id="localStorageUrlGroup" style="display: none;">
+          <label>URL вкладки:</label>
+          <div id="localStorageUrl" style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all;"></div>
+        </div>
+        
+        <div class="form-group" id="localStorageVariablesGroup" style="display: none;">
+          <label>2. Выберите переменную из localStorage:</label>
+          <div id="localStorageVariablesList" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+            <div style="text-align: center; padding: 20px; color: #666;">
+              Нажмите "Загрузить переменные" для получения списка
+            </div>
+          </div>
+          <button type="button" id="loadLocalStorageBtn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;">
+            📥 Загрузить переменные из localStorage
+          </button>
+        </div>
+        
+        <div class="form-group" id="localStorageVariableInfo" style="display: none;">
+          <label>Информация о выбранной переменной:</label>
+          <div id="localStorageVariableDetails" style="padding: 12px; background: #f0f7ff; border-radius: 4px; border-left: 3px solid #2196F3;">
+            <div><strong>Ключ:</strong> <span id="localStorageVarKey" style="font-family: monospace;"></span></div>
+            <div style="margin-top: 8px;"><strong>Значение:</strong> <span id="localStorageVarValue" style="font-family: monospace; word-break: break-all;"></span></div>
+            <div style="margin-top: 8px;"><strong>Тип:</strong> <span id="localStorageVarType"></span></div>
+          </div>
+        </div>
+        
+        <div class="form-group" id="localStorageVariableNameGroup" style="display: none;">
+          <label>3. Имя переменной в тесте:</label>
+          <input type="text" id="localStorageVariableName" class="form-control" placeholder="Имя переменной (например: orderId)">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Имя, под которым переменная будет сохранена в тесте
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveLocalStorageVariable" class="btn btn-primary" disabled>💾 Сохранить переменную</button>
+        <button type="button" id="cancelLocalStorageVariable" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для переменных -->
+  <div id="variablesModal" class="variables-modal">
+    <div class="variables-modal-content">
+      <div class="variables-modal-header">
+        <h3>📊 Управление переменными</h3>
+        <button class="variables-modal-close" id="closeVariablesModal">&times;</button>
+      </div>
+      <div class="variables-modal-body">
+        <div class="variables-tabs">
+          <button class="variables-tab active" data-tab="scenario">📄 Сценарий</button>
+          <button class="variables-tab" data-tab="loop">🔁 Циклы</button>
+          <button class="variables-tab" data-tab="condition">🔀 Условия</button>
+          <button class="variables-tab" data-tab="global">🌐 Глобальные</button>
+        </div>
+        
+        <div class="variables-tab-content active" data-tab-content="scenario">
+          <h4>Переменные всех сценариев</h4>
+          <p style="color: #666; margin-bottom: 16px;">Переменные из всех сценариев. Переменные текущего сценария имеют приоритет при выполнении.</p>
+          <div class="variables-list" id="scenarioVariables"></div>
+          <button class="add-variable-btn" data-add-variable="scenario">➕ Добавить переменную в текущий сценарий</button>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="loop">
+          <h4>Переменные циклов</h4>
+          <p style="color: #666; margin-bottom: 16px;">
+            💡 Переменные циклов создаются автоматически при добавлении цикла.<br>
+            При старте цикла переменная инициализируется в 0 и увеличивается на 1 после каждой итерации.<br>
+            После завершения цикла переменная равна количеству выполненных итераций.
+          </p>
+          <div class="variables-list" id="loopVariables"></div>
+          <small style="color: #999; font-style: italic;">Переменные циклов управляются автоматически, их не нужно объявлять вручную.</small>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="condition">
+          <h4>Переменные условий</h4>
+          <p style="color: #666; margin-bottom: 16px;">Переменные для использования в условиях</p>
+          <div class="variables-list" id="conditionVariables"></div>
+          <button class="add-variable-btn" data-add-variable="condition">➕ Добавить переменную условия</button>
+        </div>
+        
+        <div class="variables-tab-content" data-tab-content="global">
+          <h4>Глобальные переменные</h4>
+          <p style="color: #666; margin-bottom: 16px;">Переменные, доступные во всех сценариях</p>
+          <div class="variables-list" id="globalVariables"></div>
+          <button class="add-variable-btn" data-add-variable="global">➕ Добавить глобальную переменную</button>
+        </div>
+        
+        <div class="variable-recommendations" id="variableRecommendations" style="display: none;">
+          <h4>💡 Рекомендации</h4>
+          <div id="recommendationsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для диалога с незаданными переменными -->
+  <div id="missingVariablesDialog" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>⚠️ Незаданные переменные</h3>
+        <button class="modal-close" id="closeMissingVarsDialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 16px;">
+          <p>Обнаружены не заданные переменные, используемые в тесте:</p>
+          <ul id="missingVarsList" style="margin: 12px 0; padding-left: 24px;">
+            <!-- Список переменных будет добавлен динамически -->
+          </ul>
+          <p>Продолжить запуск теста?</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="setMissingVarsBtn" class="btn btn-primary">📝 Задать переменные</button>
+        <button type="button" id="continueWithoutVarsBtn" class="btn btn-secondary">▶️ Продолжить</button>
+        <button type="button" id="cancelMissingVarsBtn" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для редактирования незаданных переменных -->
+  <div id="setMissingVariablesModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>📝 Задать значения переменных</h3>
+        <button class="modal-close" id="closeSetMissingVarsModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="missingVarsForm" style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Поля для переменных будут добавлены динамически -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveMissingVarsBtn" class="btn btn-primary">💾 Сохранить</button>
+        <button type="button" id="cancelSetMissingVarsBtn" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для импорта API тестов -->
+  <div id="importApiModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3>🌐 Импорт API тестов из OpenAPI/Swagger</h3>
+        <button class="modal-close" id="closeImportApiModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Выберите файл спецификации (YAML/JSON)</label>
+          <input type="file" id="apiSpecFile" accept=".yaml,.yml,.json" style="margin-bottom: 12px;">
+          <small style="display: block; margin-top: 4px; color: #666;">
+            Поддерживаются форматы OpenAPI 3.0.x и Swagger 2.0
+          </small>
+        </div>
+        
+        <div id="apiImportInfo" style="display: none; margin: 16px 0; padding: 12px; background: #f5f5f5; border-radius: 4px;">
+          <h4>Информация о спецификации:</h4>
+          <div id="apiSpecInfo" style="word-wrap: break-word; overflow-wrap: break-word; white-space: normal;"></div>
+        </div>
+
+        <div id="apiEndpointsList" style="display: none; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 style="margin: 0;">Доступные эндпоинты:</h4>
+            <button type="button" id="selectAllEndpoints" class="btn btn-small">✅ Выбрать все</button>
+          </div>
+          <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+            <div id="apiEndpointsContainer"></div>
+          </div>
+        </div>
+
+        <div id="apiImportOptions" style="display: none; margin-top: 16px;">
+          <h4>Параметры импорта:</h4>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiGenerateTestData" checked>
+              Генерировать тестовые данные автоматически
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiValidateResponse" checked>
+              Включить валидацию ответов по схеме
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="apiSaveResponse" checked>
+              Сохранять ответы в переменные
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Базовый URL (если не указан в спецификации):</label>
+            <input type="text" id="apiBaseUrl" placeholder="https://api.example.com" style="width: 100%;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="importApiBtn" class="btn btn-primary" disabled>📥 Импортировать выбранные</button>
+        <button type="button" id="cancelImportApiBtn" class="btn btn-secondary">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../i18n/i18n.js"></script>
+  <script src="../shared/action-types.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="openapi-parser.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
+

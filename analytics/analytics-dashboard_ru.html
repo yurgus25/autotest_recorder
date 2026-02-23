@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аналитика тестов - AutoTest Recorder</title>
+  <link rel="stylesheet" href="analytics-dashboard.css">
+  <script src="../i18n/i18n.js"></script>
+  <script src="../libs/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📊 Аналитика и метрики тестов</h1>
+      <div class="header-actions">
+        <button id="exportCsv" class="btn btn-secondary" title="Экспорт в CSV">📥 CSV</button>
+        <button id="printPdf" class="btn btn-secondary" title="Печать или сохранение в PDF">🖨️ Печать / PDF</button>
+        <a id="backToSettings" href="#" class="btn btn-secondary">← Настройки</a>
+      </div>
+    </header>
+
+    <div id="analyticsDisabled" class="disabled-message hidden">
+      <p>Аналитика отключена. Включите её в настройках расширения.</p>
+      <a id="openSettings" href="#">Открыть настройки</a>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content">
+      <div id="loadingState" class="loading-state">Загрузка данных...</div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>Нет данных для аналитики. Запустите тесты и повторите открытие дашборда.</p>
+      </div>
+
+      <div id="chartsSection" class="charts-section hidden">
+        <section class="card">
+          <h2>Успешность по дням</h2>
+          <div class="chart-wrap">
+            <canvas id="chartSuccessRate"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Тренд длительности прогонов (с)</h2>
+          <div class="chart-wrap">
+            <canvas id="chartDuration"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Heatmap ошибок (час × день недели)</h2>
+          <div class="heatmap-wrap">
+            <div id="heatmapContainer"></div>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Проблемные шаги (чаще всего падают)</h2>
+          <div class="table-wrap">
+            <table id="stepFailuresTable">
+              <thead>
+                <tr>
+                  <th>Тест</th>
+                  <th>Шаг</th>
+                  <th>Тип</th>
+                  <th>Падений</th>
+                  <th>Всего</th>
+                  <th>% ошибок</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card summary-card">
+          <h2>Сводка</h2>
+          <div id="summaryGrid" class="summary-grid"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script src="../shared/utils.js"></script>
+  <script src="analytics-dashboard.js"></script>
+<script src="../i18n/i18n.js"></script>
+</body>
+</html>

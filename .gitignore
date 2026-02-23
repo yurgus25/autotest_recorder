@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build output
+extension-pack/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temp files
+*.tmp
+*.temp
+.cache/
+.tmp/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Packed extension
+*.crx
+*.pem
+*.zip
+*.xpi
+
+# Certificates
+*.p12
+*.cert
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Package locks (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock

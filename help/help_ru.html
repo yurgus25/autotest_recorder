@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Справка — AutoTest Recorder</title>
+  <link rel="stylesheet" href="help.css">
+</head>
+<body>
+  <div class="help-container">
+    <header class="help-header">
+      <div class="help-header-inner">
+        <h1>🎯 AutoTest Recorder</h1>
+        <p class="help-subtitle">Запись, редактирование и воспроизведение автотестов для веб-приложений</p>
+      </div>
+    </header>
+
+    <nav class="help-nav">
+      <a href="#quickstart">⚡ Быстрый старт</a>
+      <a href="#popup">Popup</a>
+      <a href="#recording">Запись</a>
+      <a href="#editor">Редактор</a>
+      <a href="#variables">Переменные</a>
+      <a href="#playback">Воспроизведение</a>
+      <a href="#api-import">Импорт API</a>
+      <a href="#settings">Настройки</a>
+      <a href="#hotref">Шпаргалка</a>
+    </nav>
+
+    <main class="help-content">
+
+      <!-- ===== БЫСТРЫЙ СТАРТ ===== -->
+      <section id="quickstart" class="help-section">
+        <h2>⚡ Быстрый старт</h2>
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <div class="step-body">
+              <strong>Откройте popup</strong>
+              <p>Кликните иконку расширения на панели Chrome.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <div class="step-body">
+              <strong>Начните запись</strong>
+              <p>Нажмите <span class="tag red">🔴 Начать запись</span></p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <div class="step-body">
+              <strong>Выполните действия</strong>
+              <p>Перейдите на сайт: кликайте, вводите текст, выбирайте из списков.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <div class="step-body">
+              <strong>Остановите запись</strong>
+              <p>Вернитесь в popup → <span class="tag gray">⏹️ Остановить запись</span></p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">5</div>
+            <div class="step-body">
+              <strong>Готово!</strong>
+              <p>Тест в списке. <span class="tag green">▶️</span> — запустить, <span class="tag yellow">✏️</span> — редактировать.</p>
+            </div>
+          </div>
+        </div>
+        <p class="hint">Данные хранятся локально в Chrome. Экспорт/импорт — через JSON-файлы.</p>
+      </section>
+
+      <!-- ===== POPUP-ПАНЕЛЬ ===== -->
+      <section id="popup" class="help-section">
+        <h2>Popup-панель</h2>
+
+        <h3>Шапка</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-icon"><strong>⛶</strong></td><td>Развернуть popup в отдельное окно.</td></tr>
+            <tr><td class="col-icon"><strong>🔍</strong></td><td>Инспектор селекторов — детальный анализ элементов страницы.</td></tr>
+            <tr><td class="col-icon"><strong>⚙️</strong></td><td>Настройки расширения.</td></tr>
+            <tr><td class="col-icon"><strong>📊</strong></td><td>Дашборд аналитики (виден, когда аналитика включена в настройках).</td></tr>
+            <tr><td class="col-icon"><strong>❓</strong></td><td>Эта справка.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Кнопки управления</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag red">🔴 Начать запись</span></td><td>Запуск записи действий.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">⏹️ Остановить запись</span></td><td>Остановка и сохранение теста.</td></tr>
+            <tr><td class="col-btn"><span class="tag yellow">⏸️ Пауза</span></td><td>Приостановка воспроизведения.</td></tr>
+            <tr><td class="col-btn"><span class="tag green">▶️ Продолжить</span></td><td>Возобновление воспроизведения.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">⏹️ Стоп</span></td><td>Принудительная остановка.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Панель «Тесты»</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-icon"><strong>📥</strong></td><td>Импорт теста из JSON-файла.</td></tr>
+            <tr><td class="col-icon"><strong>🔄</strong></td><td>Обновить список тестов.</td></tr>
+            <tr><td class="col-icon"><strong>💾 Память</strong></td><td>Объём данных. По клику на <strong>▼</strong> — детали по категориям (тесты, история, переменные, настройки, скриншоты, файлы) и кнопки очистки.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Карточка теста</h3>
+        <p>Каждый тест показывает название, количество шагов, даты создания и обновления.</p>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag green">▶️ Воспроизвести</span></td><td>Запуск теста на активной вкладке.</td></tr>
+            <tr><td class="col-btn"><span class="tag yellow">✏️ Редактировать</span></td><td>Открыть редактор теста.</td></tr>
+            <tr><td class="col-btn"><span class="tag red">🗑️ Удалить</span></td><td>Удалить тест.</td></tr>
+            <tr><td class="col-icon"><strong>📊</strong></td><td>История прогонов (дата, результат, детали по шагам).</td></tr>
+            <tr><td class="col-icon"><strong>📸</strong></td><td>Скриншоты прогонов (если сохранение включено).</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===== ЗАПИСЬ ===== -->
+      <section id="recording" class="help-section">
+        <h2>Запись тестов</h2>
+        <p>Расширение фиксирует: клики, ввод текста, выбор из <code>&lt;select&gt;</code> и кастомных dropdown, переходы, навигацию.</p>
+
+        <h3>Режимы выбора селекторов</h3>
+        <p>Настраиваются в <strong>⚙️ → Режим записи</strong>:</p>
+        <div class="card-grid">
+          <div class="info-card">
+            <strong>Автоматический</strong>
+            <p>Расширение само выбирает лучший селектор по приоритетам атрибутов. Подходит для большинства случаев.</p>
+          </div>
+          <div class="info-card">
+            <strong>Пикер</strong>
+            <p>При каждом клике показывается панель с вариантами селекторов — вы выбираете нужный.</p>
+          </div>
+          <div class="info-card">
+            <strong>Инспектор</strong>
+            <p>Полный инспектор элемента с детальным анализом всех доступных селекторов.</p>
+          </div>
+        </div>
+        <p>Для генерации используются библиотеки <strong>Finder</strong>, <strong>Optimal Select</strong> и <strong>Unique Select</strong> (включаются в настройках, для каждой есть версия Lite/Full).</p>
+
+        <div class="tip-box">
+          <strong>💡 Совет:</strong> Перед записью обновите страницу. Действуйте без спешки — расширение фиксирует каждый клик. Имя теста можно задать в popup до остановки записи.
+        </div>
+      </section>
+
+      <!-- ===== РЕДАКТОР ===== -->
+      <section id="editor" class="help-section">
+        <h2>Редактор тестов</h2>
+        <p>Открывается кнопкой <span class="tag yellow">✏️ Редактировать</span> в карточке теста.</p>
+
+        <h3>Панель инструментов</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag blue">💾 Сохранить</span></td><td>Сохранить изменения. Также <kbd>Ctrl+S</kbd>.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📥 Экспорт JSON</span></td><td>Выгрузить тест в файл.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📤 Импорт JSON</span></td><td>Загрузить тест из файла.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">🌐 Импорт API</span></td><td>Импорт из OpenAPI/Swagger спецификации.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📦 Переменные</span></td><td>Управление переменными сценария.</td></tr>
+            <tr><td class="col-icon"><strong>🌙 / ☀️</strong></td><td>Тёмная / светлая тема.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Режимы запуска</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>Полный прогон</strong></td><td>Все шаги подряд, включая скрытые.</td></tr>
+            <tr><td><strong>Режим отладки</strong></td><td>Пошаговое выполнение с паузами.</td></tr>
+            <tr><td><strong>Параллельный</strong></td><td>Запуск в нескольких вкладках одновременно.</td></tr>
+            <tr><td><strong>Оптимизированный</strong></td><td>Доступен после успешной оптимизации теста.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Работа с шагами</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>➕ Добавить</strong></td><td>Добавить действие, условие (🔀) или цикл (🔁).</td></tr>
+            <tr><td><strong>🌐 API Шаблоны</strong></td><td>Готовые шаги: 📱 Telegram, 🔗 Webhook, 📥 REST GET, 📤 REST POST.</td></tr>
+            <tr><td><strong>✏️</strong> у шага</td><td>Редактирование: тип, селектор, значение, таймауты.</td></tr>
+            <tr><td><strong>Перетаскивание</strong></td><td>Перестановка шагов drag-and-drop.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Вид списка шагов</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td>📄 Группировка</td><td>Объединение шагов по URL страницы.</td></tr>
+            <tr><td>🔽 Свернуть/развернуть</td><td>Управление видимостью всех шагов.</td></tr>
+            <tr><td>🔗 Показать URL</td><td>Показать/скрыть URL страниц у шагов.</td></tr>
+            <tr><td>🏷️ Показать поля</td><td>Показать/скрыть наименования полей.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Условия и циклы</h3>
+        <p><strong>Условие</strong> — содержит ветки «then» и «else» с произвольным выражением.<br>
+        <strong>Цикл</strong> — задаётся количеством итераций или условием выхода.<br>
+        Внутри условий и циклов размещаются обычные шаги.</p>
+      </section>
+
+      <!-- ===== ПЕРЕМЕННЫЕ ===== -->
+      <section id="variables" class="help-section">
+        <h2>Переменные</h2>
+        <p>Кнопка <strong>📦 Переменные</strong> в редакторе. Переменные позволяют переиспользовать данные между шагами.</p>
+
+        <h3>Создание переменных</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>➕ Вручную</strong></td><td>Имя, значение, флаги «глобальная», «чувствительные данные».</td></tr>
+            <tr><td><strong>🔗 Из URL</strong></td><td>Извлечение из URL шага: query-параметр, путь, регулярное выражение.</td></tr>
+            <tr><td><strong>📄 Со страницы</strong></td><td>Выбор элемента на вкладке и сохранение его текста.</td></tr>
+            <tr><td><strong>🗄️ Из localStorage</strong></td><td>Получение значения из localStorage страницы.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Области видимости</h3>
+        <p>В модальном окне переменных есть вкладки:</p>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>📄 Сценарий</strong></td><td>Переменные текущего теста.</td></tr>
+            <tr><td><strong>🔁 Циклы</strong></td><td>Переменные внутри циклов.</td></tr>
+            <tr><td><strong>🔀 Условия</strong></td><td>Переменные внутри условий.</td></tr>
+            <tr><td><strong>🌐 Глобальные</strong></td><td>Доступны во всех тестах.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Подстановка в шагах</h3>
+        <p>Используйте <code>{var:имя_переменной}</code> в полях значения, URL, заголовках и теле API-запросов.</p>
+
+        <h3>Фильтры (в панели переменных)</h3>
+        <p>Все · Пустые · Для данного сценария · Глобальные · Входные · Выходные · В теле запроса.</p>
+
+        <div class="tip-box">
+          <strong>💡</strong> Если при запуске теста есть переменные без значения — откроется диалог для их заполнения.
+        </div>
+      </section>
+
+      <!-- ===== ВОСПРОИЗВЕДЕНИЕ ===== -->
+      <section id="playback" class="help-section">
+        <h2>Воспроизведение</h2>
+        <p>Запуск: <span class="tag green">▶️</span> в popup или режим запуска в редакторе.</p>
+        <ul>
+          <li><strong>Прогресс</strong> — в popup: «Шаг N из M» и тип текущего действия.</li>
+          <li><strong>⏸️ Пауза</strong> и <strong>⏹️ Стоп</strong> доступны в любой момент.</li>
+          <li>Результат сохраняется в <strong>📊 Историю</strong> теста.</li>
+        </ul>
+
+        <h3>Скриншоты</h3>
+        <p>При включённой опции расширение снимает экран при воспроизведении. Сохранение на диск (папка «Загрузки») и/или в памяти расширения для просмотра через <strong>📸</strong>. Можно ограничить «только при ошибках».</p>
+
+        <h3>Видео</h3>
+        <p>При включённой опции записывается видео вкладки в формате WebM. Опция «Постобработка» добавляет индекс перемотки. Файлы сохраняются в подпапку <code>videos</code> внутри папки сохранения.</p>
+      </section>
+
+      <!-- ===== ИМПОРТ API ===== -->
+      <section id="api-import" class="help-section">
+        <h2>Импорт из OpenAPI / Swagger</h2>
+        <p>Кнопка <span class="tag gray">🌐 Импорт API</span> в редакторе.</p>
+        <div class="steps-grid compact">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <div class="step-body">Загрузите файл спецификации (YAML или JSON).</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <div class="step-body">Выберите нужные эндпоинты галочками.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <div class="step-body">Настройте опции: тестовые данные, валидация, переменные, базовый URL.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <div class="step-body"><strong>«Импортировать выбранные»</strong> — шаги добавятся в тест.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== НАСТРОЙКИ ===== -->
+      <section id="settings" class="help-section">
+        <h2>Настройки</h2>
+        <p>Открываются через <strong>⚙️</strong> в popup. Кнопки внизу страницы: <em>Сбросить</em>, <em>Экспорт</em>, <em>Импорт</em>, <em>Сохранить</em>.</p>
+
+        <div class="settings-overview">
+
+          <div class="setting-block">
+            <h3>🎯 Генерация селекторов</h3>
+            <p><strong>Библиотеки</strong> — Finder, Optimal Select, Unique Select (вкл/выкл, версия Lite/Full).</p>
+            <p><strong>Приоритеты атрибутов</strong> — порядок проверки: data-testid, data-cy, id, name и др. Меняется перетаскиванием.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🎬 Режим записи</h3>
+            <p><strong>Выбор селекторов</strong> — Автоматический / Пикер / Инспектор.</p>
+            <p><strong>Стратегия</strong> — Стабильность / Читаемость / Кратчайший.</p>
+            <p><strong>Пикер</strong> — таймаут автовыбора, показ оценок стабильности, выделение лучшего варианта.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>⚡ Производительность</h3>
+            <p>Кэширование селекторов, максимальная длина селектора, таймаут генерации.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>📊 Аналитика</h3>
+            <p>Включает дашборд: графики успешности, проблемные шаги, heatmap ошибок. В popup появляется кнопка <strong>📊</strong>.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🎬 Видео и 📸 Скриншоты</h3>
+            <p><strong>Видео</strong> — запись вкладки в WebM, постобработка для перемотки.</p>
+            <p><strong>Скриншоты</strong> — на диск и/или в память расширения. Опция «только при ошибках».</p>
+            <p><strong>Папка</strong> — задаётся относительно «Загрузок» (по умолчанию <code>AutoTestRecorder</code>). Внутри создаются подпапки <code>videos</code> и <code>screenshots</code>.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🚀 Оптимизация селекторов</h3>
+            <p>Группы настроек по фазам:</p>
+            <ul>
+              <li><strong>🔴 Фаза 1</strong> — дедупликация, кэширование, умная оценка стабильности, штраф за динамические части.</li>
+              <li><strong>🟠 Фаза 2</strong> — улучшенное обнаружение dropdown, экспоненциальный backoff при ретраях, MutationObserver.</li>
+              <li><strong>🟡 Фаза 3</strong> — генерация XPath, поиск оверлеев, валидация перед сохранением, debounce/throttle событий.</li>
+              <li><strong>🟢 Метрики</strong> — расчёт метрик стабильности, автоисправление нестабильных селекторов, порог стабильности.</li>
+            </ul>
+          </div>
+
+          <div class="setting-block">
+            <h3>📁 Файлы для тестов</h3>
+            <p>Загрузка файлов для использования в шагах (например, при загрузке документов через формы).</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>📊 Экспорт в Excel</h3>
+            <p>Выгрузка отчётов в Excel/CSV/XLS. Опции: автоэкспорт, триггеры (запись/прогон/оптимизация), логирование ошибок консоли, формат файла, разделитель, путь сохранения.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🔧 Расширенные</h3>
+            <p>Включение/отключение автотестов, подробное логирование, исключение скрытых элементов, умные ожидания.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===== ШПАРГАЛКА ===== -->
+      <section id="hotref" class="help-section">
+        <h2>🔖 Шпаргалка</h2>
+        <table class="help-table hotref-table">
+          <thead>
+            <tr><th>Задача</th><th>Где</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Записать тест</td><td>Popup → <strong>🔴 Начать запись</strong> → сайт → <strong>⏹️ Остановить</strong></td></tr>
+            <tr><td>Запустить тест</td><td>Popup → <strong>▶️</strong> на карточке</td></tr>
+            <tr><td>Редактировать</td><td>Popup → <strong>✏️</strong> на карточке</td></tr>
+            <tr><td>Экспорт JSON</td><td>Редактор → <strong>📥 Экспорт JSON</strong></td></tr>
+            <tr><td>Импорт JSON</td><td>Popup → <strong>📥</strong> или Редактор → <strong>📤 Импорт JSON</strong></td></tr>
+            <tr><td>Переменные</td><td>Редактор → <strong>📦 Переменные</strong></td></tr>
+            <tr><td>Подстановка</td><td><code>{var:имя}</code> в полях шага</td></tr>
+            <tr><td>Импорт Swagger</td><td>Редактор → <strong>🌐 Импорт API</strong></td></tr>
+            <tr><td>История</td><td>Popup → карточка → <strong>📊</strong></td></tr>
+            <tr><td>Скриншоты</td><td>Popup → карточка → <strong>📸</strong></td></tr>
+            <tr><td>Очистить</td><td>Popup → <strong>💾 Память ▼</strong> → категория</td></tr>
+            <tr><td>Сохранить тест</td><td>Редактор → <strong>💾</strong> или <kbd>Ctrl+S</kbd></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+
+    <footer class="help-footer">
+      <p>AutoTest Recorder & Player</p>
+    </footer>
+  </div>
+  <script src="../i18n/i18n.js"></script>
+  <script>if(window.i18n){i18n.init().then(()=>i18n.applyToDOM())}</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Screenshots - AutoTest Recorder</title>
+  <link rel="stylesheet" href="screenshots.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📸 Test Screenshots</h1>
+      <div class="header-actions">
+        <button id="downloadBtn" class="btn btn-primary hidden">💾 Download ZIP</button>
+        <button id="closeBtn" class="btn btn-secondary">✕ Close</button>
+      </div>
+    </header>
+    
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading screenshots…</p>
+    </div>
+    <div id="emptyState" class="empty-state hidden">No screenshots found</div>
+    
+    <div id="screenshotsContainer" class="screenshots-container hidden">
+      <div id="screenshotsGrid" class="screenshots-grid"></div>
+    </div>
+    
+    <div id="fullscreenView" class="fullscreen-view hidden">
+      <button id="closeFullscreen" class="close-fullscreen">✕</button>
+      <img id="fullscreenImage" src="" alt="Full-size screenshot">
+      <div id="fullscreenInfo" class="fullscreen-info"></div>
+    </div>
+  </div>
+  
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="screenshots.js"></script>
+</body>
+</html>

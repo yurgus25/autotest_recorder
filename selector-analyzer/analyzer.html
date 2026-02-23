@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 Advanced Selector Search</title>
+  <link rel="stylesheet" href="analyzer.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🔍 Advanced Selector Search</h1>
+      <div class="header-actions">
+        <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+        <button id="exportBtn" class="btn btn-secondary">📥 Export JSON</button>
+      </div>
+    </header>
+
+    <div class="info-panel">
+      <div class="info-item">
+        <span class="info-label">URL:</span>
+        <span id="currentUrl" class="info-value">Loading...</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Framework:</span>
+        <span id="framework" class="info-value">Detecting...</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Total elements:</span>
+        <span id="totalElements" class="info-value">0</span>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="🔍 Search by text, selector, type..."
+        class="search-input"
+      >
+      <div class="filter-group">
+        <label>
+          <input type="checkbox" id="filterButtons" checked>
+          Buttons
+        </label>
+        <label>
+          <input type="checkbox" id="filterInputs" checked>
+          Input fields
+        </label>
+        <label>
+          <input type="checkbox" id="filterSelects" checked>
+          Dropdowns
+        </label>
+        <label>
+          <input type="checkbox" id="filterLinks" checked>
+          Links
+        </label>
+        <label>
+          <input type="checkbox" id="filterDropdowns" checked>
+          Dropdown elements
+        </label>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="all">All elements</button>
+      <button class="tab-btn" data-tab="dropdowns">Dropdown</button>
+      <button class="tab-btn" data-tab="status">Status</button>
+      <button class="tab-btn" data-tab="options">Dropdown options</button>
+    </div>
+
+    <div class="results-container">
+      <div id="loading" class="loading">⏳ Analyzing page...</div>
+      <div id="results" class="results"></div>
+    </div>
+  </div>
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="analyzer.js"></script>
+</body>
+</html>

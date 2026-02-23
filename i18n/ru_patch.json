@@ -1,0 +1,17 @@
+{
+  "editorUI": {
+    "actionTypeAssertion": "Проверка / Assertion",
+    "actionTypeAI": "AI Операция",
+    "actionTypeCloud": "Облачная операция",
+    "actionTypeSuite": "Операция с набором тестов",
+    "actionTypeJavaScript": "Выполнить JavaScript",
+    "actionTypeScreenshot": "Скриншот",
+    "actionTypeCookie": "Операция с Cookie",
+    "actionTypeMobile": "Мобильный жест",
+    "actionTypeHover": "Наведение",
+    "actionTypeFocus": "Фокус",
+    "actionTypeBlur": "Снятие фокуса",
+    "actionTypeClear": "Очистить поле",
+    "actionTypeUpload": "Загрузка файла"
+  }
+}

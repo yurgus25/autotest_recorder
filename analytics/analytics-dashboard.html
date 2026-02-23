@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Analytics - AutoTest Recorder</title>
+  <link rel="stylesheet" href="analytics-dashboard.css">
+  <script src="../i18n/i18n.js"></script>
+  <script src="../libs/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📊 Test Analytics and Metrics</h1>
+      <div class="header-actions">
+        <button id="exportCsv" class="btn btn-secondary" title="Export to CSV">📥 CSV</button>
+        <button id="printPdf" class="btn btn-secondary" title="Print or save as PDF">🖨️ Print / PDF</button>
+        <a id="backToSettings" href="#" class="btn btn-secondary">← Settings</a>
+      </div>
+    </header>
+
+    <div id="analyticsDisabled" class="disabled-message hidden">
+      <p>Analytics is disabled. Enable it in extension settings.</p>
+      <a id="openSettings" href="#">Open settings</a>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content">
+      <div id="loadingState" class="loading-state">Loading data...</div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>No data for analytics. Run tests and reopen the dashboard.</p>
+      </div>
+
+      <div id="chartsSection" class="charts-section hidden">
+        <section class="card">
+          <h2>Success rate by day</h2>
+          <div class="chart-wrap">
+            <canvas id="chartSuccessRate"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Run duration trend (s)</h2>
+          <div class="chart-wrap">
+            <canvas id="chartDuration"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Error heatmap (hour × day of week)</h2>
+          <div class="heatmap-wrap">
+            <div id="heatmapContainer"></div>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Problematic steps (most frequent failures)</h2>
+          <div class="table-wrap">
+            <table id="stepFailuresTable">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Step</th>
+                  <th>Type</th>
+                  <th>Failures</th>
+                  <th>Total</th>
+                  <th>Error %</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card summary-card">
+          <h2>Summary</h2>
+          <div id="summaryGrid" class="summary-grid"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="analytics-dashboard.js"></script>
+</body>
+</html>

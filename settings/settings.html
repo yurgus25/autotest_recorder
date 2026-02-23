@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — AutoTest Recorder</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 data-i18n="settings.title">⚙️ AutoTest Recorder Settings</h1>
+      <button id="backButton" class="btn btn-secondary" data-i18n="common.back">← Back</button>
+    </header>
+
+    <div class="settings-content">
+      <!-- Selector Engine Settings -->
+      <section class="settings-section">
+        <h2 data-i18n="settings.selectorGeneration">🎯 Selector generation settings</h2>
+        
+        <div class="setting-group">
+          <h3 data-i18n="settings.selectorLibraries">Selector libraries</h3>
+          <p class="description" data-i18n="settings.selectorLibrariesDesc">Choose which libraries to use for selector generation</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useFinder" checked>
+              <div class="checkbox-info">
+                <strong>Finder</strong>
+                <span class="badge badge-recommended">Recommended</span>
+                <p>Intelligent CSS selector generator with optimization</p>
+              </div>
+            </label>
+            <div class="radio-group" id="finderVersion">
+              <label>
+                <input type="radio" name="finderVersion" value="lite" checked>
+                Lite version (fast, minimal)
+              </label>
+              <label>
+                <input type="radio" name="finderVersion" value="full">
+                Full version (full functionality)
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useOptimalSelect" checked>
+              <div class="checkbox-info">
+                <strong>Optimal Select</strong>
+                <span class="badge badge-recommended">Recommended</span>
+                <p>Optimal selectors with attribute prioritization</p>
+              </div>
+            </label>
+            <div class="radio-group" id="optimalSelectVersion">
+              <label>
+                <input type="radio" name="optimalSelectVersion" value="lite" checked>
+                Lite version (fast, minimal)
+              </label>
+              <label>
+                <input type="radio" name="optimalSelectVersion" value="full">
+                Full version (extended optimization)
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useUniqueSelector" checked>
+              <div class="checkbox-info">
+                <strong>Unique Selector</strong>
+                <span class="badge badge-recommended">Recommended</span>
+                <p>Guaranteed unique selectors</p>
+              </div>
+            </label>
+            <div class="radio-group" id="uniqueSelectorVersion">
+              <label>
+                <input type="radio" name="uniqueSelectorVersion" value="lite" checked>
+                Lite version (basic uniqueness)
+              </label>
+              <label>
+                <input type="radio" name="uniqueSelectorVersion" value="full">
+                Full version (advanced strategies)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>Attribute priorities</h3>
+          <p class="description">Order of attribute checking during selector generation</p>
+          
+          <div class="sortable-list" id="attributePriorities">
+            <div class="sortable-item" data-attr="data-testid">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-testid</span>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="sortable-item" data-attr="data-cy">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-cy</span>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="sortable-item" data-attr="data-test">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-test</span>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="sortable-item" data-attr="id">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">id</span>
+              <span class="badge badge-medium">Medium</span>
+            </div>
+            <div class="sortable-item" data-attr="name">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">name</span>
+              <span class="badge badge-medium">Medium</span>
+            </div>
+            <div class="sortable-item" data-attr="aria-label">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">aria-label</span>
+              <span class="badge badge-medium">Medium</span>
+            </div>
+            <div class="sortable-item" data-attr="role">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">role</span>
+              <span class="badge badge-low">Low</span>
+            </div>
+            <div class="sortable-item" data-attr="class">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">class</span>
+              <span class="badge badge-low">Low</span>
+            </div>
+            <div class="sortable-item" data-attr="tag">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">tag</span>
+              <span class="badge badge-low">Low</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recording Mode Settings -->
+      <section id="recording-mode-settings" class="settings-section">
+        <h2 data-i18n="settings.recordingMode">🎬 Recording mode</h2>
+        
+        <div class="setting-group">
+          <h3 data-i18n="settings.selectorSelection">Selector selection during recording</h3>
+          <p class="description">Configure how selectors are chosen during action recording</p>
+          
+          <div class="setting-item">
+            <h4>Selector selection mode:</h4>
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="recordingMode" value="auto" checked>
+                <strong>🚀 Automatic</strong>
+                <p>Automatically selects the best selector based on priorities</p>
+              </label>
+              <label>
+                <input type="radio" name="recordingMode" value="picker">
+                <strong>🎯 With selector picker</strong>
+                <span class="badge badge-new">NEW</span>
+                <p>Shows a panel with selector options for each click</p>
+              </label>
+              <label>
+                <input type="radio" name="recordingMode" value="inspector">
+                <strong>🔍 Via inspector</strong>
+                <p>Opens full selector inspector for detailed analysis</p>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-item" id="pickerSettings" style="display: none;">
+            <h4>Picker settings:</h4>
+            
+            <div class="inline-setting">
+              <label for="pickerTimeout">Auto-select timeout:</label>
+              <input type="number" id="pickerTimeout" value="5" min="1" max="30" style="width: 60px;"> sec
+              <p class="setting-hint">After the specified time, the best selector will be auto-selected</p>
+            </div>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="showSelectorScores" checked>
+              <div class="checkbox-info">
+                <strong>Show stability scores</strong>
+                <p>Show scores and recommendations for each selector</p>
+              </div>
+            </label>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="highlightBestSelector" checked>
+              <div class="checkbox-info">
+                <strong>Highlight best option</strong>
+                <p>Visually highlight the recommended selector</p>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h3>Selector selection strategy</h3>
+          <p class="description">Criteria for determining the "best" selector</p>
+          
+          <div class="setting-item">
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="selectorStrategy" value="stability" checked>
+                <strong>🛡️ Stability</strong>
+                <p>Priority: data-testid, id, name — for reliable tests</p>
+              </label>
+              <label>
+                <input type="radio" name="selectorStrategy" value="readability">
+                <strong>📖 Readability</strong>
+                <p>Priority: element text, aria-label — for readable tests</p>
+              </label>
+              <label>
+                <input type="radio" name="selectorStrategy" value="shortest">
+                <strong>⚡ Shortest</strong>
+                <p>Priority: shortest unique selectors</p>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Playback (воспроизведение) -->
+      <section class="settings-section" id="playback-settings">
+        <h2 data-i18n="settings.playback">▶️ Воспроизведение</h2>
+        <div class="setting-group">
+          <h3 data-i18n="settings.stepTimeout">Таймаут выполнения шага</h3>
+          <p class="description" data-i18n="settings.stepTimeoutDesc">Если шаг не выполнился за это время — показывается диалог: продолжить со следующего шага или остановить тест. В консоли пишется, что шаг завершён принудительно.</p>
+          <div class="setting-item">
+            <label for="playbackStepTimeout">Таймаут (сек):</label>
+            <select id="playbackStepTimeout" class="input" style="width: 100px;">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Performance Settings -->
+      <section class="settings-section">
+        <h2>⚡ Performance</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="cacheSelectors" checked>
+              <div class="checkbox-info">
+                <strong>Cache selectors</strong>
+                <p>Cache previously found selectors for faster performance</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="maxSelectorLength">Maximum selector length:</label>
+            <input type="number" id="maxSelectorLength" class="input" value="200" min="50" max="1000">
+            <small>Longer selectors will be automatically optimized</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="selectorTimeout">Generation timeout (ms):</label>
+            <input type="number" id="selectorTimeout" class="input" value="5000" min="1000" max="30000">
+            <small>Maximum time for generating a single selector</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytics -->
+      <section class="settings-section" id="analytics-settings">
+        <h2>📊 Analytics and test metrics</h2>
+        <p class="section-description">Dashboard with execution statistics, success rate over time, and problem step analysis</p>
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="analyticsEnabled">
+              <div class="checkbox-info">
+                <strong>Enable analytics</strong>
+                <p>Collect and display run statistics, success charts, problem steps and error heatmaps</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item">
+            <a id="openAnalyticsDashboard" href="#" class="btn btn-secondary" target="_blank" rel="noopener" style="display: inline-block; margin-top: 8px;">
+              📊 Open analytics dashboard
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Video recording & Screenshots (unified section) -->
+      <section class="settings-section" id="video-and-screenshots-settings">
+        <h2>🎬 Video and 📸 Screenshots</h2>
+        <p class="section-description">Record tab video and save screenshots during test playback. Files are saved to the Downloads folder in the specified subfolder (video — in videos subfolder, screenshots — in screenshots).</p>
+        <div class="setting-group">
+          <h3 class="setting-subsection" style="margin-bottom: 0.5em;">🎬 Video</h3>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="videoRecordingEnabled">
+              <div class="checkbox-info">
+                <strong>Video recording during playback</strong>
+                <p>Record tab to WebM on each test run (disabled by default)</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item setting-item-dependent" id="videoRecordingMakeSeekableWrap" style="margin-top: 0.75em;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="videoRecordingMakeSeekable">
+              <div class="checkbox-info">
+                <strong>Make video seekable (post-processing)</strong>
+                <p>Adds seek index to WebM — standard player can seek, but file becomes larger</p>
+              </div>
+            </label>
+          </div>
+          <p class="description hint setting-item-dependent" id="videoRecordingSeekableHint" style="margin-top: 0.5em; font-size: 0.9em; color: var(--text-muted, #666);">
+            Without post-processing the file is smaller; with it — seeking works in any player.
+          </p>
+
+          <h3 class="setting-subsection" style="margin-top: 1.25rem; margin-bottom: 0.5em;">📸 Screenshots</h3>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsSaveEnabled">
+              <div class="checkbox-info">
+                <strong>Save screenshots to disk</strong>
+                <p>Screenshots are not saved by default. When enabled, they are saved to the Downloads folder</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsOnlyOnError">
+              <div class="checkbox-info">
+                <strong>Only on errors</strong>
+                <p>Save screenshots only if a step failed</p>
+              </div>
+            </label>
+            <small id="screenshotsOnlyOnErrorHint">Only available when screenshot saving is enabled</small>
+          </div>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsStoreInMemory" checked>
+              <div class="checkbox-info">
+                <strong>Store screenshots in extension memory</strong>
+                <p>Store images in run history and editor interface</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label for="mediaSavePath">Folder for saving video and screenshots (optional):</label>
+            <input type="text" id="mediaSavePath" class="input" placeholder="e.g. AutoTestRecorder">
+            <small>Path is relative to Downloads folder. Subfolders <code>videos</code> and <code>screenshots</code> will be created; inside — a subfolder with test ID and run time</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Selector Optimization Settings (NEW) -->
+      <section class="settings-section">
+        <h2>🚀 Selector optimization</h2>
+        <p class="section-description">Advanced settings for improving selector quality and performance</p>
+        
+        <div class="setting-group">
+          <h3>🔴 Critical improvements (Phase 1)</h3>
+          <p class="description">Core optimizations for improved reliability</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optDeduplicateSelectors" checked>
+              <div class="checkbox-info">
+                <strong>Deduplicate selectors</strong>
+                <p>Exclude duplicate selectors from different libraries</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optEnableSelectorCache" checked>
+              <div class="checkbox-info">
+                <strong>Enable selector cache</strong>
+                <p>Cache generated selectors for reuse</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optSelectorCacheTTL">Selector cache TTL (ms):</label>
+            <input type="number" id="optSelectorCacheTTL" class="input" value="30000" min="5000" max="300000">
+            <small>Lifetime of cached selectors</small>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optAsyncUniquenessCheck" checked>
+              <div class="checkbox-info">
+                <strong>Async uniqueness check</strong>
+                <p>Check selector uniqueness without blocking UI</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟠 Significant improvements (Phase 2)</h3>
+          <p class="description">Improve selector quality and playback</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optSmartSelectorScoring" checked>
+              <div class="checkbox-info">
+                <strong>Smart selector scoring</strong>
+                <p>Consider length, stability and specificity when choosing selectors</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optPenalizeDynamicParts" checked>
+              <div class="checkbox-info">
+                <strong>Penalize dynamic parts</strong>
+                <p>Lower priority of selectors with UUID, timestamp, Angular hashes</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optImprovedDropdownDetection" checked>
+              <div class="checkbox-info">
+                <strong>Improved dropdown detection</strong>
+                <p>Extended support for Web Components, Shadow DOM, ARIA</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optExponentialBackoffRetry" checked>
+              <div class="checkbox-info">
+                <strong>Exponential backoff</strong>
+                <p>Adaptive delays when searching for elements</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optUseMutationObserver" checked>
+              <div class="checkbox-info">
+                <strong>MutationObserver for waiting</strong>
+                <p>Efficient waiting for dynamic elements to appear</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟡 Additional improvements (Phase 3)</h3>
+          <p class="description">Extended capabilities (some disabled by default)</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optGenerateXPath">
+              <div class="checkbox-info">
+                <strong>Generate XPath selectors</strong>
+                <span class="badge badge-optional">Optional</span>
+                <p>Additionally generate XPath for complex cases</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optImprovedOverlaySearch" checked>
+              <div class="checkbox-info">
+                <strong>Improved overlay search</strong>
+                <p>Search dropdown panels in overlay containers (Angular CDK, Material UI, etc.)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optValidateBeforeSave" checked>
+              <div class="checkbox-info">
+                <strong>Validate before saving</strong>
+                <p>Check selectors for dynamic parts and uniqueness</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optEventDebounce" checked>
+              <div class="checkbox-info">
+                <strong>Event debounce</strong>
+                <p>Merge rapid sequential events</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optEventDebounceDelay">Debounce delay (ms):</label>
+            <input type="number" id="optEventDebounceDelay" class="input" value="100" min="50" max="500">
+          </div>
+
+          <div class="setting-item">
+            <label for="optClickThrottleMs">Click throttle (ms):</label>
+            <input type="number" id="optClickThrottleMs" class="input" value="200" min="100" max="1000">
+            <small>Minimum interval between recording clicks</small>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟢 Metrics and auto-repair</h3>
+          <p class="description">Quality analysis and automatic selector improvement</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optCalculateMetrics">
+              <div class="checkbox-info">
+                <strong>Calculate quality metrics</strong>
+                <span class="badge badge-optional">Optional</span>
+                <p>Calculate stability, readability and specificity of selectors</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optAutoFixUnstable">
+              <div class="checkbox-info">
+                <strong>Auto-fix unstable selectors</strong>
+                <span class="badge badge-optional">Optional</span>
+                <p>Automatically replace unstable selectors with better alternatives</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optMinStabilityScore">Minimum stability threshold:</label>
+            <input type="number" id="optMinStabilityScore" class="input" value="70" min="0" max="100">
+            <small>Selectors below this threshold will be auto-fixed (0-100)</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- File Management -->
+      <section class="settings-section">
+        <h2 data-i18n="settings.fileManagement">📁 File management for tests</h2>
+        
+        <div class="setting-group">
+          <p class="description">Upload files to be used in autotests. Files are stored in the extension and can be auto-inserted into file upload fields.</p>
+          
+          <div class="setting-item">
+            <label for="fileUploadInput" class="btn btn-secondary" style="display: inline-block; cursor: pointer;">
+              📤 Upload file
+            </label>
+            <input type="file" id="fileUploadInput" multiple style="display: none;">
+            <small style="display: block; margin-top: 8px; color: #666;">
+              Max file size: 5MB. Total storage limit: ~10MB
+            </small>
+          </div>
+
+          <div class="setting-item">
+            <h4>Uploaded files:</h4>
+            <div id="uploadedFilesList" class="files-list">
+              <div class="empty-state" style="padding: 20px; text-align: center; color: #999;">
+                No uploaded files
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Excel Export Settings -->
+      <section class="settings-section">
+        <h2 data-i18n="settings.excelExport">📊 Export test cases to Excel</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelExportEnabled">
+              <div class="checkbox-info">
+                <strong>Enable Excel export</strong>
+                <p>Automatically create Excel files with test cases on recording, playback, or optimization</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelAutoExportEnabled">
+              <div class="checkbox-info">
+                <strong>Automatic export</strong>
+                <p>Export files without user interaction right after recording, running, or optimization</p>
+              </div>
+            </label>
+            <small>By default, reports are only available via the 📊 "Export report" button in run history</small>
+          </div>
+
+          <div class="setting-item">
+            <h4>When to export:</h4>
+            <div class="checkbox-grid">
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnRecord" checked>
+                On test recording
+              </label>
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnPlay" checked>
+                On test playback
+              </label>
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnOptimize" checked>
+                After test optimization
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelRecordConsoleErrors">
+              <div class="checkbox-info">
+                <strong>Record console errors</strong>
+                <p>During test playback, save all browser console errors to Excel (in column N for the corresponding step)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportFormat">File format:</label>
+            <select id="excelExportFormat" class="input">
+              <option value="xls">XLS (compatible CSV wrapper)</option>
+              <option value="csv">CSV</option>
+              <option value="xlsx">XLSX (real Excel file)</option>
+            </select>
+            <small>XLS format saves CSV with .xls extension (Excel opens without warnings). Choose XLSX for a full Excel file or CSV for plain text.</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportDelimiter">Value delimiter (for CSV/XLS):</label>
+            <input type="text" id="excelExportDelimiter" class="input" maxlength="2" placeholder="e.g. ; or ,">
+            <small>Default is semicolon ; — change if needed, e.g. to comma ,</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportPath">Save path (optional):</label>
+            <input type="text" id="excelExportPath" class="input" placeholder="Leave empty to save to Downloads">
+            <small>If not specified, files will be saved to the browser Downloads folder</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Advanced Settings -->
+      <section class="settings-section">
+        <h2 data-i18n="settings.advancedSettings">🔧 Advanced settings</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autotestsEnabled" checked>
+              <div class="checkbox-info">
+                <strong>Enable autotests</strong>
+                <p>Enable recording and playback interface in popup</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="verboseLogging">
+              <div class="checkbox-info">
+                <strong>Verbose logging</strong>
+                <p>Output detailed information to console (for debugging)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excludeHiddenElements" checked>
+              <div class="checkbox-info">
+                <strong>Exclude hidden elements</strong>
+                <p>Do not record interactions with hidden elements</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="smartWaits" checked>
+              <div class="checkbox-info">
+                <strong>Smart waits</strong>
+                <p>Automatically add waits for dynamic elements</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <div class="button-group">
+        <button id="resetSettings" class="btn btn-secondary">
+          <span data-i18n="settings.resetDefaults">🔄 Reset to defaults</span>
+        </button>
+        <button id="exportSettings" class="btn btn-secondary">
+          <span data-i18n="settings.exportSettings">📥 Export settings</span>
+        </button>
+        <button id="importSettings" class="btn btn-secondary">
+          <span data-i18n="settings.importSettings">📤 Import settings</span>
+        </button>
+        <button id="saveSettings" class="btn btn-primary">
+          <span data-i18n="settings.saveSettings">💾 Save settings</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

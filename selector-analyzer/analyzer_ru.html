@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 Расширенный поиск селекторов</title>
+  <link rel="stylesheet" href="analyzer.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🔍 Расширенный поиск селекторов</h1>
+      <div class="header-actions">
+        <button id="refreshBtn" class="btn btn-primary">🔄 Обновить</button>
+        <button id="exportBtn" class="btn btn-secondary">📥 Экспорт JSON</button>
+      </div>
+    </header>
+
+    <div class="info-panel">
+      <div class="info-item">
+        <span class="info-label">URL:</span>
+        <span id="currentUrl" class="info-value">Загрузка...</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Фреймворк:</span>
+        <span id="framework" class="info-value">Определение...</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Всего элементов:</span>
+        <span id="totalElements" class="info-value">0</span>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="🔍 Поиск по тексту, селектору, типу..."
+        class="search-input"
+      >
+      <div class="filter-group">
+        <label>
+          <input type="checkbox" id="filterButtons" checked>
+          Кнопки
+        </label>
+        <label>
+          <input type="checkbox" id="filterInputs" checked>
+          Поля ввода
+        </label>
+        <label>
+          <input type="checkbox" id="filterSelects" checked>
+          Выпадающие списки
+        </label>
+        <label>
+          <input type="checkbox" id="filterLinks" checked>
+          Ссылки
+        </label>
+        <label>
+          <input type="checkbox" id="filterDropdowns" checked>
+          Dropdown элементы
+        </label>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="all">Все элементы</button>
+      <button class="tab-btn" data-tab="dropdowns">Dropdown</button>
+      <button class="tab-btn" data-tab="status">Статус</button>
+      <button class="tab-btn" data-tab="options">Опции dropdown</button>
+    </div>
+
+    <div class="results-container">
+      <div id="loading" class="loading">⏳ Анализ страницы...</div>
+      <div id="results" class="results"></div>
+    </div>
+  </div>
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="analyzer.js"></script>
+</body>
+</html>
+
+

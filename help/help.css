@@ -1,0 +1,367 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.help-container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+/* ===== HEADER ===== */
+.help-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  margin: 0 -16px;
+  padding: 32px 32px 28px;
+  margin-bottom: 0;
+}
+
+.help-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.help-subtitle {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/* ===== NAV ===== */
+.help-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  background: #fff;
+  margin: 0 -16px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.help-nav a {
+  color: #555;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.help-nav a:hover {
+  color: #667eea;
+  border-bottom-color: #667eea;
+}
+
+/* ===== CONTENT ===== */
+.help-content {
+  background: #fff;
+  border-radius: 0 0 12px 12px;
+  padding: 28px 28px 8px;
+  margin: 0 -16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.help-section {
+  margin-bottom: 36px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid #eee;
+}
+
+.help-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.help-section h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: #1a1a2e;
+}
+
+.help-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.help-section p,
+.help-section li {
+  margin-bottom: 8px;
+  font-size: 0.92rem;
+  color: #444;
+}
+
+.help-section ul,
+.help-section ol {
+  margin-left: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.help-section code {
+  background: #f0f0f5;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.86em;
+  color: #764ba2;
+}
+
+kbd {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 0.84em;
+  font-family: inherit;
+  box-shadow: 0 1px 0 #bbb;
+}
+
+/* ===== STEPS GRID ===== */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.steps-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.step-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  background: #fafafe;
+  border: 1px solid #e8e8f0;
+  border-radius: 8px;
+}
+
+.step-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.step-body {
+  font-size: 0.88rem;
+}
+
+.step-body strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.9rem;
+}
+
+.step-body p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* ===== CARD GRID ===== */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
+.info-card {
+  padding: 14px;
+  background: #fafafe;
+  border: 1px solid #e8e8f0;
+  border-radius: 8px;
+}
+
+.info-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+}
+
+.info-card p {
+  font-size: 0.84rem;
+  color: #555;
+  margin: 0;
+}
+
+/* ===== TABLES ===== */
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 14px;
+  font-size: 0.9rem;
+}
+
+.help-table th,
+.help-table td {
+  border: 1px solid #e8e8f0;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.help-table th {
+  background: #f5f5fa;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.help-table tbody tr:nth-child(even) {
+  background: #fafafd;
+}
+
+.col-icon {
+  width: 60px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.col-btn {
+  width: 180px;
+  white-space: nowrap;
+}
+
+.hotref-table td:first-child {
+  font-weight: 500;
+  width: 140px;
+}
+
+/* ===== TAGS ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag.red { background: #fee; color: #c0392b; }
+.tag.green { background: #eafbe7; color: #27ae60; }
+.tag.yellow { background: #fff8e1; color: #f39c12; }
+.tag.blue { background: #e8f0fe; color: #2962ff; }
+.tag.gray { background: #f0f0f0; color: #555; }
+
+/* ===== TIP BOX ===== */
+.tip-box {
+  background: #f0f7ff;
+  border-left: 3px solid #667eea;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+  font-size: 0.88rem;
+  color: #333;
+}
+
+.tip-box strong {
+  color: #667eea;
+}
+
+/* ===== HINT ===== */
+.hint {
+  font-size: 0.85rem;
+  color: #777;
+  margin-top: 4px;
+}
+
+/* ===== SETTINGS OVERVIEW ===== */
+.settings-overview {
+  display: grid;
+  gap: 2px;
+}
+
+.setting-block {
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.setting-block:last-child {
+  border-bottom: none;
+}
+
+.setting-block h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.setting-block p {
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+
+.setting-block ul {
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.setting-block li {
+  font-size: 0.86rem;
+  margin-bottom: 3px;
+}
+
+/* ===== FOOTER ===== */
+.help-footer {
+  text-align: center;
+  padding: 20px 0 8px;
+  color: #aaa;
+  font-size: 0.82rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 600px) {
+  .help-header {
+    padding: 24px 20px;
+  }
+
+  .help-content {
+    padding: 20px 16px 8px;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col-btn {
+    width: auto;
+  }
+
+  .help-nav a {
+    font-size: 0.8rem;
+    padding: 8px 8px;
+  }
+}

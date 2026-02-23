@@ -1,0 +1,3988 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #f5f5f5;
+  min-height: 100vh;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Темная тема */
+body.dark-theme {
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+body.dark-theme .header,
+body.dark-theme .actions-section {
+  background: #2d2d2d;
+  color: #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+body.dark-theme .action-item {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+/* Убеждаемся, что action-item.input выглядит так же, как action-item.click */
+body.dark-theme .action-item.input {
+  background: #2d2d2d !important;
+  border-color: #404040 !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-theme .action-item:hover {
+  border-color: #4CAF50;
+}
+
+body.dark-theme .action-item.input:hover {
+  border-color: #4CAF50 !important;
+}
+
+body.dark-theme .action-field-input {
+  background: white !important; /* Тот же цвет, что и в светлом режиме */
+  border-color: #e0e0e0 !important; /* Тот же цвет, что и в светлом режиме */
+  color: #333 !important; /* Тот же цвет, что и в светлом режиме */
+}
+
+body.dark-theme .action-field-input:focus {
+  border-color: #4CAF50 !important;
+  background: white !important; /* Тот же цвет, что и в светлом режиме */
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1) !important;
+}
+
+body.dark-theme .action-field-input:hover {
+  border-color: #b0b0b0 !important;
+}
+
+/* Убеждаемся, что поля ввода в действиях типа input выглядят так же, как и в других действиях */
+body.dark-theme .action-item.input .action-field-input,
+body.dark-theme .action-item .action-field-input {
+  background: white !important;
+  border-color: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+/* Поля значения тоже должны быть белыми в темном режиме */
+body.dark-theme .action-field-value {
+  background: white !important;
+  border-color: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+body.dark-theme .action-item.input .action-field-value,
+body.dark-theme .action-item .action-field-value {
+  background: white !important;
+  border-color: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+/* Универсальный селектор для всех input элементов внутри action-item в темном режиме */
+body.dark-theme .action-item input,
+body.dark-theme .action-item input[type="text"],
+body.dark-theme .action-item input[type="password"],
+body.dark-theme .action-item textarea {
+  background: white !important;
+  border-color: #e0e0e0 !important;
+  color: #333 !important;
+}
+
+body.dark-theme .action-item input:focus,
+body.dark-theme .action-item input[type="text"]:focus,
+body.dark-theme .action-item input[type="password"]:focus,
+body.dark-theme .action-item textarea:focus {
+  background: white !important;
+  border-color: #4CAF50 !important;
+  color: #333 !important;
+}
+
+body.dark-theme .input {
+  background: white; /* Тот же цвет, что и в светлом режиме */
+  border-color: #e0e0e0; /* Тот же цвет, что и в светлом режиме */
+  color: #333; /* Тот же цвет, что и в светлом режиме */
+}
+
+body.dark-theme .input:focus {
+  border-color: #4CAF50;
+  background: white; /* Тот же цвет, что и в светлом режиме */
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+body.dark-theme .modal-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+body.dark-theme .modal-header,
+body.dark-theme .modal-footer {
+  border-color: #404040;
+}
+
+body.dark-theme .form-group input,
+body.dark-theme .form-group select,
+body.dark-theme .form-group textarea {
+  background: white; /* Тот же цвет, что и в светлом режиме */
+  border-color: #e0e0e0; /* Тот же цвет, что и в светлом режиме */
+  color: #333; /* Тот же цвет, что и в светлом режиме */
+}
+
+body.dark-theme .form-group input:focus,
+body.dark-theme .form-group select:focus,
+body.dark-theme .form-group textarea:focus {
+  border-color: #4CAF50;
+  background: white; /* Тот же цвет, что и в светлом режиме */
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+body.dark-theme .selector-dropdown {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+body.dark-theme .selector-entry-value {
+  background: #1e1e1e;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+body.dark-theme .test-metadata,
+body.dark-theme .optimization-status {
+  background: #252525;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+/* Группировка шагов по страницам */
+.action-group {
+  margin-bottom: 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+body.dark-theme .action-group {
+  background: #252525;
+  border-color: #404040;
+}
+
+.action-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f0f0f0;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+  font-weight: 600;
+  color: #333;
+}
+
+body.dark-theme .action-group-header {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.action-group-header:hover {
+  background: #e8e8e8;
+}
+
+body.dark-theme .action-group-header:hover {
+  background: #353535;
+}
+
+.group-toggle-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+body.dark-theme .group-toggle-icon {
+  color: #999;
+}
+
+.group-url {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-action-count {
+  font-size: 12px;
+  color: #666;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+body.dark-theme .group-action-count {
+  background: #1e1e1e;
+  color: #999;
+}
+
+.action-group-content {
+  padding: 12px;
+  display: block;
+}
+
+.action-group-content.collapsed {
+  display: none;
+}
+
+.action-group-content .action-item {
+  margin-bottom: 12px;
+}
+
+.action-group-content .action-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Меню экспорта */
+.export-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.export-menu-content {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  min-width: 300px;
+}
+
+body.dark-theme .export-menu-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.export-menu-content h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+body.dark-theme .export-menu-content h3 {
+  color: #e0e0e0;
+}
+
+.export-menu-content .btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.export-menu-content .btn:last-of-type {
+  margin-bottom: 0;
+  margin-top: 16px;
+}
+
+/* Секция скриншотов */
+.screenshot-section {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+body.dark-theme .screenshot-section {
+  background: #252525;
+  border-color: #404040;
+}
+
+.screenshot-container {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.screenshot-image {
+  max-width: 100%;
+  max-height: 400px;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+body.dark-theme .screenshot-image {
+  border-color: #404040;
+}
+
+.screenshot-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.screenshot-comparison {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+body.dark-theme .screenshot-comparison {
+  background: #1e1e1e;
+  border-color: #404040;
+}
+
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.comparison-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.comparison-badge.has-differences {
+  background: #ffebee;
+  color: #c62828;
+}
+
+body.dark-theme .comparison-badge.has-differences {
+  background: #3d1f1f;
+  color: #ff6b6b;
+}
+
+.comparison-badge.no-differences {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+body.dark-theme .comparison-badge.no-differences {
+  background: #1f3d1f;
+  color: #81c784;
+}
+
+/* Блоки условий и циклов */
+.condition-block,
+.loop-block {
+  border-left: 4px solid #2196F3;
+  background: #e3f2fd;
+  margin-left: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body.dark-theme .condition-block,
+body.dark-theme .loop-block {
+  background: #1a237e;
+  border-left-color: #64b5f6;
+  color: #e0e0e0;
+}
+
+body.dark-theme .condition-block .action-header,
+body.dark-theme .loop-block .action-header {
+  color: #e0e0e0;
+}
+
+/* Защита от удаления циклов/условий при перетаскивании */
+.condition-block.protected-from-delete,
+.loop-block.protected-from-delete {
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.5);
+}
+
+/* Индикатор того, что цикл/условие защищен */
+.loop-block::before,
+.condition-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: background-color 0.2s;
+}
+
+.loop-block.drag-protected::before,
+.condition-block.drag-protected::before {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.condition-expression,
+.loop-description {
+  flex: 1;
+  margin: 0 12px;
+  font-weight: 600;
+  color: #1976d2;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+body.dark-theme .condition-expression,
+body.dark-theme .loop-description {
+  color: #90caf9;
+}
+
+.condition-branch {
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff;
+  border-radius: 6px;
+  border-left: 3px solid #4CAF50;
+}
+
+body.dark-theme .condition-branch {
+  background: #2d2d2d;
+  border-left-color: #66bb6a;
+  color: #e0e0e0;
+}
+
+.condition-branch.else-branch {
+  border-left-color: #f44336;
+  margin-top: 12px;
+}
+
+body.dark-theme .condition-branch.else-branch {
+  border-left-color: #ef5350;
+  background: #2d1f1f;
+}
+
+.branch-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+body.dark-theme .branch-header {
+  color: #e0e0e0;
+}
+
+.loop-actions-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+body.dark-theme .loop-actions-header {
+  color: #e0e0e0;
+}
+
+.branch-actions,
+.loop-actions {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  transition: border-color 0.2s, background-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Минимальная высота и padding только когда нет действий (для empty-branch) */
+.branch-actions .empty-branch,
+.loop-actions .empty-branch {
+  min-height: 40px;
+  padding: 8px;
+  margin: 0;
+  border: 2px dashed transparent;
+  border-radius: 4px;
+}
+
+/* Border и padding при перетаскивании (drop-zone-active) */
+.branch-actions.drop-zone-active,
+.loop-actions.drop-zone-active {
+  min-height: 40px;
+  padding: 8px;
+  border: 2px dashed #4CAF50;
+  border-radius: 4px;
+}
+
+/* Расширяем действия внутри цикла/условия */
+.loop-actions .action-item,
+.branch-actions .action-item {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.loop-actions .action-item:last-child,
+.branch-actions .action-item:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Расширяем контент действий внутри цикла */
+.loop-actions .action-content,
+.branch-actions .action-content {
+  width: 100% !important;
+  max-width: none !important;
+  grid-template-columns: 1fr !important; /* Одна колонка внутри цикла/условия */
+  display: grid !important;
+}
+
+/* Расширяем header действий внутри цикла */
+.loop-actions .action-header,
+.branch-actions .action-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+
+.loop-actions .action-header .action-type,
+.branch-actions .action-header .action-type {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Кнопки действий внутри цикла - справа в header (как в свёрнутом режиме, но для развёрнутых) */
+.loop-actions .action-item:not(.collapsed) .action-actions,
+.branch-actions .action-item:not(.collapsed) .action-actions {
+  width: auto !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+  margin-top: 0 !important;
+  margin-left: auto !important;
+}
+
+/* В свёрнутом режиме кнопки на одной линии справа */
+.loop-actions .action-item.collapsed .action-actions,
+.branch-actions .action-item.collapsed .action-actions {
+  width: auto !important;
+  margin-top: 0 !important;
+  flex-wrap: nowrap !important;
+}
+
+/* Расширяем поля действий внутри цикла */
+.loop-actions .action-field,
+.branch-actions .action-field {
+  width: 100%;
+  max-width: none;
+}
+
+/* Расширяем обертку селектора внутри цикла */
+.loop-actions .selector-field-wrapper,
+.branch-actions .selector-field-wrapper {
+  width: 100%;
+  max-width: none;
+}
+
+/* Расширяем кнопки быстрых действий внутри цикла */
+.loop-actions .selector-quick-actions,
+.branch-actions .selector-quick-actions {
+  width: 100%;
+  max-width: none;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Расширяем все input поля внутри цикла */
+.loop-actions .action-field-input,
+.branch-actions .action-field-input {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Расширяем поля значений внутри цикла */
+.loop-actions .action-field-value,
+.branch-actions .action-field-value {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Расширяем selector-input-container внутри цикла */
+.loop-actions .selector-input-container,
+.branch-actions .selector-input-container {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Расширяем selector-input внутри цикла */
+.loop-actions .selector-input,
+.branch-actions .selector-input {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.branch-actions.drop-zone-active,
+.loop-actions.drop-zone-active {
+  border-color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.empty-branch {
+  padding: 8px;
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed transparent;
+  border-radius: 4px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.empty-branch.drop-zone-active {
+  border-color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+body.dark-theme .empty-branch {
+  color: #666;
+}
+
+body.dark-theme .branch-actions.drop-zone-active,
+body.dark-theme .loop-actions.drop-zone-active,
+body.dark-theme .empty-branch.drop-zone-active {
+  border-color: #66bb6a;
+  background-color: rgba(102, 187, 106, 0.1);
+}
+
+/* Зона drop после цикла/условия - расширенная, становится видимой при перетаскивании */
+.after-loop-drop-zone,
+.after-condition-drop-zone {
+  min-height: 60px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  margin-left: 0;
+  margin-right: 0;
+  padding: 16px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  background: rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.after-loop-drop-zone::after,
+.after-condition-drop-zone::after {
+  content: '⬇️ Перетащите сюда шаг для добавления после цикла';
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+}
+
+body.dark-theme .after-loop-drop-zone::after,
+body.dark-theme .after-condition-drop-zone::after {
+  color: #666;
+}
+
+.after-condition-drop-zone::after {
+  content: '⬇️ Перетащите сюда шаг для добавления после условия';
+}
+
+.after-loop-drop-zone.drop-zone-active,
+.after-condition-drop-zone.drop-zone-active {
+  border-color: #4CAF50 !important;
+  background-color: rgba(76, 175, 80, 0.15) !important;
+  min-height: 80px !important;
+  border-width: 3px !important;
+  border-style: solid !important;
+}
+
+.after-loop-drop-zone.drop-zone-active::after,
+.after-condition-drop-zone.drop-zone-active::after {
+  content: '✨ Отпустите для добавления шага';
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+body.dark-theme .after-loop-drop-zone,
+body.dark-theme .after-condition-drop-zone {
+  border-color: #555;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+body.dark-theme .after-loop-drop-zone.drop-zone-active,
+body.dark-theme .after-condition-drop-zone.drop-zone-active {
+  border-color: #66bb6a !important;
+  background-color: rgba(102, 187, 106, 0.15) !important;
+}
+
+body.dark-theme .after-loop-drop-zone.drop-zone-active::after,
+body.dark-theme .after-condition-drop-zone.drop-zone-active::after {
+  color: #66bb6a;
+}
+
+/* Стили для информации о переменной цикла в тёмном режиме */
+body.dark-theme .loop-variable-info {
+  background: rgba(33, 150, 243, 0.2) !important;
+  color: #e0e0e0 !important;
+  border: 1px solid rgba(100, 181, 246, 0.3) !important;
+}
+
+body.dark-theme .loop-variable-info code {
+  background: #1e1e1e !important;
+  color: #64b5f6 !important;
+  border: 1px solid rgba(100, 181, 246, 0.3) !important;
+}
+
+body.dark-theme .loop-variable-info strong {
+  color: #90caf9 !important;
+}
+
+/* Стили для элементов перехода (goto) в тёмном режиме */
+body.dark-theme .goto-inline {
+  color: #e0e0e0 !important;
+}
+
+body.dark-theme .goto-inline label {
+  color: #b0b0b0 !important;
+}
+
+body.dark-theme .goto-select {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #555 !important;
+}
+
+body.dark-theme .goto-select:hover {
+  border-color: #64b5f6 !important;
+  background: #333 !important;
+}
+
+body.dark-theme .goto-select:focus {
+  border-color: #64b5f6 !important;
+  outline: none !important;
+  background: #333 !important;
+}
+
+body.dark-theme .goto-select option {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+/* Улучшенные стили для веток условий в тёмном режиме */
+body.dark-theme .condition-branch .branch-header {
+  color: #e0e0e0;
+}
+
+body.dark-theme .condition-branch .branch-header span {
+  color: #90caf9;
+}
+
+/* Улучшенные стили для действий внутри циклов/условий в тёмном режиме */
+body.dark-theme .loop-actions .action-item,
+body.dark-theme .branch-actions .action-item {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+body.dark-theme .loop-actions .action-item:hover,
+body.dark-theme .branch-actions .action-item:hover {
+  border-color: #66bb6a;
+  background: #333;
+}
+
+/* Улучшенные стили для пустых веток в тёмном режиме */
+body.dark-theme .empty-branch {
+  color: #888;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: #555;
+}
+
+body.dark-theme .empty-branch:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #666;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header h1 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+body.dark-theme .header h1 {
+  color: #e0e0e0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.test-name-input {
+  flex: 1;
+}
+
+.run-mode-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-run-full {
+  background: #795548;
+  color: #fff;
+}
+
+.btn-run-full:hover {
+  background: #5d4037;
+}
+
+.btn-run-optimized {
+  background: #673ab7;
+  color: #fff;
+}
+
+.btn-run-optimized:hover {
+  background: #4e2a9c;
+}
+
+.btn-run-optimized:disabled,
+.btn-run-full:disabled,
+.btn-run-debug:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-run-debug {
+  background: #9C27B0;
+  color: #fff;
+}
+
+.btn-run-debug:hover {
+  background: #7B1FA2;
+}
+
+.btn-run-parallel {
+  background: #FF6F00;
+  color: #fff;
+}
+
+.btn-run-parallel:hover {
+  background: #E65100;
+}
+
+.test-metadata {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+  color: #666;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.metadata-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metadata-label {
+  font-weight: 600;
+  color: #333;
+}
+
+body.dark-theme .metadata-label {
+  color: #e0e0e0;
+}
+
+.metadata-value {
+  color: #666;
+}
+
+.optimization-status {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #f9f9ff;
+  border: 1px solid #dfe2ff;
+  font-size: 13px;
+  color: #333;
+}
+
+.optimization-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.optimization-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #666;
+}
+
+body.dark-theme .stat-label {
+  color: #666; /* Тот же цвет, что и в светлом режиме */
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #333;
+}
+
+body.dark-theme .stat-value {
+  color: #333; /* Тот же цвет, что и в светлом режиме */
+}
+
+.stat-value.active {
+  color: #4CAF50;
+}
+
+.stat-value.inactive {
+  color: #FF9800;
+}
+
+.stat-value.optimized {
+  color: #667eea;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-telegram {
+  background: linear-gradient(135deg, #0088cc 0%, #0066aa 100%);
+  color: white;
+  border: none;
+  font-weight: 600;
+}
+
+.btn-telegram:hover {
+  background: linear-gradient(135deg, #0066aa 0%, #004488 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 136, 204, 0.3);
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-primary {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #45a049;
+}
+
+.btn-secondary {
+  background: #2196F3;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #0b7dda;
+}
+
+.btn-secondary {
+  background: #2196F3;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #0b7dda;
+}
+
+.btn-danger {
+  background: #f44336;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #da190b;
+}
+
+.btn-warning {
+  background: #FF9800;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #e68900;
+}
+
+.btn-info {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #138496;
+}
+
+.btn-record {
+  background: #9e9e9e;
+  color: white;
+}
+
+.btn-record:hover {
+  background: #757575;
+}
+
+.btn-record-active {
+  background: #f44336;
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+.btn-record-active:hover {
+  background: #da190b;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.input {
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.actions-section {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 18px;
+  color: #333;
+}
+
+body.dark-theme .section-header h2 {
+  color: #e0e0e0;
+}
+
+.section-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.actions-list.drop-zone-active {
+  border: 2px dashed #4CAF50;
+  border-radius: 4px;
+  background-color: rgba(76, 175, 80, 0.05);
+  padding: 8px;
+}
+
+body.dark-theme .actions-list.drop-zone-active {
+  border-color: #66bb6a;
+  background-color: rgba(102, 187, 106, 0.1);
+}
+
+.actions-list:has(.action-item.collapsed) {
+  gap: 4px;
+}
+
+/* Более компактное отображение для свёрнутых элементов */
+.action-item.collapsed {
+  border-left: 3px solid transparent;
+  transition: border-left-color 0.2s, border-color 0.2s;
+}
+
+.action-item.collapsed:hover {
+  border-left-color: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.action-item.collapsed.click,
+.action-item.collapsed.dblclick {
+  border-left-color: #4CAF50;
+}
+
+.action-item.collapsed.input {
+  border-left-color: #FF9800;
+}
+
+.action-item.collapsed.change {
+  border-left-color: #9C27B0;
+}
+
+.action-item.collapsed.scroll {
+  border-left-color: #2196F3;
+}
+
+.action-item.collapsed.navigation {
+  border-left-color: #607D8B;
+}
+
+/* Приглушаем цветную границу для скрытых и оптимизированных */
+.action-item.collapsed.action-hidden.click,
+.action-item.collapsed.action-hidden.input,
+.action-item.collapsed.action-hidden.change,
+.action-item.collapsed.action-hidden.scroll,
+.action-item.collapsed.action-hidden.navigation {
+  border-left-color: #b0b0b0;
+}
+
+.action-item.collapsed.action-optimized.click,
+.action-item.collapsed.action-optimized.input,
+.action-item.collapsed.action-optimized.change,
+.action-item.collapsed.action-optimized.scroll,
+.action-item.collapsed.action-optimized.navigation {
+  border-left-color: #a0a0a0;
+}
+
+.action-item {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+  transition: all 0.2s;
+  position: relative;
+}
+
+/* Кнопки вставки шага между существующими */
+.action-insert-before,
+.action-insert-after {
+  position: absolute;
+  left: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #4CAF50;
+  font-size: 16px;
+  font-weight: bold;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.2s;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.action-insert-before {
+  top: -12px;
+  transform: none;
+}
+
+.action-insert-after {
+  bottom: -12px;
+  top: auto;
+  transform: none;
+}
+
+.action-item.show-insert-buttons .action-insert-before,
+.action-item.show-insert-buttons .action-insert-after {
+  display: flex;
+}
+
+.action-insert-before:hover,
+.action-insert-after:hover {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: #4CAF50;
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+body.dark-theme .action-insert-before,
+body.dark-theme .action-insert-after {
+  background: rgba(102, 187, 106, 0.2);
+  border-color: rgba(102, 187, 106, 0.4);
+  color: #66bb6a;
+}
+
+body.dark-theme .action-insert-before:hover,
+body.dark-theme .action-insert-after:hover {
+  background: rgba(102, 187, 106, 0.3);
+  border-color: #66bb6a;
+}
+
+/* Компактные отступы для действий внутри циклов/условий в развёрнутом режиме */
+.loop-actions .action-item:not(.collapsed),
+.branch-actions .action-item:not(.collapsed) {
+  padding: 8px 12px !important;
+  margin-bottom: 8px !important;
+  border-radius: 6px;
+  background: white !important;
+}
+
+.action-item:hover {
+  border-color: #4CAF50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.action-item.collapsed {
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  background: white;
+}
+
+.action-item.collapsed:hover {
+  border-color: #4CAF50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.action-item.collapsed .action-content {
+  display: none;
+}
+
+/* Для циклов и условий в свёрнутом режиме показываем содержимое компактно */
+.loop-block.collapsed .action-content,
+.condition-block.collapsed .action-content {
+  display: block !important;
+  margin-top: 8px;
+  padding: 0;
+}
+
+/* Скрываем заголовки и лишние элементы в свёрнутых циклах/условиях */
+.loop-block.collapsed .loop-actions-header,
+.condition-block.collapsed .branch-header,
+.loop-block.collapsed .loop-variable-info,
+.condition-block.collapsed .goto-inline {
+  display: none;
+}
+
+/* Компактное отображение свёрнутых шагов внутри циклов/условий */
+.loop-block.collapsed .loop-actions,
+.condition-block.collapsed .branch-actions {
+  margin: 0;
+  padding: 4px 0;
+  min-height: auto;
+}
+
+/* Компактные отступы для свёрнутых веток условий */
+.condition-block.collapsed .condition-branch {
+  margin: 4px 0;
+  padding: 4px 8px;
+}
+
+/* В свёрнутом режиме действия внутри циклов/условий используют те же стили, что и обычные свёрнутые действия */
+/* Не переопределяем стили - используем стандартные .action-item.collapsed */
+
+/* Скрываем содержимое действий внутри свёрнутых циклов/условий */
+.loop-block.collapsed .loop-actions .action-item .action-content,
+.condition-block.collapsed .branch-actions .action-item .action-content {
+  display: none !important;
+}
+
+/* Скрываем все поля (селектор, значение) внутри свёрнутых действий */
+.loop-block.collapsed .loop-actions .action-item .action-field,
+.condition-block.collapsed .branch-actions .action-item .action-field,
+.loop-block.collapsed .loop-actions .action-item .selector-field-wrapper,
+.condition-block.collapsed .branch-actions .action-item .selector-field-wrapper,
+.loop-block.collapsed .loop-actions .action-item .selector-quick-actions,
+.condition-block.collapsed .branch-actions .action-item .selector-quick-actions {
+  display: none !important;
+}
+
+/* Скрываем индикаторы качества и другие элементы внутри свёрнутых действий */
+.loop-block.collapsed .loop-actions .action-item .selector-quality-indicator,
+.condition-block.collapsed .branch-actions .action-item .selector-quality-indicator,
+.loop-block.collapsed .loop-actions .action-item .action-status-badge,
+.condition-block.collapsed .branch-actions .action-item .action-status-badge {
+  display: none;
+}
+
+/* Компактные отступы между свёрнутыми действиями внутри циклов */
+.loop-block.collapsed .loop-actions .action-item,
+.condition-block.collapsed .branch-actions .action-item {
+  margin-bottom: 4px;
+}
+
+.loop-block.collapsed .loop-actions .action-item:last-child,
+.condition-block.collapsed .branch-actions .action-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Скрываем пустые сообщения в свёрнутом режиме */
+.loop-block.collapsed .empty-branch,
+.condition-block.collapsed .empty-branch {
+  display: none;
+}
+
+/* Компактный заголовок для свёрнутых веток условий */
+.condition-block.collapsed .condition-branch::before {
+  content: attr(data-branch-label);
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 4px;
+  display: block;
+}
+
+body.dark-theme .condition-block.collapsed .condition-branch::before {
+  color: #999;
+}
+
+/* Уменьшаем отступы в свёрнутом режиме */
+.loop-block.collapsed,
+.condition-block.collapsed {
+  padding: 8px 12px;
+}
+
+/* Компактное отображение свёрнутых шагов - убираем лишние отступы */
+.loop-block.collapsed .loop-actions .action-item:last-child,
+.condition-block.collapsed .branch-actions .action-item:last-child {
+  margin-bottom: 0;
+}
+
+.action-item.collapsed .action-header {
+  margin-bottom: 0;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: space-between; /* Текст слева, кнопки справа */
+}
+
+.action-item.action-hidden {
+  opacity: 0.65;
+  background: #e8e8e8;
+  border-color: #d0d0d0;
+}
+
+.action-item.action-hidden:hover {
+  border-color: #b0b0b0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.action-item.collapsed.action-hidden {
+  opacity: 0.7;
+  background: #f0f0f0;
+  border: 2px solid #d5d5d5;
+}
+
+.action-item.collapsed.action-hidden:hover {
+  border-color: #b5b5b5;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+/* Приглушаем все элементы внутри скрытого действия */
+.action-item.action-hidden .action-type-badge {
+  opacity: 0.6;
+  filter: grayscale(40%);
+}
+
+.action-item.action-hidden .action-summary {
+  color: #999;
+  opacity: 0.7;
+}
+
+.action-item.action-hidden .action-number.clickable-number {
+  opacity: 0.7;
+  filter: grayscale(30%);
+}
+
+.action-item.action-hidden .action-actions .btn {
+  opacity: 0.6;
+  filter: grayscale(50%);
+}
+
+/* Деактивация кнопок вложенных шагов, когда родительский цикл/условие скрыт */
+.loop-block.action-hidden .loop-actions .action-item .action-actions .btn,
+.condition-block.action-hidden .branch-actions .action-item .action-actions .btn,
+.loop-block.action-hidden .loop-actions .action-item .action-actions,
+.condition-block.action-hidden .branch-actions .action-item .action-actions {
+  opacity: 0.25 !important;
+  filter: grayscale(100%) !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+.loop-block.action-hidden .loop-actions .action-item .action-actions .btn:hover,
+.condition-block.action-hidden .branch-actions .action-item .action-actions .btn:hover {
+  opacity: 0.25 !important;
+  filter: grayscale(100%) !important;
+  transform: none !important;
+  box-shadow: none !important;
+  background-color: inherit !important;
+  border-color: inherit !important;
+}
+
+/* Деактивация всех интерактивных элементов вложенных шагов, когда родитель скрыт */
+.loop-block.action-hidden .loop-actions .action-item,
+.condition-block.action-hidden .branch-actions .action-item {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.loop-block.action-hidden .loop-actions .action-item .action-header,
+.condition-block.action-hidden .branch-actions .action-item .action-header {
+  pointer-events: none !important;
+}
+
+/* Разрешаем pointer-events только для самого скрытого блока, чтобы можно было его показать */
+.loop-block.action-hidden .action-actions,
+.condition-block.action-hidden .action-actions {
+  pointer-events: auto !important;
+}
+
+.action-item.action-hidden .drag-handle {
+  opacity: 0.4;
+}
+
+.action-item.action-hidden .action-status-badge {
+  opacity: 0.6;
+  filter: grayscale(30%);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.action-item.action-hidden::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 152, 0, 0.15);
+  border-radius: 8px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.action-item.action-hidden::after {
+  content: '👁️ СКРЫТО';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 152, 0, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.action-item.collapsed.action-hidden::after {
+  top: 4px;
+  right: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+.action-item.action-optimized {
+  background: #f5f5f5;
+  border-color: #d5d5d5;
+  opacity: 0.75;
+}
+
+.action-item.action-optimized:hover {
+  border-color: #b5b5b5;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.action-item.collapsed.action-optimized {
+  background: #f8f8f8;
+  border: 2px solid #d8d8d8;
+  opacity: 0.8;
+}
+
+.action-item.collapsed.action-optimized:hover {
+  border-color: #b8b8b8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.action-item.action-optimized::before {
+  content: '⚡ ОПТИМИЗАЦИЯ';
+  background: #673ab7;
+  opacity: 0.8;
+}
+
+.action-item.collapsed.action-optimized::before {
+  top: 4px;
+  right: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+/* Приглушаем все элементы внутри оптимизированного действия */
+.action-item.action-optimized .action-type-badge {
+  opacity: 0.7;
+  filter: grayscale(30%);
+}
+
+.action-item.action-optimized .action-summary {
+  color: #888;
+  opacity: 0.8;
+}
+
+.action-item.action-optimized .action-number.clickable-number {
+  opacity: 0.75;
+  filter: grayscale(20%);
+}
+
+.action-item.action-optimized .action-actions .btn {
+  opacity: 0.65;
+  filter: grayscale(40%);
+}
+
+.action-item.action-optimized .drag-handle {
+  opacity: 0.5;
+}
+
+.action-item.action-optimized .action-status-badge {
+  opacity: 0.7;
+  filter: grayscale(20%);
+}
+
+/* Если элемент и скрыт, и оптимизирован - делаем ещё более серым */
+.action-item.action-hidden.action-optimized {
+  opacity: 0.55;
+  background: #e0e0e0;
+  filter: grayscale(20%);
+}
+
+.action-item.action-hidden.action-optimized .action-type-badge,
+.action-item.action-hidden.action-optimized .action-number.clickable-number,
+.action-item.action-hidden.action-optimized .action-actions .btn {
+  filter: grayscale(60%);
+  opacity: 0.5;
+}
+
+.action-status-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.action-item.collapsed .action-status-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.action-status-badge.optimized {
+  background: #ede7f6;
+  color: #4a2aa8;
+  border: 1px solid #d1c4e9;
+}
+
+
+.optimization-details {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  background: #f3f5ff;
+  border-left: 4px solid #5a39c4;
+  font-size: 13px;
+  color: #333;
+  display: grid;
+  gap: 4px;
+}
+
+.action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-item.collapsed .action-header {
+  margin-bottom: 0;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: space-between; /* Текст слева, кнопки справа */
+}
+
+.action-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.action-item.collapsed .action-type {
+  flex: 1;
+  overflow: hidden;
+  gap: 6px;
+  min-width: 0; /* Позволяет summary обрезаться */
+}
+
+.action-type-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.action-item.collapsed .action-type-badge {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 10px;
+}
+
+.action-type-badge.click {
+  background: #4CAF50;
+  color: white;
+}
+
+.action-type-badge.input {
+  background: #FF9800;
+  color: white;
+}
+
+/* В темном режиме шильдик ВВОД должен оставаться оранжевым */
+body.dark-theme .action-type-badge.input {
+  background: #FF9800 !important;
+  color: white !important;
+}
+
+.action-type-badge.change {
+  background: #9C27B0;
+  color: white;
+}
+
+.action-type-badge.scroll {
+  background: #2196F3;
+  color: white;
+}
+
+.action-type-badge.navigation {
+  background: #607D8B;
+  color: white;
+}
+
+.action-type-badge.wait {
+  background: #795548;
+  color: white;
+}
+
+.action-type-badge.keyboard {
+  background: #3F51B5;
+  color: white;
+}
+
+.action-type-badge.api {
+  background: #009688;
+  color: white;
+}
+
+.action-type-badge.variable,
+.action-type-badge.setVariable {
+  background: #E91E63;
+  color: white;
+}
+
+.action-type-badge.assertion {
+  background: #4CAF50;
+  color: white;
+}
+
+.action-type-badge.ai {
+  background: #9C27B0;
+  color: white;
+}
+
+.action-type-badge.cloud {
+  background: #00BCD4;
+  color: white;
+}
+
+.action-type-badge.suite {
+  background: #673AB7;
+  color: white;
+}
+
+.action-type-badge.javascript {
+  background: #FFC107;
+  color: #333;
+}
+
+.action-type-badge.screenshot {
+  background: #FF5722;
+  color: white;
+}
+
+.action-type-badge.cookie {
+  background: #8BC34A;
+  color: white;
+}
+
+.action-type-badge.mobile {
+  background: #03A9F4;
+  color: white;
+}
+
+.action-type-badge.hover,
+.action-type-badge.focus,
+.action-type-badge.blur {
+  background: #607D8B;
+  color: white;
+}
+
+.action-type-badge.clear {
+  background: #9E9E9E;
+  color: white;
+}
+
+.action-type-badge.upload {
+  background: #2196F3;
+  color: white;
+}
+
+.action-type-badge.condition {
+  background: #FF9800;
+  color: white;
+}
+
+.action-type-badge.loop {
+  background: #3F51B5;
+  color: white;
+}
+
+.action-field-label {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+  background: #f5f5f5;
+  border: 2px solid #e0e0e0;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-item.collapsed .action-field-label {
+  padding: 3px 8px;
+  font-size: 11px;
+  margin-left: 6px;
+  max-width: 200px;
+}
+
+.action-item.action-hidden .action-field-label {
+  opacity: 0.6;
+  background: #e8e8e8;
+  border-color: #d0d0d0;
+  color: #777;
+}
+
+.action-item.action-optimized .action-field-label {
+  opacity: 0.75;
+  background: #f0f0f0;
+  border-color: #d5d5d5;
+}
+
+.action-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Компактные кнопки для действий внутри циклов и условий (только в развёрнутом режиме) */
+.action-item.inside-nested:not(.collapsed) .action-header {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.action-item.inside-nested:not(.collapsed) .action-type {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-item.inside-nested:not(.collapsed) .action-actions {
+  position: relative;
+  top: 0;
+  right: 0;
+  gap: 4px;
+  flex-wrap: nowrap;
+  margin: 0;
+  margin-left: auto;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.action-item.inside-nested:not(.collapsed) .action-actions.compact-buttons .btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  min-width: 28px;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-actions .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.action-item.collapsed .action-actions {
+  gap: 4px;
+  flex-shrink: 0; /* Кнопки не сжимаются */
+  margin-left: auto; /* Прижимаем к правому краю */
+}
+
+.action-item.collapsed .action-actions .btn {
+  padding: 4px 8px;
+  font-size: 14px; /* Размер для иконок-эмодзи */
+  min-width: 32px;
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  line-height: 1; /* Для правильного отображения эмодзи */
+}
+
+.btn-collapse {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-collapse:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.action-summary {
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  max-width: 400px;
+}
+
+.action-item.collapsed .action-summary {
+  font-size: 11px;
+  color: #888;
+  margin-left: 6px;
+  max-width: none;
+  flex: 1 1 auto;
+}
+
+.action-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+/* Дублирующее правило удалено - используется выше */
+
+.action-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+body.dark-theme .action-field label {
+  color: #b0b0b0;
+}
+
+/* Приглушаем поля ввода в скрытых и оптимизированных элементах */
+.action-item.action-hidden .action-field label,
+.action-item.action-optimized .action-field label {
+  color: #999;
+  opacity: 0.7;
+}
+
+.action-item.action-hidden .action-field-input,
+.action-item.action-optimized .action-field-input {
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+  color: #777;
+  opacity: 0.8;
+}
+
+.action-item.action-hidden .action-field-value,
+.action-item.action-optimized .action-field-value {
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+  color: #777;
+  opacity: 0.8;
+}
+
+.action-field-value {
+  padding: 8px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.action-field-input {
+  padding: 8px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 100%;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.action-field-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.action-field-input:hover {
+  border-color: #b0b0b0;
+}
+
+.selector-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selector-field-wrapper.has-reserves .selector-dropdown-toggle {
+  background: #f1f8e9;
+  border-color: #c5e1a5;
+}
+
+.selector-dropdown-toggle {
+  border: 2px solid #e0e0e0;
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.selector-dropdown-toggle:hover {
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.selector-dropdown-toggle .selector-count {
+  background: #4CAF50;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.selector-dropdown {
+  display: none;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  z-index: 5;
+}
+
+.selector-dropdown.open {
+  display: block;
+}
+
+.selector-dropdown-divider {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #999;
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
+
+.selector-dropdown-empty {
+  font-size: 12px;
+  color: #777;
+}
+
+.selector-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.selector-entry:last-child {
+  border-bottom: none;
+}
+
+.selector-entry.readonly {
+  padding-bottom: 10px;
+}
+
+.selector-entry-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selector-entry-label {
+  font-size: 12px;
+  color: #444;
+  font-weight: 600;
+}
+
+.selector-entry-value {
+  font-size: 12px;
+  padding: 4px 6px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  display: inline-block;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.selector-entry-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.selector-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.selector-entry-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.selector-entry-btn:hover {
+  background: #f2f2f2;
+}
+
+.selector-entry-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.selector-badge {
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.selector-entry-remove {
+  border: none;
+  background: transparent;
+  color: #f44336;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.selector-entry-remove:hover {
+  color: #c62828;
+}
+
+.set-variable-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.set-variable-prefix {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #555;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.set-variable-input {
+  flex: 1;
+}
+
+.selector-hint {
+  font-size: 11px;
+  color: #999;
+}
+
+.selector-dropdown-hint {
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 4px;
+}
+
+body.dark-theme .selector-dropdown-hint {
+  background: #2d2d2d;
+  border-bottom-color: #404040;
+}
+
+.selector-dropdown-hint small {
+  font-size: 11px;
+  color: #666;
+  display: block;
+  line-height: 1.4;
+}
+
+body.dark-theme .selector-dropdown-hint small {
+  color: #b0b0b0;
+}
+
+/* Быстрые действия для селекторов */
+.selector-quick-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-tiny {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-tiny:hover {
+  background: #f5f5f5;
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.btn-quick-action {
+  font-size: 11px;
+}
+
+body.dark-theme .btn-tiny {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+body.dark-theme .btn-tiny:hover {
+  background: #404040;
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+/* Индикатор качества селектора */
+.selector-quality-indicator {
+  width: 4px;
+  height: 100%;
+  min-height: 40px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  cursor: help;
+  transition: width 0.2s;
+}
+
+.action-item.collapsed .selector-quality-indicator {
+  min-height: 24px;
+  width: 3px;
+  margin-right: 6px;
+}
+
+.selector-quality-indicator:hover {
+  width: 6px;
+}
+
+.action-item.collapsed .selector-quality-indicator:hover {
+  width: 4px;
+}
+
+/* Индикатор качества в поле ввода */
+.selector-input-with-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.selector-quality-indicator-inline {
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  cursor: help;
+  transition: width 0.2s;
+}
+
+.selector-quality-indicator-inline:hover {
+  width: 6px;
+}
+
+/* Предупреждение о проблемном селекторе */
+.selector-warning-icon {
+  color: #FF9800;
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.selector-warning-icon-inline {
+  color: #FF9800;
+  font-size: 14px;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.action-field-input.selector-problematic {
+  border-color: #FF9800;
+  background-color: #fff8e1;
+}
+
+.action-field-input.selector-problematic:focus {
+  border-color: #FF9800;
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
+}
+
+/* Стили для поля URL */
+.action-field-url {
+  grid-column: 1 / -1; /* Занимает всю ширину */
+}
+
+.action-url-display {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 12px;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: text;
+}
+
+.action-url-display:hover {
+  background: #e8f5e9;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.action-url-display:active {
+  background: #c8e6c9;
+  transform: scale(0.98);
+}
+
+.action-url-display .url-text {
+  flex: 1;
+  color: #1976d2;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.action-url-display .url-copy-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.action-url-display:hover .url-copy-icon {
+  opacity: 1;
+}
+
+/* Приглушаем URL в скрытых и оптимизированных элементах */
+.action-item.action-hidden .action-url-display,
+.action-item.action-optimized .action-url-display {
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+  opacity: 0.8;
+}
+
+.action-item.action-hidden .action-url-display .url-text,
+.action-item.action-optimized .action-url-display .url-text {
+  color: #777;
+}
+
+.action-item.action-hidden .action-url-display:hover,
+.action-item.action-optimized .action-url-display:hover {
+  background: #e8e8e8;
+  border-color: #b0b0b0;
+}
+
+.selector-details {
+  background: #f0f0f0;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.selector-details strong {
+  color: #333;
+}
+
+.drag-handle {
+  cursor: move;
+  color: #999;
+  font-size: 18px;
+  padding: 4px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.drag-handle:hover {
+  color: #333;
+  opacity: 1;
+}
+
+.action-item.collapsed .drag-handle {
+  font-size: 14px;
+  padding: 2px 4px;
+  opacity: 0.5;
+}
+
+.action-number {
+  font-size: 12px;
+  color: #666;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.action-number.clickable-number {
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  font-weight: 700;
+  color: #333;
+  min-width: 36px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-number.clickable-number:hover {
+  background: #e8f5e9;
+  border-color: #4CAF50;
+  color: #2e7d32;
+  transform: scale(1.05);
+}
+
+.action-number.clickable-number.inactive {
+  background: #e0e0e0;
+  border-color: #b0b0b0;
+  color: #888;
+  opacity: 0.6;
+  text-decoration: line-through;
+  filter: grayscale(50%);
+}
+
+.action-number.clickable-number.inactive:hover {
+  background: #d0d0d0;
+  border-color: #999;
+  color: #777;
+  filter: grayscale(40%);
+}
+
+.action-item.collapsed .action-number.clickable-number {
+  font-size: 11px;
+  padding: 3px 6px;
+  min-width: 28px;
+  border-radius: 4px;
+}
+
+.action-item.collapsed .action-number.clickable-number.inactive {
+  opacity: 0.6;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+/* Модальное окно */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  overflow: auto;
+}
+
+/* Модальное окно редактирования переменной должно быть выше модального окна переменных */
+#variableModal {
+  z-index: 25000;
+}
+
+/* Модальные окна для незаданных переменных должны быть выше других модальных окон */
+#missingVariablesDialog,
+#setMissingVariablesModal {
+  z-index: 26000;
+}
+
+/* Модальное окно для localStorage переменных должно быть видимым */
+#localStorageVariablesModal {
+  z-index: 15000;
+}
+
+.modal.show {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  color: #333;
+}
+
+body.dark-theme .modal-header h3 {
+  color: #e0e0e0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  text-align: left;
+}
+
+body.dark-theme .form-group label {
+  color: #e0e0e0;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  text-align: left;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+  text-align: left;
+}
+
+/* Стили для чекбоксов в модальном окне */
+.form-group input[type="checkbox"] {
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  cursor: pointer;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  border: 2px solid #ccc;
+  border-radius: 3px;
+  appearance: checkbox;
+  -webkit-appearance: checkbox;
+  -moz-appearance: checkbox;
+}
+
+/* Стили для label с чекбоксами */
+.form-group > div > label,
+.form-group label[style*="display: flex"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  text-align: left !important;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+  font-weight: normal;
+  font-size: 14px;
+  color: #333;
+  white-space: normal !important;
+  overflow: visible !important;
+  word-wrap: break-word;
+}
+
+/* Стили для span внутри label с чекбоксами */
+.form-group label span {
+  flex: 1;
+  text-align: left !important;
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow: visible !important;
+  min-width: 0;
+  display: block;
+}
+
+.variable-hint-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 16px;
+  color: #2196F3;
+  user-select: none;
+  z-index: 10;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.variable-hint-icon:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.variable-hint {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  border-left: 4px solid #2196F3;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.variable-hint strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-size: 13px;
+}
+
+.variable-hint ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: #555;
+}
+
+.variable-hint li {
+  margin: 4px 0;
+}
+
+.variable-hint code {
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #d32f2f;
+}
+
+.form-group input[type="text"] {
+  padding-right: 40px;
+}
+
+/* Toast уведомления */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  min-width: 300px;
+  max-width: 500px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideInRight 0.3s ease-out;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.toast-success {
+  background: #4caf50;
+  color: white;
+}
+
+.toast-error {
+  background: #f44336;
+  color: white;
+}
+
+.toast-info {
+  background: #2196F3;
+  color: white;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.fade-out {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ========== Система переменных ========== */
+
+.variables-btn {
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.variables-btn:hover {
+  background: linear-gradient(135deg, #AB47BC, #8E24AA);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.3);
+}
+
+/* Модальное окно переменных */
+.variables-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 20000;
+  backdrop-filter: blur(2px);
+}
+
+.variables-modal.show {
+  display: flex;
+}
+
+.variables-modal-content {
+  background: white;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .variables-modal-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.variables-modal-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.variables-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.variables-modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.variables-modal-close:hover {
+  opacity: 1;
+}
+
+.variables-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.variables-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+body.dark-theme .variables-tabs {
+  border-color: #404040;
+}
+
+.variables-tab {
+  padding: 10px 20px;
+  border: none;
+  background: #f5f5f5;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: #666;
+}
+
+body.dark-theme .variables-tab {
+  background: #3d3d3d;
+  color: #999;
+}
+
+.variables-tab:hover {
+  background: #e0e0e0;
+}
+
+body.dark-theme .variables-tab:hover {
+  background: #4d4d4d;
+}
+
+.variables-tab.active {
+  background: #9C27B0;
+  color: white;
+}
+
+.variables-tab-content {
+  display: none;
+}
+
+.variables-tab-content.active {
+  display: block;
+}
+
+.variables-list {
+  margin-bottom: 20px;
+}
+
+.variable-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto auto;
+  gap: 12px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+body.dark-theme .variable-item {
+  background: #3d3d3d;
+}
+
+.variable-item input,
+.variable-item select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+body.dark-theme .variable-item input,
+body.dark-theme .variable-item select {
+  background: #2d2d2d;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.variable-item .delete-variable {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.variable-item .delete-variable:hover {
+  background: #d32f2f;
+}
+
+.add-variable-btn {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.add-variable-btn:hover {
+  background: #43A047;
+}
+
+.variable-source-type {
+  min-width: 120px;
+}
+
+.variable-recommendations {
+  margin-top: 20px;
+  padding: 16px;
+  background: #FFF3E0;
+  border-radius: 8px;
+  border-left: 4px solid #FF9800;
+}
+
+body.dark-theme .variable-recommendations {
+  background: #3d3020;
+  border-left-color: #FFB74D;
+}
+
+.variable-recommendations h4 {
+  margin: 0 0 12px 0;
+  color: #E65100;
+}
+
+body.dark-theme .variable-recommendations h4 {
+  color: #FFB74D;
+}
+
+.recommendation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+body.dark-theme .recommendation-item {
+  background: #2d2d2d;
+}
+
+.recommendation-item .apply-recommendation {
+  background: #2196F3;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.recommendation-item .apply-recommendation:hover {
+  background: #1976D2;
+}
+
+/* Go-to стили для условий */
+.goto-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #E3F2FD;
+  border-radius: 8px;
+  border: 1px solid #BBDEFB;
+}
+
+body.dark-theme .goto-section {
+  background: #1a237e40;
+  border-color: #303f9f;
+}
+
+.goto-section h4 {
+  margin: 0 0 12px 0;
+  color: #1565C0;
+  font-size: 14px;
+}
+
+body.dark-theme .goto-section h4 {
+  color: #64B5F6;
+}
+
+.goto-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goto-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.goto-option label {
+  min-width: 120px;
+  font-weight: 500;
+  color: #333;
+}
+
+body.dark-theme .goto-option label {
+  color: #e0e0e0;
+}
+
+.goto-option select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+body.dark-theme .goto-option select {
+  background: #2d2d2d;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.goto-warning {
+  margin-top: 10px;
+  padding: 10px;
+  background: #FFF8E1;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #F57F17;
+}
+
+body.dark-theme .goto-warning {
+  background: #3d3020;
+  color: #FFB74D;
+}
+
+/* Подсветка шага-цели go-to */
+.action-item.goto-target {
+  animation: gotoPulse 2s ease-in-out;
+}
+
+@keyframes gotoPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(33, 150, 243, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px 8px rgba(33, 150, 243, 0.3);
+  }
+}
+
+/* Предупреждение о защите от удаления */
+.drag-delete-warning {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #FF9800;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(255, 152, 0, 0.4);
+  z-index: 30000;
+  animation: warningSlideIn 0.3s ease-out;
+}
+
+@keyframes warningSlideIn {
+  from {
+    transform: translateX(-50%) translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Модальное окно подтверждения удаления */
+.confirm-delete-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30000;
+}
+
+.confirm-delete-content {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .confirm-delete-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.confirm-delete-content h4 {
+  margin: 0 0 16px 0;
+  color: #f44336;
+}
+
+.confirm-delete-content p {
+  margin: 0 0 20px 0;
+  color: #666;
+}
+
+body.dark-theme .confirm-delete-content p {
+  color: #aaa;
+}
+
+.confirm-delete-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-delete-buttons button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.confirm-delete-yes {
+  background: #f44336;
+  color: white;
+}
+
+.confirm-delete-yes:hover {
+  background: #d32f2f;
+}
+
+.confirm-delete-no {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.confirm-delete-no:hover {
+  background: #bdbdbd;
+}
+
+body.dark-theme .confirm-delete-no {
+  background: #555;
+  color: #e0e0e0;
+}
+
+/* Панель переменных сценария */
+.variables-panel {
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.variables-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%);
+  color: white;
+}
+
+.variables-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.variables-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.variables-filter-select {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.variables-filter-select:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.variables-filter-select option {
+  background: #7b1fa2;
+  color: white;
+}
+
+.variables-actions .btn {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.variables-actions .btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.variables-content {
+  padding: 12px 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+
+.variables-content.collapsed {
+  max-height: 0;
+  padding: 0 16px;
+}
+
+.variables-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.no-variables {
+  color: #999;
+  font-size: 13px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.variable-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f3e5f5;
+  border: 1px solid #ce93d8;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #7b1fa2;
+}
+
+.variable-tag.global {
+  background: #e3f2fd;
+  border-color: #64b5f6;
+  color: #1976d2;
+}
+
+.variable-tag.sensitive {
+  background: #fff3e0;
+  border-color: #ffb74d;
+  color: #e65100;
+}
+
+.variable-tag .var-name {
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.variable-tag .var-value {
+  color: #666;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-tag .var-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.variable-tag .var-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.variable-tag .var-action-btn:hover {
+  opacity: 1;
+}
+
+/* Dropdown меню */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-toggle {
+  cursor: pointer;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 200px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  color: #333;
+  text-decoration: none;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.dropdown-menu a:hover {
+  background: #f5f5f5;
+}
+
+.dropdown-header {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  background: #fafafa;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 4px 0;
+}
+
+.modal-small {
+  max-width: 500px;
+}
+
+.modal-large {
+  max-width: 800px;
+}
+
+#pageGrabberSelectorInfo {
+  margin-top: 12px;
+}
+
+#pageGrabberElementPreview {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#pageGrabberPreview {
+  word-break: break-all;
+}
+
+/* Стили для модального окна переменных из хранилища */
+.storage-variable-item {
+  transition: all 0.2s ease;
+}
+
+.storage-variable-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#storageVariablesList {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#storageVariablesList::-webkit-scrollbar {
+  width: 8px;
+}
+
+#storageVariablesList::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+#storageVariablesList::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+#storageVariablesList::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Стили для модального окна переменных из localStorage */
+.localstorage-variable-item {
+  transition: all 0.2s ease;
+}
+
+.localstorage-variable-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#localStorageVariablesList {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+#localStorageVariablesList::-webkit-scrollbar {
+  width: 8px;
+}
+
+#localStorageVariablesList::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+#localStorageVariablesList::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+#localStorageVariablesList::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Стили для элементов эндпоинтов API */
+.api-endpoint-item {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.api-endpoint-item > * {
+  flex-shrink: 0;
+}
+
+.api-endpoint-item input[type="checkbox"] {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.api-endpoint-summary {
+  flex: 2 !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.4 !important;
+}
+
+/* Контейнер для API полей - располагаем в ряд */
+.action-item.api .action-content {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.action-item.api .action-content > .action-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Стили для поля описания API шага */
+.api-description-field {
+  border-left: 3px solid #4CAF50;
+  padding-left: 12px;
+  margin-bottom: 12px;
+}
+
+.api-description-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid #4CAF50;
+  border-radius: 4px;
+  background: #f9f9f9;
+  color: #333;
+  font-size: 14px;
+}
+
+.api-description-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+body.dark-theme .api-description-input {
+  background: #2d2d2d;
+  border-color: #4CAF50;
+  color: #e0e0e0;
+}
+
+body.dark-theme .api-description-input:focus {
+  background: #3a3a3a;
+  border-color: #4CAF50;
+}
+
+/* Стили для API запроса в контенте */
+.api-request-field {
+  border-left: 3px solid #4CAF50;
+  padding-left: 12px;
+  margin-bottom: 12px;
+}
+
+.api-request-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.api-method-badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.api-method-badge.api-method-get {
+  background: #2196F3;
+  color: white;
+}
+
+.api-method-badge.api-method-post {
+  background: #4CAF50;
+  color: white;
+}
+
+.api-method-badge.api-method-put {
+  background: #FF9800;
+  color: white;
+}
+
+.api-method-badge.api-method-patch {
+  background: #FFC107;
+  color: #333;
+}
+
+.api-method-badge.api-method-delete {
+  background: #f44336;
+  color: white;
+}
+
+.api-url-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f9f9f9;
+  color: #333;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+}
+
+.api-url-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  background: white;
+}
+
+body.dark-theme .api-url-input {
+  background: #2d2d2d;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+body.dark-theme .api-url-input:focus {
+  background: #3a3a3a;
+  border-color: #4CAF50;
+}
+
+/* Стили для кнопки выполнения API запроса */
+.api-execute-btn {
+  background: #4CAF50 !important;
+  color: white !important;
+  border-color: #4CAF50 !important;
+  font-weight: 600;
+}
+
+.api-execute-btn:hover {
+  background: #45a049 !important;
+  border-color: #45a049 !important;
+  transform: scale(1.05);
+}
+
+.api-execute-btn:active {
+  background: #3d8b40 !important;
+  transform: scale(0.98);
+}
+
+body.dark-theme .api-execute-btn {
+  background: #4CAF50 !important;
+  color: white !important;
+}
+
+body.dark-theme .api-execute-btn:hover {
+  background: #45a049 !important;
+}
+
+
+/* Компактное многоуровневое меню Quick Steps */
+.quick-steps-compact {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 280px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+
+.quick-steps-compact.show {
+  display: block;
+}
+
+/* Группы первого уровня */
+.quick-group {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.quick-group:last-child {
+  border-bottom: none;
+}
+
+.quick-group-header {
+  padding: 10px 16px;
+  background: #f8f9fa;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s;
+}
+
+.quick-group-header:hover {
+  background: #e9ecef;
+}
+
+.quick-group-header .icon {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+.quick-group-header .arrow {
+  transition: transform 0.2s;
+  font-size: 12px;
+  color: #666;
+}
+
+.quick-group.expanded .arrow {
+  transform: rotate(90deg);
+}
+
+/* Список операций внутри группы */
+.quick-operations {
+  display: none;
+  padding: 8px 0;
+}
+
+.quick-group.expanded .quick-operations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 4px;
+  padding: 8px;
+}
+
+.quick-operation {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  color: #333;
+  text-decoration: none;
+}
+
+.quick-operation:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.quick-operation .op-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* Адаптивная сетка для больших экранов */
+@media (min-width: 768px) {
+  .quick-steps-compact {
+    min-width: 400px;
+    max-width: 800px;
+  }
+  
+  .quick-group.expanded .quick-operations {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .quick-steps-compact {
+    max-width: 900px;
+  }
+  
+  .quick-group.expanded .quick-operations {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+/* Поиск внутри Quick Steps */
+.quick-search {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.quick-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.quick-search input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.1);
+}
+
+/* Счетчик операций в группе */
+.ops-count {
+  font-size: 11px;
+  color: #666;
+  font-weight: normal;
+  margin-left: 4px;
+}

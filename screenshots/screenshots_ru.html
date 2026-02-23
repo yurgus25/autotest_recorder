@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Скриншоты теста - AutoTest Recorder</title>
+  <link rel="stylesheet" href="screenshots.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>📸 Скриншоты теста</h1>
+      <div class="header-actions">
+        <button id="downloadBtn" class="btn btn-primary hidden">💾 Скачать ZIP</button>
+        <button id="closeBtn" class="btn btn-secondary">✕ Закрыть</button>
+      </div>
+    </header>
+    
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Загрузка скриншотов…</p>
+    </div>
+    <div id="emptyState" class="empty-state hidden">Скриншоты не найдены</div>
+    
+    <div id="screenshotsContainer" class="screenshots-container hidden">
+      <div id="screenshotsGrid" class="screenshots-grid"></div>
+    </div>
+    
+    <div id="fullscreenView" class="fullscreen-view hidden">
+      <button id="closeFullscreen" class="close-fullscreen">✕</button>
+      <img id="fullscreenImage" src="" alt="Полноразмерный скриншот">
+      <div id="fullscreenInfo" class="fullscreen-info"></div>
+    </div>
+  </div>
+  
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="screenshots.js"></script>
+</body>
+</html>
+
