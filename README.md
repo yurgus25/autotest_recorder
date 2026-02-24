@@ -1,6 +1,8 @@
 # 🎬 AutoTest Recorder & Player
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-v0.9.4-blue?logo=google-chrome)](https://chrome.google.com/webstore)
+[![Русский](https://img.shields.io/badge/README-Русский-blue)](README.md) | [![English](https://img.shields.io/badge/README-English-lightgrey)](README_EN.md)
+
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-v1.9.4-blue?logo=google-chrome)](https://chrome.google.com/webstore)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange.svg)](https://developer.chrome.com/docs/extensions/mv3/)
 [![GitHub Stars](https://img.shields.io/github/stars/yurgus25/autotest_recorder?style=social)](https://github.com/yurgus25/autotest_recorder/stargazers)
@@ -8,6 +10,8 @@
 **Мощное расширение для браузера для автоматизации тестирования веб-приложений без написания кода.**
 
 Записывайте действия пользователя, редактируйте тест-кейсы в визуальном редакторе и воспроизводите их автоматически. Идеально для QA-инженеров, разработчиков и всех, кто хочет сэкономить время на рутинном тестировании.
+
+![AutoTest Recorder Demo](https://via.placeholder.com/800x400?text=Demo+Screenshot+Coming+Soon)
 
 ---
 
@@ -165,16 +169,16 @@ autotest-recorder/
 
 ## 🗺️ Roadmap
 
-### v0.9.5 (Текущая разработка)
+### v1.9.5 (Текущая разработка)
 - [x] Исправления записи (dblclick, select)
 - [x] Улучшения UI
 
-### v1.0.0 (Планируется)
+### v2.0.0 (Планируется)
 - [ ] 🤖 **AI-функции** — умные селекторы, анализ стабильности
 - [ ] 📱 **Мобильные жесты** — swipe, pinch, rotate
 - [ ] 👁️ **Visual Testing** — сравнение скриншотов
 
-### v1.1.0 (Будущее)
+### v2.1.0 (Будущее)
 - [ ] ☁️ **Облачная синхронизация** тестов
 - [ ] 👥 **Командная работа** — шаринг тестов
 - [ ] 📊 **Расширенная аналитика** — дашборд метрик
@@ -200,6 +204,15 @@ autotest-recorder/
 
 - **[Инструкция по работе](docs/ИНСТРУКЦИЯ.md)** — полное руководство пользователя
 - **[Формат тест-кейсов](docs/TEST_CASE_FORMAT.md)** — структура JSON
+- **[История изменений](CHANGELOG_v1.9.4.md)** — что нового в версии
+
+---
+
+## 📜 Лицензионные документы
+
+- **[MIT License](LICENSE)** — лицензия на использование кода
+- **[Политика конфиденциальности](docs/PRIVACY_POLICY.md)** — обработка данных
+- **[Условия использования](docs/ТАРИФЫ_И_ЛИЦЕНЗИИ.md)** — тарифы и лицензии
 
 ---
 
