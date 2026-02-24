@@ -11,7 +11,6 @@
 
 Record user actions, edit test cases in a visual editor, and replay them automatically. Perfect for QA engineers, developers, and anyone who wants to save time on routine testing.
 
-![AutoTest Recorder Demo](https://via.placeholder.com/800x400?text=Demo+Screenshot+Coming+Soon)
 
 ---
 
@@ -204,15 +203,12 @@ autotest-recorder/
 
 - **[User Guide](docs/ИНСТРУКЦИЯ.md)** — complete user manual (Russian)
 - **[Test Case Format](docs/TEST_CASE_FORMAT.md)** — JSON structure
-- **[Changelog](CHANGELOG_v1.9.4.md)** — what's new in this version
 
 ---
 
 ## 📜 Legal Documents
 
 - **[MIT License](LICENSE)** — code usage license
-- **[Privacy Policy](docs/PRIVACY_POLICY.md)** — data handling
-- **[Terms of Use](docs/ТАРИФЫ_И_ЛИЦЕНЗИИ.md)** — tariffs and licenses (Russian)
 
 ---
 
