@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help — AutoTest Recorder</title>
+  <link rel="stylesheet" href="help.css">
+</head>
+<body>
+  <div class="help-container">
+    <header class="help-header">
+      <div class="help-header-inner">
+        <h1>🎯 AutoTest Recorder</h1>
+        <p class="help-subtitle">Record, edit and play automated tests for web applications</p>
+      </div>
+      <div class="lang-switcher">
+        <button id="lang-en" class="active">EN</button>
+        <button id="lang-ru">RU</button>
+      </div>
+    </header>
+
+    <nav class="help-nav">
+      <a href="#quickstart">⚡ Quick Start</a>
+      <a href="#popup">Popup</a>
+      <a href="#selector-search-inspector">Selector search &amp; inspector</a>
+      <a href="#recording">Recording</a>
+      <a href="#editor">Editor</a>
+      <a href="#variables">Variables</a>
+      <a href="#playback">Playback</a>
+      <a href="#analysis">Analysis</a>
+      <a href="#adaptive">Adaptive</a>
+      <a href="#actions">Actions</a>
+      <a href="#api-import">API Import</a>
+      <a href="#settings">Settings</a>
+      <a href="#performance-analytics">Perf analytics</a>
+      <a href="#hotref">Cheat Sheet</a>
+    </nav>
+
+    <main class="help-content">
+
+      <!-- ===== QUICK START ===== -->
+      <section id="quickstart" class="help-section">
+        <h2>⚡ Quick Start</h2>
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <div class="step-body">
+              <strong>Open popup</strong>
+              <p>Click the extension icon on the Chrome toolbar.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <div class="step-body">
+              <strong>Start recording</strong>
+              <p>Click <span class="tag red">🔴 Start recording</span></p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <div class="step-body">
+              <strong>Perform actions</strong>
+              <p>Go to the site: click, enter text, select from dropdowns.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <div class="step-body">
+              <strong>Stop recording</strong>
+              <p>Return to popup → <span class="tag gray">⏹️ Stop recording</span></p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">5</div>
+            <div class="step-body">
+              <strong>Done!</strong>
+              <p>Test is in the list. <span class="tag green">▶️</span> — to play, <span class="tag yellow">✏️</span> — to edit.</p>
+            </div>
+          </div>
+        </div>
+        <p class="hint">Data is stored locally in Chrome. Export/import — via JSON files.</p>
+      </section>
+
+      <!-- ===== POPUP PANEL ===== -->
+      <section id="popup" class="help-section">
+        <h2>Popup Panel</h2>
+
+        <h3>Header</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-icon"><strong>⛶</strong></td><td>Expand popup to a separate window.</td></tr>
+            <tr><td class="col-icon"><strong>🔍 Advanced search</strong></td><td>Opens the selector analyzer page for the active or selected tab — see <a href="#selector-search-inspector">Selector search &amp; inspector</a>.</td></tr>
+            <tr><td class="col-icon"><strong>🔍 Inspector</strong></td><td>Turns on the selector inspector on the page (floating panel on hover) — see <a href="#selector-search-inspector">Selector search &amp; inspector</a>.</td></tr>
+            <tr><td class="col-icon"><strong>⚙️</strong></td><td>Extension settings.</td></tr>
+            <tr><td class="col-icon"><strong>📊</strong></td><td>Analytics dashboard (visible when analytics is enabled in settings).</td></tr>
+            <tr><td class="col-icon"><strong>❓</strong></td><td>This help.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Control Buttons</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag red">🔴 Start recording</span></td><td>Start recording actions.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">⏹️ Stop recording</span></td><td>Stop and save the test.</td></tr>
+            <tr><td class="col-btn"><span class="tag yellow">⏸️ Pause</span></td><td>Pause playback.</td></tr>
+            <tr><td class="col-btn"><span class="tag green">▶️ Resume</span></td><td>Resume playback.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">⏹️ Stop</span></td><td>Force stop.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Tests Panel</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-icon"><strong>📥</strong></td><td>Import test from JSON file.</td></tr>
+            <tr><td class="col-icon"><strong>🔄</strong></td><td>Refresh test list.</td></tr>
+            <tr><td class="col-icon"><strong>💾 Memory</strong></td><td>Data volume. Click <strong>▼</strong> for details by category (tests, history, variables, settings, screenshots, files) and cleanup buttons.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Test Card</h3>
+        <p>Each test shows name, step count, creation and update dates.</p>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag green">▶️ Play</span></td><td>Run test on the active tab.</td></tr>
+            <tr><td class="col-btn"><span class="tag yellow">✏️ Edit</span></td><td>Open test editor.</td></tr>
+            <tr><td class="col-btn"><span class="tag red">🗑️ Delete</span></td><td>Delete test.</td></tr>
+            <tr><td class="col-icon"><strong>📊</strong></td><td>Run history (date, result, step details).</td></tr>
+            <tr><td class="col-icon"><strong>📸</strong></td><td>Run screenshots (if saving is enabled).</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Groups of Tests</h3>
+        <p>Groups help to organize several related tests into one reusable block and run them together.</p>
+        <table class="help-table">
+          <tbody>
+            <tr>
+              <td class="col-icon"><strong>🧩</strong></td>
+              <td>
+                Create a group from the popup and choose a color. The color is used for the group background and shadow so that business areas are visually separated.
+              </td>
+            </tr>
+            <tr>
+              <td class="col-btn"><span class="tag gray">🧩 Add to group</span></td>
+              <td>
+                On a single test card adds this test into an existing group. The same test can be reused in several groups without copying steps.
+              </td>
+            </tr>
+            <tr>
+              <td class="col-btn"><span class="tag green">▶️ Group play</span></td>
+              <td>
+                Runs all tests inside the group in order. This is convenient for building bigger scenarios from smaller tests (login → actions → logout).
+              </td>
+            </tr>
+            <tr>
+              <td class="col-icon"><strong>●●●▶️</strong></td>
+              <td>
+                The icon with three red dots before ▶️ on the group play button shows how many record markers are inside all nested tests (up to three dots). It is easy to see where additional recording will be requested.
+              </td>
+            </tr>
+            <tr>
+              <td class="col-icon"><strong>💾</strong> / <strong>✏️</strong> / <strong>🗑️</strong></td>
+              <td>
+                Export the whole group to JSON, edit group name and color, delete group (tests themselves stay in the list).
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="hint">
+          Using groups you can keep tests small and focused, but still run long user journeys with one click and reuse the same login/navigation pieces across different scenarios.
+        </p>
+      </section>
+
+      <!-- ===== SELECTOR SEARCH & INSPECTOR ===== -->
+      <section id="selector-search-inspector" class="help-section">
+        <h2>🔍 Advanced selector search and selector inspector</h2>
+        <p>Two tools help find and check selectors for page elements: <strong>advanced selector search</strong> (a separate page listing all elements on a tab) and the <strong>selector inspector</strong> (a floating panel over the page with hover highlight).</p>
+
+        <h3>Advanced selector search</h3>
+        <p>Opened by the <strong>🔍 Advanced selector search</strong> button in the popup header (or in the row below the title in fullscreen mode). Opens a new tab with the analyzer.</p>
+        <ul>
+          <li><strong>Tab selection:</strong> at the top, the <strong>Tab</strong> dropdown lists all open tabs. You can choose any tab — selector analysis runs for that page.</li>
+          <li><strong>Analysis:</strong> the page lists buttons, inputs, links, dropdowns and other interactive elements. For each it shows selector options (data-testid, id, classes, Finder Lite, Unique Selector, etc.), priority and uniqueness.</li>
+          <li><strong>Result tabs:</strong> “All elements”, “Dropdown”, “Status”, “Dropdown options” — filter by element type.</li>
+          <li><strong>Filters and search:</strong> checkboxes (buttons, inputs, selects, links, dropdowns) and a search field by text or selector.</li>
+          <li><strong>Copy:</strong> each selector variant has a <strong>📋 Copy</strong> button — paste the copied selector into a test step in the editor.</li>
+          <li><strong>Refresh:</strong> <strong>🔄 Refresh</strong> runs analysis again for the selected tab. <strong>📥 Export JSON</strong> saves the full report to a file.</li>
+        </ul>
+
+        <h3>Selector inspector</h3>
+        <p>Enabled by the <strong>🔍</strong> (inspector) button in the popup header. A floating panel appears on the current tab; hovering over an element highlights it and shows generated selectors in the panel.</p>
+        <ul>
+          <li><strong>How to use:</strong> open the target page, turn on the inspector from the popup. Hover over elements — the panel shows tag, text, attributes and a list of selectors with “Best” and “Unique” labels. <strong>📋 Copy</strong> and <strong>✓ Test</strong> let you copy a selector or verify it on the page.</li>
+          <li><strong>Fixing the selector:</strong> to lock the panel on one element and copy a selector without the list changing, <strong>hold the pointer on the element for about 2 seconds</strong> (without releasing the mouse button). The element is then fixed: the selector list in the panel no longer changes when you move the cursor, and the hint changes to “✓ Element fixed. Click outside to unfreeze.” To unfix, <strong>click on the page outside the inspector panel</strong> (e.g. on empty space or another element). You can then hover over other elements again.</li>
+          <li><strong>Closing:</strong> the <strong>✕</strong> button in the panel closes the inspector. The <strong>←</strong> button returns to the popup.</li>
+        </ul>
+        <div class="tip-box">
+          <strong>💡 Tip:</strong> use advanced search when you need a full list of selectors on a page or to pick a tab for analysis. The inspector is handy for quickly checking one element and fixing its selector before pasting into a test step.
+        </div>
+      </section>
+
+      <!-- ===== RECORDING ===== -->
+      <section id="recording" class="help-section">
+        <h2>Test Recording</h2>
+        <p>The extension captures: clicks, text input, selection from <code>&lt;select&gt;</code> and custom dropdowns, navigation.</p>
+
+        <h3>Record markers</h3>
+        <p>
+          A record marker is a special step that pauses playback and starts a short additional recording session in the middle of the test.
+          You can insert several markers into one test and during each run record new actions exactly where they are needed.
+        </p>
+        <ul>
+          <li>When playback reaches a marker, the test pauses and a recording session for the current test is started.</li>
+          <li>Do the extra actions on the page, then stop recording:</li>
+          <li><strong>⏹️ Stop recording</strong> (red button in popup) — saves the new steps after the marker and removes the marker.</li>
+          <li><strong>⏹️ Stop</strong> (gray button) — cancels marker recording: new steps are discarded, the marker stays, playback is stopped.</li>
+          <li>After a normal stop the test continues from the next step as if the new steps were originally part of the scenario.</li>
+        </ul>
+
+        <h3>Selector Selection Modes</h3>
+        <p>Configured in <strong>⚙️ → Recording mode</strong>:</p>
+        <div class="card-grid">
+          <div class="info-card">
+            <strong>Automatic</strong>
+            <p>The extension automatically selects the best selector by attribute priorities. Suitable for most cases.</p>
+          </div>
+          <div class="info-card">
+            <strong>Picker</strong>
+            <p>On each click, a panel with selector variants is shown — you choose the needed one.</p>
+          </div>
+          <div class="info-card">
+            <strong>Inspector</strong>
+            <p>Full element inspector with detailed analysis of all available selectors.</p>
+          </div>
+        </div>
+        <p>For generation, libraries <strong>Finder</strong>, <strong>Optimal Select</strong> and <strong>Unique Select</strong> are used (enabled in settings, each has Lite/Full version).</p>
+
+        <div class="tip-box">
+          <strong>💡 Tip:</strong> Refresh the page before recording. Act without rushing — the extension captures every click.
+          Use record markers to iteratively enrich long scenarios: first record the “skeleton”, then on every run add details exactly where they are missing.
+        </div>
+      </section>
+
+      <!-- ===== EDITOR ===== -->
+      <section id="editor" class="help-section">
+        <h2>Test Editor</h2>
+        <p>Opens with <span class="tag yellow">✏️ Edit</span> button on the test card.</p>
+
+        <h3>Opening and creating tests</h3>
+        <ul>
+          <li><strong>Edit existing test</strong> — click <span class="tag yellow">✏️ Edit</span> on a card in the popup.</li>
+          <li><strong>Create from recording</strong> — record a new test from the popup; when you click Edit, the recorded steps open in the editor.</li>
+          <li><strong>Duplicate via “Save As…”</strong> — in the editor use <strong>💾 Save As…</strong> to create a copy with a new name and ID (the original test remains unchanged).</li>
+          <li><strong>Import as new</strong> — use <strong>📤 Import JSON</strong> in the editor; imported data is saved as a separate test which then opens in the editor.</li>
+        </ul>
+
+        <h3>Toolbar</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td class="col-btn"><span class="tag blue">💾 Save</span></td><td>Save changes. Also <kbd>Ctrl+S</kbd>.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📥 Export JSON</span></td><td>Export test to file.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📤 Import JSON</span></td><td>Load test from file.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">🌐 API Import</span></td><td>Import from OpenAPI/Swagger specification.</td></tr>
+            <tr><td class="col-btn"><span class="tag gray">📦 Variables</span></td><td>Scenario variable management.</td></tr>
+            <tr><td class="col-icon"><strong>🌙 / ☀️</strong></td><td>Dark / light theme.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Run Modes</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>Full run</strong></td><td>All steps in sequence, including hidden ones.</td></tr>
+            <tr><td><strong>Debug mode</strong></td><td>Step-by-step execution with pauses.</td></tr>
+            <tr><td><strong>Parallel</strong></td><td>Run in multiple tabs simultaneously.</td></tr>
+            <tr><td><strong>Optimized</strong></td><td>Available after successful test optimization.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Working with Steps</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>➕ Add</strong></td><td>Add action, condition (🔀) or loop (🔁).</td></tr>
+            <tr><td><strong>🌐 API Templates</strong></td><td>Ready-made steps: 📱 Telegram, 🔗 Webhook, 📥 REST GET, 📤 REST POST.</td></tr>
+            <tr><td><strong>✏️</strong> on step</td><td>Editing: type, selector, value, timeouts.</td></tr>
+            <tr><td><strong>Inline “+” dots</strong></td><td>Hover over the left side of a step — round “+” buttons appear between steps. Click a dot to insert a new step exactly in that position.</td></tr>
+            <tr><td><strong>Drag and drop</strong></td><td>Click and hold the <strong>☰</strong> handle on the left side of the step, then drag it to a new position.</td></tr>
+            <tr><td><strong>Move by number</strong></td><td>Double‑click the <strong>☰</strong> icon to open an input for the step number, type the target index and press <kbd>Enter</kbd> — the step will move there and existing steps are automatically renumbered in order.</td></tr>
+            <tr><td><strong>Hide step</strong></td><td>Click the <strong>Hide</strong> button or single‑click on the step number — the step becomes hidden and will be skipped in normal runs; it still remains visible in the editor, in full run mode and in debug mode.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="step-screenshot">
+          <p><strong>Example of a step in the editor:</strong></p>
+          <img src="editor-step.png" alt="Example of a navigation step row in the test editor" />
+        </div>
+
+        <h3>Step List View</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td>📄 Grouping</td><td>Group steps by page URL.</td></tr>
+            <tr><td>🔽 Collapse/expand</td><td>Control visibility of all steps.</td></tr>
+            <tr><td>🔗 Show URL</td><td>Show/hide page URLs on steps.</td></tr>
+            <tr><td>🏷️ Show fields</td><td>Show/hide field names.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Conditions and Loops</h3>
+        <p><strong>Condition</strong> — contains "then" and "else" branches with an arbitrary expression.<br>
+        <strong>Loop</strong> — set by iteration count or exit condition.<br>
+        Regular steps are placed inside conditions and loops.</p>
+
+        <div class="step-screenshot">
+          <p><strong>Example: configuring a screenshot action:</strong></p>
+          <img src="editor-screenshot-dialog.png" alt="Action edit dialog with screenshot types and capture area options" />
+        </div>
+      </section>
+
+      <!-- ===== ANALYSIS ===== -->
+      <section id="analysis" class="help-section">
+        <h2>Analysis Steps</h2>
+
+        <p>Analysis steps help you automatically analyze a page, selectors and performance without manually inspecting every element.</p>
+
+        <h3>How to add</h3>
+        <ul>
+          <li>Open the editor → click <strong>⚡ Quick steps</strong> → group <strong>🔍 Analysis</strong>.</li>
+          <li>Select the needed template (Selectors, Fill fields, Validation, Forms, Links, Performance).</li>
+          <li>Configure target URL / selector / scope if the template requires it.</li>
+        </ul>
+        <table class="help-table">
+          <tbody>
+            <tr>
+              <td><strong>Analysis → Selectors</strong></td>
+              <td>
+                Scans the page, generates several selector variants for important elements and evaluates their stability. Results are available in the editor so you can quickly choose and apply the best selector.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Analysis → Fill fields</strong></td>
+              <td>
+                Detects forms and inputs on the page and automatically builds steps for filling them with test data (can use variables). Great for onboarding a new form: the majority of steps are created for you.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Analysis → Validation</strong></td>
+              <td>
+                Adds checks for validation messages and important UI states (for example, "field is required", "success message visible"). Saves time when turning exploratory testing into stable checks.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Analysis → Forms</strong></td>
+              <td>
+                Builds a structured view of forms on the page (fields, labels, placeholders) and helps to generate a set of form‑related steps (fill, clear, check).
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Analysis → Links</strong></td>
+              <td>
+                Collects all links, buttons and navigation elements on the page, checks that they are reachable by selectors and can optionally create checks for them.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Analysis → Performance</strong></td>
+              <td>
+                Measures Web Vitals (LCP, CLS, INP, TTFB) and resource loading during test execution. Results are shown in the Performance Dashboard and can be compared with baselines and per‑resource report (timings, sizes, step where the resource was loaded).
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Result report</h3>
+        <p>
+          After Analysis steps are executed you can open a detailed report from the editor:
+        </p>
+        <ul>
+          <li><strong>Selectors / Forms / Links</strong> — a structured breakdown of elements with generated selectors, stability scores and hints what should be fixed or covered by tests.</li>
+          <li><strong>Validation</strong> — a list of detected messages and suggested assertions.</li>
+          <li><strong>Performance</strong> — Web Vitals charts, resource table (name, type, size, duration, step), baselines comparison.</li>
+        </ul>
+      </section>
+
+      <!-- ===== ADAPTIVE ===== -->
+      <section id="adaptive" class="help-section">
+        <h2>Adaptive Step</h2>
+
+        <p>
+          Adaptive steps are used when you need to quickly make a scenario tolerant to different layouts (A/B tests, feature flags, minor markup changes) or just want to fill all visible form fields with reasonable random values without manually configuring each selector.
+        </p>
+
+        <h3>Configuration nuances</h3>
+        <ul>
+          <li><strong>Target area</strong> — usually a container selector (form, modal, card). Adaptive logic searches inputs/buttons only inside this area.</li>
+          <li><strong>Strategies</strong> — you can choose whether to prefer stable attributes (data-testid) or short selectors; for pure “fill everything” scenarios it is enough to leave defaults.</li>
+          <li><strong>Field types</strong> — for text, numbers, dates, selects and checkboxes generator picks values that look valid (email, phone, dates in range, existing options).</li>
+          <li><strong>Exclusions</strong> — you can specify selectors that must be skipped (e.g. search box, destructive buttons).</li>
+        </ul>
+        <table class="help-table">
+          <tbody>
+            <tr>
+              <td><strong>Adaptive → Single</strong></td>
+              <td>
+                Describes several alternative selectors or actions for one logical step. At runtime AutoTest Recorder tries them in order and uses the first one that works.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Adaptive → Auto</strong></td>
+              <td>
+                Automatically learns from previous successful runs: when selectors were healed or changed, adaptive logic stores alternatives and can reuse them in future runs.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Adaptive → Flow</strong></td>
+              <td>
+                Describes an entire mini‑flow (for example, login) with several possible paths. On execution the engine picks the branch that matches the current UI version.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip-box">
+          <strong>💡 Tip:</strong> Use Analysis steps to quickly bootstrap test logic on a new page, and Adaptive steps to keep tests stable when frontend markup changes over time.
+        </div>
+      </section>
+
+      <!-- ===== ACTIONS CATALOG ===== -->
+      <section id="actions" class="help-section">
+        <h2>Available Actions (Quick Overview)</h2>
+        <p>The editor supports many action types that you can add through <strong>➕ Add</strong> and via the <strong>⚡ Quick steps</strong> menu.</p>
+
+        <h3>Navigation and Scrolling</h3>
+        <ul>
+          <li><strong>Navigation</strong> — open URL, refresh, back/forward in history, get current URL.</li>
+          <li><strong>Tabs</strong> — open new tab, switch between tabs, close tab.</li>
+          <li><strong>Scroll</strong> — scroll to element, to top, to bottom.</li>
+        </ul>
+
+        <h3>Interaction with Elements</h3>
+        <ul>
+          <li><strong>Clicks</strong> — click, double‑click, right‑click, focus/blur, hover.</li>
+          <li><strong>Dropdowns</strong> — select option, multiselect, clear, select all, toggle, copy/paste options, reorder.</li>
+          <li><strong>Input</strong> — type text, clear field, press key, upload file.</li>
+        </ul>
+
+        <h3>Variables and Clipboard</h3>
+        <ul>
+          <li><strong>Variables</strong> — set variable, read from element or URL, build strings, work with localStorage values.</li>
+          <li><strong>Clipboard</strong> — copy from element, paste into element, read/write OS clipboard via variables.</li>
+        </ul>
+
+        <h3>Waits and Assertions</h3>
+        <ul>
+          <li><strong>Wait</strong> — until element is visible, hidden, exists / does not exist, until option appears, until value or JS condition.</li>
+          <li><strong>Assertions</strong> — visibility/hidden, existence, text/value contains, element count, disabled/enabled, multiselect content.</li>
+        </ul>
+
+        <h3>Tables, Datepickers, Drag & Drop</h3>
+        <ul>
+          <li><strong>Tables</strong> — get cell/row/column value, click cell, assert counts, find row by text.</li>
+          <li><strong>Datepicker</strong> — select date / range / time, clear, open/close.</li>
+          <li><strong>Drag & Drop</strong> — drag to element, by offset, to coordinates, start/over/drop.</li>
+        </ul>
+
+        <h3>Media, Network and Screenshots</h3>
+        <ul>
+          <li><strong>Media</strong> — play/pause/stop, seek, change volume and speed, fullscreen / exit fullscreen.</li>
+          <li><strong>Network</strong> — wait for request, wait for network idle, assert request, assert response status.</li>
+          <li><strong>Screenshots</strong> — element screenshot, full‑page screenshot (with scroll).</li>
+        </ul>
+
+        <h3>Device, JavaScript and Error Handling</h3>
+        <ul>
+          <li><strong>Device</strong> — change viewport size, emulate mobile/tablet/desktop.</li>
+          <li><strong>JavaScript</strong> — execute custom JS in the page context and use result in variables.</li>
+          <li><strong>Try‑catch</strong> — group steps and handle errors with custom fallback logic.</li>
+          <li><strong>Cookies</strong> — set and get cookies.</li>
+        </ul>
+
+        <p class="hint">
+          Actions that are marked as “soon” or “PRO” in the editor are disabled and not executed — this section describes only the actions that are available in the current version.
+        </p>
+      </section>
+
+      <!-- ===== VARIABLES ===== -->
+      <section id="variables" class="help-section">
+        <h2>Variables</h2>
+        <p><strong>📦 Variables</strong> button in the editor. Variables allow reusing data between steps.</p>
+
+        <h3>Creating Variables</h3>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>➕ Manually</strong></td><td>Name, value, "global" and "sensitive data" flags.</td></tr>
+            <tr><td><strong>🔗 From URL</strong></td><td>Extract from step URL: query parameter, path, regular expression.</td></tr>
+            <tr><td><strong>📄 From page</strong></td><td>Select element on tab and save its text.</td></tr>
+            <tr><td><strong>🗄️ From localStorage</strong></td><td>Get value from page localStorage.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Scopes</h3>
+        <p>In the variable modal there are tabs:</p>
+        <table class="help-table">
+          <tbody>
+            <tr><td><strong>📄 Scenario</strong></td><td>Variables of the current test.</td></tr>
+            <tr><td><strong>🔁 Loops</strong></td><td>Variables inside loops.</td></tr>
+            <tr><td><strong>🔀 Conditions</strong></td><td>Variables inside conditions.</td></tr>
+            <tr><td><strong>🌐 Global</strong></td><td>Available in all tests.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Substitution in Steps</h3>
+        <p>Use <code>{var:variable_name}</code> in value fields, URL, headers and API request body.</p>
+
+        <h3>Filters (in variable panel)</h3>
+        <p>All · Empty · For this scenario · Global · Input · Output · In request body.</p>
+
+        <div class="tip-box">
+          <strong>💡</strong> If there are variables without values at test start — a dialog will open to fill them.
+        </div>
+      </section>
+
+      <!-- ===== PLAYBACK ===== -->
+      <section id="playback" class="help-section">
+        <h2>Playback</h2>
+        <p>Start: <span class="tag green">▶️</span> in popup or run mode in editor.</p>
+        <ul>
+          <li><strong>Progress</strong> — in popup: "Step N of M" and current action type.</li>
+          <li><strong>⏸️ Pause</strong> and <strong>⏹️ Stop</strong> are available at any time.</li>
+          <li>Result is saved to test <strong>📊 History</strong>.</li>
+        </ul>
+
+        <h3>Screenshots</h3>
+        <p>When the option is enabled, the extension takes screenshots during playback. Saving to disk ("Downloads" folder) and/or in extension memory for viewing via <strong>📸</strong>. Can be limited to "only on errors".</p>
+
+        <h3>Video</h3>
+        <p>When the option is enabled, tab video is recorded in WebM format. "Post-processing" option adds seek index. Files are saved to <code>videos</code> subfolder inside the save folder.</p>
+      </section>
+
+      <!-- ===== API IMPORT ===== -->
+      <section id="api-import" class="help-section">
+        <h2>Import from OpenAPI / Swagger</h2>
+        <p><span class="tag gray">🌐 API Import</span> button in the editor.</p>
+        <div class="steps-grid compact">
+          <div class="step-card">
+            <div class="step-number">1</div>
+            <div class="step-body">Upload specification file (YAML or JSON).</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">2</div>
+            <div class="step-body">Select needed endpoints with checkboxes.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">3</div>
+            <div class="step-body">Configure options: test data, validation, variables, base URL.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-number">4</div>
+            <div class="step-body"><strong>"Import selected"</strong> — steps will be added to the test.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section id="settings" class="help-section">
+        <h2>Settings</h2>
+        <p>Open via <strong>⚙️</strong> in popup. Buttons at page bottom: <em>Reset</em>, <em>Export</em>, <em>Import</em>, <em>Save</em>.</p>
+
+        <div class="settings-overview">
+
+          <div class="setting-block">
+            <h3>🎯 Selector Generation</h3>
+            <p><strong>Libraries</strong> — Finder, Optimal Select, Unique Select (on/off, Lite/Full version).</p>
+            <p><strong>Attribute priorities</strong> — check order: data-testid, data-cy, id, name, etc. Changed by drag and drop.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🎬 Recording Mode</h3>
+            <p><strong>Selector selection</strong> — Automatic / Picker / Inspector.</p>
+            <p><strong>Strategy</strong> — Stability / Readability / Shortest.</p>
+            <p><strong>Picker</strong> — auto-select timeout, show stability ratings, highlight best variant.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>⚡ Performance</h3>
+            <p>Selector caching, maximum selector length, generation timeout.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>📊 Analytics</h3>
+            <p>Enables dashboard: success charts, problematic steps, error heatmap. <strong>📊</strong> button appears in popup.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🎬 Video and 📸 Screenshots</h3>
+            <p><strong>Video</strong> — tab recording in WebM, post-processing for seeking.</p>
+            <p><strong>Screenshots</strong> — to disk and/or extension memory. "Only on errors" option.</p>
+            <p><strong>Folder</strong> — set relative to "Downloads" (default <code>AutoTestRecorder</code>). Subfolders <code>videos</code> and <code>screenshots</code> are created inside.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🚀 Selector Optimization</h3>
+            <p>Setting groups by phases:</p>
+            <ul>
+              <li><strong>🔴 Phase 1</strong> — deduplication, caching, smart stability assessment, penalty for dynamic parts.</li>
+              <li><strong>🟠 Phase 2</strong> — improved dropdown detection, exponential backoff on retries, MutationObserver.</li>
+              <li><strong>🟡 Phase 3</strong> — XPath generation, overlay detection, validation before saving, event debounce/throttle.</li>
+              <li><strong>🟢 Metrics</strong> — stability metrics calculation, auto-fix unstable selectors, stability threshold.</li>
+            </ul>
+          </div>
+
+          <div class="setting-block">
+            <h3>📁 Test Files</h3>
+            <p>Loading files for use in steps (e.g., when uploading documents via forms).</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>📊 Excel Export</h3>
+            <p>Export reports to Excel/CSV/XLS. Options: auto-export, triggers (record/run/optimize), console error logging, file format, separator, save path.</p>
+          </div>
+
+          <div class="setting-block">
+            <h3>🔧 Advanced</h3>
+            <p>Enable/disable autotests, verbose logging, exclude hidden elements, smart waits.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===== PERFORMANCE ANALYTICS ===== -->
+      <section id="performance-analytics" class="help-section">
+        <h2>⚡ Performance Analytics</h2>
+        
+        <p>Performance Analytics is a web application performance monitoring system integrated into AutoTest Recorder. It collects Web Vitals metrics, resource loading details, and allows tracking performance changes over time.</p>
+
+        <div class="setting-block">
+          <h3>📊 How to Use</h3>
+          
+          <p><strong>Step 1: Add a performance analysis step</strong></p>
+          <ol>
+            <li>Open your test in the editor</li>
+            <li>Click <strong>+ Insert Step</strong></li>
+            <li>Select <strong>Analysis → Performance</strong></li>
+            <li>Specify the page URL to analyze</li>
+          </ol>
+
+          <p><strong>Step 2: Run the test</strong></p>
+          <ul>
+            <li>Click <strong>▶️ Full Run</strong> or <strong>⚡ Optimized</strong></li>
+            <li>Monitoring starts automatically when <code>analysis-performance</code> step is detected</li>
+            <li>Metrics are collected at each test step</li>
+          </ul>
+
+          <p><strong>Step 3: View the report</strong></p>
+          <ul>
+            <li>After test execution, a <strong>📊 View Performance Report</strong> button appears in the editor</li>
+            <li>Click the button to open the Performance Dashboard</li>
+            <li>Or open browser console and copy the dashboard link</li>
+          </ul>
+        </div>
+
+        <div class="setting-block">
+          <h3>📈 Web Vitals Metrics</h3>
+          
+          <p><strong>LCP (Largest Contentful Paint)</strong> — time until main content is rendered</p>
+          <ul>
+            <li>✅ Good: ≤ 2.5 seconds</li>
+            <li>⚠️ Needs improvement: 2.5s - 4s</li>
+            <li>❌ Poor: > 4 seconds</li>
+          </ul>
+
+          <p><strong>CLS (Cumulative Layout Shift)</strong> — element shifting during page load</p>
+          <ul>
+            <li>✅ Good: ≤ 0.1</li>
+            <li>⚠️ Needs improvement: 0.1 - 0.25</li>
+            <li>❌ Poor: > 0.25</li>
+          </ul>
+
+          <p><strong>INP (Interaction to Next Paint)</strong> — interaction response time</p>
+          <ul>
+            <li>✅ Good: ≤ 200 ms</li>
+            <li>⚠️ Needs improvement: 200ms - 500ms</li>
+            <li>❌ Poor: > 500 ms</li>
+          </ul>
+
+          <p><strong>TTFB (Time to First Byte)</strong> — time until first byte from server</p>
+          <ul>
+            <li>✅ Good: ≤ 800 ms</li>
+            <li>⚠️ Needs improvement: 800ms - 1800ms</li>
+            <li>❌ Poor: > 1800 ms</li>
+          </ul>
+        </div>
+
+        <div class="setting-block">
+          <h3>🗂️ Baselines</h3>
+          
+          <p><strong>Saving a baseline:</strong></p>
+          <ol>
+            <li>Open Performance Dashboard after a successful test</li>
+            <li>Click <strong>💾 Save Baseline</strong></li>
+            <li>Enter a name (e.g., "Production v1.0")</li>
+            <li>Baseline is saved (up to 10 most recent per test)</li>
+          </ol>
+
+          <p><strong>Comparing with baseline:</strong></p>
+          <ol>
+            <li>Run test after changes</li>
+            <li>Open Performance Dashboard</li>
+            <li>Click <strong>📂 Load Baseline</strong></li>
+            <li>Select desired baseline from list</li>
+            <li>Visual comparison will be available in Phase 2</li>
+          </ol>
+        </div>
+
+        <div class="setting-block">
+          <h3>📦 Resources</h3>
+          
+          <p>The dashboard shows detailed information about all loaded resources:</p>
+          <ul>
+            <li><strong>Name</strong> — resource URL</li>
+            <li><strong>Type</strong> — script, stylesheet, img, fetch, font, etc</li>
+            <li><strong>Size</strong> — transferSize in KB/MB</li>
+            <li><strong>Duration</strong> — loading time in ms</li>
+            <li><strong>Step</strong> — test step where resource was loaded</li>
+          </ul>
+
+          <p><strong>Filtering and sorting:</strong></p>
+          <ul>
+            <li>🔍 Search by name/URL</li>
+            <li>📁 Filter by type (scripts/styles/images/etc)</li>
+            <li>🔄 Sort by size, duration, name, step order</li>
+          </ul>
+        </div>
+
+        <div class="setting-block">
+          <h3>💡 Usage Tips</h3>
+          
+          <ul>
+            <li><strong>Run tests in identical conditions</strong> — use same browser, disable extensions, clear cache</li>
+            <li><strong>Make multiple runs</strong> — save 3-5 baselines for averaging</li>
+            <li><strong>Track trends</strong> — run tests regularly after deployments</li>
+            <li><strong>Pay attention to Web Vitals</strong> — they affect SEO and UX</li>
+            <li><strong>Analyze resources</strong> — find heavy scripts and images</li>
+            <li><strong>Export data</strong> — save JSON for reports and CI/CD</li>
+          </ul>
+        </div>
+
+        <div class="setting-block">
+          <h3>🚨 FAQ</h3>
+          
+          <p><strong>Q: "View Report" button doesn't appear?</strong></p>
+          <p>A: Ensure your test contains an <code>analysis-performance</code> step and was run at least once.</p>
+
+          <p><strong>Q: Web Vitals show null or 0?</strong></p>
+          <p>A: Some browsers (Firefox, Safari) have limited Web Vitals API support. Use Chrome/Edge for full functionality.</p>
+
+          <p><strong>Q: Why are there many resources on steps 0-2?</strong></p>
+          <p>A: This is normal! First test steps usually contain initial page load (HTML, CSS, JS, images). Subsequent steps load fewer resources.</p>
+
+          <p><strong>Q: Can it be used for CI/CD?</strong></p>
+          <p>A: Yes! Export data as JSON and integrate checks into your pipeline. Phase 2 will add automatic regression detection.</p>
+        </div>
+      </section>
+
+      <!-- ===== CHEAT SHEET ===== -->
+      <section id="hotref" class="help-section">
+        <h2>🔖 Cheat Sheet</h2>
+        <table class="help-table hotref-table">
+          <thead>
+            <tr><th>Task</th><th>Where</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Advanced selector search</td><td>Popup → <strong>🔍 Advanced selector search</strong> → choose tab → copy selectors</td></tr>
+            <tr><td>Selector inspector (fix)</td><td>Popup → <strong>🔍</strong> inspector → hover element → hold ~2s to fix → click outside to unfix</td></tr>
+            <tr><td>Record test</td><td>Popup → <strong>🔴 Start recording</strong> → site → <strong>⏹️ Stop</strong></td></tr>
+            <tr><td>Run test</td><td>Popup → <strong>▶️</strong> on card</td></tr>
+            <tr><td>Edit</td><td>Popup → <strong>✏️</strong> on card</td></tr>
+            <tr><td>Export JSON</td><td>Editor → <strong>📥 Export JSON</strong></td></tr>
+            <tr><td>Import JSON</td><td>Popup → <strong>📥</strong> or Editor → <strong>📤 Import JSON</strong></td></tr>
+            <tr><td>Variables</td><td>Editor → <strong>📦 Variables</strong></td></tr>
+            <tr><td>Substitution</td><td><code>{var:name}</code> in step fields</td></tr>
+            <tr><td>Import Swagger</td><td>Editor → <strong>🌐 API Import</strong></td></tr>
+            <tr><td>History</td><td>Popup → card → <strong>📊</strong></td></tr>
+            <tr><td>Screenshots</td><td>Popup → card → <strong>📸</strong></td></tr>
+            <tr><td>Clear</td><td>Popup → <strong>💾 Memory ▼</strong> → category</td></tr>
+            <tr><td>Save test</td><td>Editor → <strong>💾</strong> or <kbd>Ctrl+S</kbd></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+
+    <footer class="help-footer">
+      <p>AutoTest Recorder & Player — author: Yury V. Gushchin</p>
+      <p>
+        Telegram channel:
+        <a href="https://t.me/autotest_recorder_qa" target="_blank" rel="noopener noreferrer">@autotest_recorder_qa</a>
+      </p>
+    </footer>
+  </div>
+  <script src="../i18n/i18n.js"></script>
+  <script src="help.js"></script>
+</body>
+</html>

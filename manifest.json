@@ -1,0 +1,134 @@
+{
+  "manifest_version": 3,
+  "name": "AutoTest Recorder & Player",
+  "version": "0.9.7.1",
+  "description": "No-code web test automation: record, visual editor, playback with smart waits & self-healing. v0.9.7: Angular/app-select, analyzer tabs, GitHub-ready sources — see CHANGELOG.md",
+  "permissions": [
+    "debugger",
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "downloads",
+    "windows",
+    "tabCapture",
+    "offscreen",
+    "clipboardRead",
+    "clipboardWrite",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/background-sw.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "shared/utils.js",
+        "i18n/i18n.js",
+        "libs/finder-lite.js",
+        "libs/finder.js",
+        "libs/unique-selector-lite.js",
+        "libs/unique-selector.js",
+        "libs/optimal-select-lite.js",
+        "libs/optimal-select.js",
+        "shared/action-types.js",
+        "content/selector-engine.js",
+        "content/selector-optimizer.js",
+        "content/selenium-utils.js",
+        "content/player-optimizer.js",
+        "content/smart-waiter.js",
+        "excel-export/excel-export.js",
+        "content/screenshot-comparer.js",
+        "content/performance-collector.js",
+        "content/content.js",
+        "content/inline-selector-picker.js",
+        "content/recorder.js",
+        "content/player-core.js",
+        "content/player-handlers-basic.js",
+        "content/player-handlers-data.js",
+        "content/player-handlers-table-drag.js",
+        "content/player-handlers-ui.js",
+        "content/player-handlers-analysis.js",
+        "content/player-handlers-adaptive.js",
+        "content/player-handlers-form.js",
+        "content/player-handlers-dropdown.js",
+        "content/player-handlers-extended.js",
+        "content/player-handlers-api.js",
+        "content/player-init.js",
+        "content/selector-inspector.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "shared/utils.js",
+        "i18n/en.json",
+        "i18n/ru.json",
+        "i18n/i18n.js",
+        "i18n/page-router.js",
+        "editor/editor.html",
+        "editor/editor_ru.html",
+        "selector-analyzer/analyzer.html",
+        "selector-analyzer/analyzer_ru.html",
+        "screenshots/screenshots.html",
+        "screenshots/screenshots_ru.html",
+        "popup/popup-fullscreen.html",
+        "popup/popup-fullscreen_ru.html",
+        "analytics/analytics-dashboard.html",
+        "analytics/analytics-dashboard_ru.html",
+        "analytics/adaptive-analytics-dashboard.html",
+        "analytics/adaptive-analytics-dashboard_ru.html",
+        "performance/performance-dashboard.html",
+        "performance/performance-dashboard_ru.html",
+        "performance/timeline-chart.js",
+        "performance/har-export.js",
+        "performance/csv-export.js",
+        "performance/budget-validator.js",
+        "performance/advanced-analysis.js",
+        "help/help.html",
+        "help/help_ru.html",
+        "settings/settings.html",
+        "settings/settings_ru.html",
+        "excel-export/excel-export.js",
+        "content/selector-worker.js",
+        "libs/jszip.min.js",
+        "analysis/analysis-module.js",
+        "analysis/smart-data-generator.js",
+        "analysis/smart-fill-module.js",
+        "analysis/advanced-template-system.js",
+        "analysis/security-analyzer.js",
+        "analysis/comprehensive-security-analyzer.js",
+        "analysis/seo-analyzer.js",
+        "analysis/selector-cache.js",
+        "background/feature-flags.js",
+        "analysis/analysis-module-sw.js",
+        "analysis/selector-cache-sw.js",
+        "analysis/analysis-settings.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

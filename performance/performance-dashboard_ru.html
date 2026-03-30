@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Отчёт производительности - AutoTest Recorder</title>
+  <link rel="stylesheet" href="performance-dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>⚡ Отчёт производительности</h1>
+      <div class="header-actions">
+        <a id="linkAnalytics" href="#" class="btn btn-secondary" target="_blank" rel="noopener" title="Аналитика тестов">📊 Аналитика</a>
+        <a id="linkAdaptive" href="#" class="btn btn-secondary" target="_blank" rel="noopener" title="Адаптивные шаги и анализ">🔄 Адаптивный</a>
+        <a href="../help/help_ru.html#performance-analytics" target="_blank" class="btn btn-link" title="Справка по Performance Analytics">❓ Справка</a>
+        <button id="exportJson" class="btn btn-primary" title="Экспорт данных в JSON">📥 Экспорт JSON</button>
+        <button id="exportHAR" class="btn btn-primary" title="Экспорт в HAR для DevTools">📊 HAR</button>
+        <button id="exportCSV" class="btn btn-primary" title="Экспорт в CSV для Excel">📊 CSV</button>
+        <button id="saveBaseline" class="btn btn-secondary" title="Сохранить текущие данные как базовую линию">💾 Сохранить базовую линию</button>
+        <button id="loadBaseline" class="btn btn-secondary" title="Загрузить базовую линию для сравнения">📂 Загрузить базовую линию</button>
+      </div>
+    </header>
+
+    <div id="loadingState" class="loading-state">
+      <div class="spinner"></div>
+      <p>Загрузка данных производительности...</p>
+    </div>
+
+    <div id="emptyState" class="empty-state hidden">
+      <p><strong>Отчёт не найден</strong></p>
+      <p class="hint">Данные производительности отсутствуют для этого теста.</p>
+      <p class="hint">Чтобы получить отчёт:</p>
+      <ul class="hint-list">
+        <li>Добавьте в тест шаг «Анализ производительности» (analysis-performance)</li>
+        <li>Запустите тест до конца (хотя бы один раз)</li>
+      </ul>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content hidden">
+      <!-- Web Vitals Summary -->
+      <section class="card web-vitals-summary">
+        <h2>📊 Web Vitals метрики</h2>
+        <div class="vitals-grid">
+          <div class="vital-card" data-vital="lcp">
+            <div class="vital-label">LCP</div>
+            <div class="vital-value" id="lcp-value">-</div>
+            <div class="vital-rating" id="lcp-rating"></div>
+            <div class="vital-description">Отрисовка основного контента</div>
+            <div class="vital-hint">Хорошо: &lt;2.5с, Плохо: &gt;4с</div>
+          </div>
+          
+          <div class="vital-card" data-vital="cls">
+            <div class="vital-label">CLS</div>
+            <div class="vital-value" id="cls-value">-</div>
+            <div class="vital-rating" id="cls-rating"></div>
+            <div class="vital-description">Смещение макета</div>
+            <div class="vital-hint">Хорошо: &lt;0.1, Плохо: &gt;0.25</div>
+          </div>
+          
+          <div class="vital-card" data-vital="inp">
+            <div class="vital-label">INP</div>
+            <div class="vital-value" id="inp-value">-</div>
+            <div class="vital-rating" id="inp-rating"></div>
+            <div class="vital-description">Отклик на взаимодействие</div>
+            <div class="vital-hint">Хорошо: &lt;200мс, Плохо: &gt;500мс</div>
+          </div>
+          
+          <div class="vital-card" data-vital="ttfb">
+            <div class="vital-label">TTFB</div>
+            <div class="vital-value" id="ttfb-value">-</div>
+            <div class="vital-rating" id="ttfb-rating"></div>
+            <div class="vital-description">Время до первого байта</div>
+            <div class="vital-hint">Хорошо: &lt;800мс, Плохо: &gt;1800мс</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Test Timeline -->
+      <section class="card timeline-section dashboard-section">
+        <h2 class="section-title">🕐 Временная шкала теста</h2>
+        <div class="comparison-controls" id="comparisonControls" style="display: none;">
+          <div class="comparison-control-row">
+            <select id="baselineSelect" class="baseline-select">
+              <option value="">Выбрать базовую линию для сравнения...</option>
+            </select>
+            <button id="compareBtn" class="btn btn-primary">Сравнить</button>
+            <button id="clearComparisonBtn" class="btn btn-secondary" style="display: none;">Сбросить</button>
+          </div>
+        </div>
+        <div class="timeline-chart-container">
+          <canvas id="timelineChart" width="900" height="350"></canvas>
+        </div>
+        <div class="timeline-summary" id="timelineSummary"></div>
+        <div class="comparison-table-container" id="comparisonTableContainer" style="display: none;">
+          <h3>📈 Результаты сравнения</h3>
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Метрика</th>
+                <th>Текущее</th>
+                <th>Базовая линия</th>
+                <th>Разница</th>
+                <th>Изменение %</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonTableBody"></tbody>
+          </table>
+        </div>
+        <div id="timeline-container" class="timeline-container">
+          <!-- Steps will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Resource Details -->
+      <section class="card resources-section">
+        <h2>📦 Детали ресурсов</h2>
+        <div class="table-controls">
+          <input type="text" id="searchResources" class="search-input" placeholder="🔍 Фильтр по имени или URL...">
+          <select id="filterType" class="filter-select">
+            <option value="all">Все типы</option>
+            <option value="script">Скрипты</option>
+            <option value="stylesheet">Стили</option>
+            <option value="img">Изображения</option>
+            <option value="fetch">Fetch/XHR</option>
+            <option value="font">Шрифты</option>
+            <option value="other">Другое</option>
+          </select>
+          <select id="sortBy" class="sort-select">
+            <option value="size-desc">Размер (сначала большие)</option>
+            <option value="size-asc">Размер (сначала маленькие)</option>
+            <option value="duration-desc">Длительность (сначала долгие)</option>
+            <option value="duration-asc">Длительность (сначала быстрые)</option>
+            <option value="name-asc">Имя (А-Я)</option>
+            <option value="step-asc">По порядку шагов</option>
+          </select>
+        </div>
+        
+        <div class="table-wrap">
+          <table id="resourcesTable" class="resources-table">
+            <thead>
+              <tr>
+                <th>Имя ресурса</th>
+                <th>Тип</th>
+                <th>Размер</th>
+                <th>Длительность</th>
+                <th>Шаг</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Resources will be rendered here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="resourcesSummary" class="resources-summary">
+          <span>Всего: <strong id="totalResources">0</strong> ресурсов</span>
+          <span>Общий размер: <strong id="totalSize">0 КБ</strong></span>
+          <span>Средняя длительность: <strong id="avgDuration">0 мс</strong></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="timeline-chart.js"></script>
+  <script src="har-export.js"></script>
+  <script src="csv-export.js"></script>
+  <script src="performance-dashboard.js"></script>
+</body>
+</html>

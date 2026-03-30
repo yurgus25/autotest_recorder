@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Настройки - AutoTest Recorder</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>⚙️ Настройки AutoTest Recorder</h1>
+      <div class="header-right">
+        <div class="lang-switcher">
+          <button id="lang-en">EN</button>
+          <button id="lang-ru" class="active">RU</button>
+        </div>
+        <button id="backButton" class="btn btn-secondary">← Назад</button>
+      </div>
+    </header>
+
+    <div class="settings-content">
+      <!-- Selector Engine Settings -->
+      <section class="settings-section">
+        <h2>🎯 Настройки генерации селекторов</h2>
+        
+        <div class="setting-group">
+          <h3>Библиотеки селекторов</h3>
+          <p class="description">Выберите, какие библиотеки использовать для генерации селекторов</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useFinder" checked>
+              <div class="checkbox-info">
+                <strong>Finder</strong>
+                <span class="badge badge-recommended">Рекомендуется</span>
+                <p>Интеллектуальный генератор CSS селекторов с оптимизацией</p>
+              </div>
+            </label>
+            <div class="radio-group" id="finderVersion">
+              <label>
+                <input type="radio" name="finderVersion" value="lite" checked>
+                Lite версия (быстрая, минимальная)
+              </label>
+              <label>
+                <input type="radio" name="finderVersion" value="full">
+                Full версия (полная функциональность)
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useOptimalSelect" checked>
+              <div class="checkbox-info">
+                <strong>Optimal Select</strong>
+                <span class="badge badge-recommended">Рекомендуется</span>
+                <p>Оптимальные селекторы с приоритизацией атрибутов</p>
+              </div>
+            </label>
+            <div class="radio-group" id="optimalSelectVersion">
+              <label>
+                <input type="radio" name="optimalSelectVersion" value="lite" checked>
+                Lite версия (быстрая, минимальная)
+              </label>
+              <label>
+                <input type="radio" name="optimalSelectVersion" value="full">
+                Full версия (расширенная оптимизация)
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useUniqueSelector" checked>
+              <div class="checkbox-info">
+                <strong>Unique Selector</strong>
+                <span class="badge badge-recommended">Рекомендуется</span>
+                <p>Гарантированно уникальные селекторы</p>
+              </div>
+            </label>
+            <div class="radio-group" id="uniqueSelectorVersion">
+              <label>
+                <input type="radio" name="uniqueSelectorVersion" value="lite" checked>
+                Lite версия (базовая уникальность)
+              </label>
+              <label>
+                <input type="radio" name="uniqueSelectorVersion" value="full">
+                Full версия (продвинутые стратегии)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>Приоритеты атрибутов</h3>
+          <p class="description">Порядок проверки атрибутов при генерации селекторов</p>
+          
+          <div class="sortable-list" id="attributePriorities">
+            <div class="sortable-item" data-attr="data-testid">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-testid</span>
+              <span class="badge badge-high">Высокий</span>
+            </div>
+            <div class="sortable-item" data-attr="data-cy">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-cy</span>
+              <span class="badge badge-high">Высокий</span>
+            </div>
+            <div class="sortable-item" data-attr="data-test">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">data-test</span>
+              <span class="badge badge-high">Высокий</span>
+            </div>
+            <div class="sortable-item" data-attr="id">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">id</span>
+              <span class="badge badge-medium">Средний</span>
+            </div>
+            <div class="sortable-item" data-attr="name">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">name</span>
+              <span class="badge badge-medium">Средний</span>
+            </div>
+            <div class="sortable-item" data-attr="aria-label">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">aria-label</span>
+              <span class="badge badge-medium">Средний</span>
+            </div>
+            <div class="sortable-item" data-attr="role">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">role</span>
+              <span class="badge badge-low">Низкий</span>
+            </div>
+            <div class="sortable-item" data-attr="class">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">class</span>
+              <span class="badge badge-low">Низкий</span>
+            </div>
+            <div class="sortable-item" data-attr="tag">
+              <span class="drag-handle">⋮⋮</span>
+              <span class="attr-name">tag</span>
+              <span class="badge badge-low">Низкий</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recording Mode Settings -->
+      <section id="recording-mode-settings" class="settings-section">
+        <h2>🎬 Режим записи</h2>
+        
+        <div class="setting-group">
+          <h3>Выбор селекторов при записи</h3>
+          <p class="description">Настройте, как выбираются селекторы при записи действий</p>
+          
+          <div class="setting-item">
+            <h4>Режим выбора селекторов:</h4>
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="recordingMode" value="auto" checked>
+                <strong>🚀 Автоматический</strong>
+                <p>Автоматически выбирается лучший селектор на основе приоритетов</p>
+              </label>
+              <label>
+                <input type="radio" name="recordingMode" value="picker">
+                <strong>🎯 С выбором селектора</strong>
+                <span class="badge badge-new">NEW</span>
+                <p>При каждом клике показывается панель с вариантами селекторов для выбора</p>
+              </label>
+              <label>
+                <input type="radio" name="recordingMode" value="inspector">
+                <strong>🔍 Через инспектор</strong>
+                <p>Открывается полный инспектор селекторов для детального анализа</p>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-item" id="pickerSettings" style="display: none;">
+            <h4>Настройки пикера:</h4>
+            
+            <div class="inline-setting">
+              <label for="pickerTimeout">Таймаут автовыбора:</label>
+              <input type="number" id="pickerTimeout" value="5" min="1" max="30" style="width: 60px;"> сек
+              <p class="setting-hint">Через указанное время автоматически выберется лучший селектор</p>
+            </div>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="showSelectorScores" checked>
+              <div class="checkbox-info">
+                <strong>Показывать оценки стабильности</strong>
+                <p>Отображать баллы и рекомендации для каждого селектора</p>
+              </div>
+            </label>
+            
+            <label class="checkbox-label">
+              <input type="checkbox" id="highlightBestSelector" checked>
+              <div class="checkbox-info">
+                <strong>Выделять лучший вариант</strong>
+                <p>Визуально подсвечивать рекомендуемый селектор</p>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <h3>Стратегия выбора селекторов</h3>
+          <p class="description">Критерии для определения "лучшего" селектора</p>
+          
+          <div class="setting-item">
+            <div class="radio-group">
+              <label>
+                <input type="radio" name="selectorStrategy" value="stability" checked>
+                <strong>🛡️ Стабильность</strong>
+                <p>Приоритет: data-testid, id, name - для надёжных тестов</p>
+              </label>
+              <label>
+                <input type="radio" name="selectorStrategy" value="readability">
+                <strong>📖 Читаемость</strong>
+                <p>Приоритет: текст элемента, aria-label - для понятных тестов</p>
+              </label>
+              <label>
+                <input type="radio" name="selectorStrategy" value="shortest">
+                <strong>⚡ Краткость</strong>
+                <p>Приоритет: самые короткие уникальные селекторы</p>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Воспроизведение -->
+      <section class="settings-section" id="playback-settings">
+        <h2>▶️ Воспроизведение</h2>
+        <div class="setting-group">
+          <h3>Таймаут выполнения шага</h3>
+          <p class="description">Если шаг не выполнился за это время — показывается диалог: продолжить со следующего шага или остановить тест. В консоли пишется, что шаг завершён принудительно.</p>
+          <div class="setting-item">
+            <label for="playbackStepTimeout">Таймаут (сек):</label>
+            <select id="playbackStepTimeout" class="input" style="width: 100px;">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="playbackShowRunNotifications" checked>
+              <div class="checkbox-info">
+                <strong>Показывать сообщения при прогоне</strong>
+                <p>Всплывающие окна с результатами завершения теста (успех/ошибка). При прогоне группы промежуточные результаты не показываются.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Performance Settings -->
+      <section class="settings-section">
+        <h2>⚡ Производительность</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="cacheSelectors" checked>
+              <div class="checkbox-info">
+                <strong>Кэшировать селекторы</strong>
+                <p>Сохранять уже найденные селекторы для ускорения</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="maxSelectorLength">Максимальная длина селектора:</label>
+            <input type="number" id="maxSelectorLength" class="input" value="200" min="50" max="1000">
+            <small>Селекторы длиннее будут автоматически оптимизированы</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="selectorTimeout">Таймаут генерации (мс):</label>
+            <input type="number" id="selectorTimeout" class="input" value="5000" min="1000" max="30000">
+            <small>Максимальное время на генерацию одного селектора</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytics -->
+      <section class="settings-section" id="analytics-settings">
+        <h2>📊 Аналитика и метрики тестов</h2>
+        <p class="section-description">Дашборд со статистикой выполнения, успешностью по времени и анализом проблемных шагов</p>
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="analyticsEnabled">
+              <div class="checkbox-info">
+                <strong>Включить аналитику</strong>
+                <p>Собирать и показывать статистику прогонов, графики успешности, проблемные шаги и heatmap ошибок</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a id="openAnalyticsDashboard" href="#" class="btn btn-secondary" target="_blank" rel="noopener" style="display: inline-block; margin-top: 8px;">
+              📊 Открыть дашборд аналитики
+            </a>
+            <a id="openAdaptiveAnalytics" href="#" class="btn btn-secondary" target="_blank" rel="noopener" style="display: inline-block; margin-top: 8px;">
+              🔄 Адаптивные шаги и анализ
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Video recording & Screenshots (unified section) -->
+      <section class="settings-section" id="video-and-screenshots-settings">
+        <h2>🎬 Видео и 📸 скриншоты</h2>
+        <p class="section-description">Запись видео вкладки и сохранение скриншотов при воспроизведении теста. Файлы сохраняются в папку «Загрузки» в указанную подпапку (видео — в подпапку videos, скриншоты — в screenshots).</p>
+        <div class="setting-group">
+          <h3 class="setting-subsection" style="margin-bottom: 0.5em;">🎬 Видео</h3>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="videoRecordingEnabled">
+              <div class="checkbox-info">
+                <strong>Запись видео при воспроизведении</strong>
+                <p>Записывать вкладку в WebM при каждом запуске теста (по умолчанию выключено)</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item setting-item-dependent" id="videoRecordingMakeSeekableWrap" style="margin-top: 0.75em;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="videoRecordingMakeSeekable">
+              <div class="checkbox-info">
+                <strong>Делать видео перематываемым (постобработка)</strong>
+                <p>Добавляет индекс перемотки в WebM — стандартный плеер сможет перематывать, но файл станет больше</p>
+              </div>
+            </label>
+          </div>
+          <p class="description hint setting-item-dependent" id="videoRecordingSeekableHint" style="margin-top: 0.5em; font-size: 0.9em; color: var(--text-muted, #666);">
+            Без постобработки файл меньше; с ней — перемотка в любом плеере.
+          </p>
+
+          <h3 class="setting-subsection" style="margin-top: 1.25rem; margin-bottom: 0.5em;">📸 Скриншоты</h3>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsSaveEnabled">
+              <div class="checkbox-info">
+                <strong>Сохранять скриншоты на диск</strong>
+                <p>По умолчанию скриншоты не сохраняются. При включении сохраняются в папку Загрузки</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsOnlyOnError">
+              <div class="checkbox-info">
+                <strong>Только при ошибках</strong>
+                <p>Сохранять скриншоты только если шаг завершился ошибкой</p>
+              </div>
+            </label>
+            <small id="screenshotsOnlyOnErrorHint">Доступно только при включенном сохранении скриншотов</small>
+          </div>
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="screenshotsStoreInMemory" checked>
+              <div class="checkbox-info">
+                <strong>Сохранять скриншоты в памяти расширения</strong>
+                <p>Хранить изображения в истории прогонов и интерфейсе редактора</p>
+              </div>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label for="screenshotsFormat">Формат скриншота:</label>
+            <select id="screenshotsFormat" class="input">
+              <option value="jpeg">JPEG (меньший размер)</option>
+              <option value="png">PNG (без потерь)</option>
+            </select>
+            <small>JPEG уменьшает объём в памяти и на диске; качество задаётся ниже.</small>
+          </div>
+          <div class="setting-item" id="screenshotsQualityWrap">
+            <label for="screenshotsQuality">Качество JPEG (1–100):</label>
+            <input type="number" id="screenshotsQuality" class="input" min="1" max="100" value="85" style="width: 5em;">
+            <small>Рекомендуется 80–90. Чем выше — больше размер файла.</small>
+          </div>
+          <div class="setting-item">
+            <label for="mediaSavePath">Папка для сохранения видео и скриншотов (опционально):</label>
+            <input type="text" id="mediaSavePath" class="input" placeholder="Например AutoTestRecorder">
+            <small>Путь задаётся относительно папки «Загрузки». Будут созданы подпапки <code>videos</code> и <code>screenshots</code>; внутри — подпапка с ID теста и временем прогона</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Selector Optimization Settings (NEW) -->
+      <section class="settings-section">
+        <h2>🚀 Оптимизация селекторов</h2>
+        <p class="section-description">Расширенные настройки для улучшения качества и производительности селекторов</p>
+        
+        <div class="setting-group">
+          <h3>🔴 Критические улучшения (Фаза 1)</h3>
+          <p class="description">Основные оптимизации для повышения надёжности</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optDeduplicateSelectors" checked>
+              <div class="checkbox-info">
+                <strong>Дедупликация селекторов</strong>
+                <p>Исключать дублирующиеся селекторы из разных библиотек</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optEnableSelectorCache" checked>
+              <div class="checkbox-info">
+                <strong>Кэширование селекторов</strong>
+                <p>Сохранять сгенерированные селекторы для повторного использования</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optSelectorCacheTTL">TTL кэша селекторов (мс):</label>
+            <input type="number" id="optSelectorCacheTTL" class="input" value="30000" min="5000" max="300000">
+            <small>Время жизни кэшированных селекторов</small>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optAsyncUniquenessCheck" checked>
+              <div class="checkbox-info">
+                <strong>Асинхронная проверка уникальности</strong>
+                <p>Проверять уникальность селекторов без блокировки UI</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟠 Значительные улучшения (Фаза 2)</h3>
+          <p class="description">Улучшения качества селекторов и воспроизведения</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optSmartSelectorScoring" checked>
+              <div class="checkbox-info">
+                <strong>Умная оценка селекторов</strong>
+                <p>Учитывать длину, устойчивость и специфичность при выборе селектора</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optPenalizeDynamicParts" checked>
+              <div class="checkbox-info">
+                <strong>Штраф за динамические части</strong>
+                <p>Понижать приоритет селекторов с UUID, timestamp, Angular-хэшами</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optImprovedDropdownDetection" checked>
+              <div class="checkbox-info">
+                <strong>Улучшенное обнаружение dropdown</strong>
+                <p>Расширенная поддержка Web Components, Shadow DOM, ARIA</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optExponentialBackoffRetry" checked>
+              <div class="checkbox-info">
+                <strong>Экспоненциальный backoff</strong>
+                <p>Адаптивные задержки при поиске элементов</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optUseMutationObserver" checked>
+              <div class="checkbox-info">
+                <strong>MutationObserver для ожидания</strong>
+                <p>Эффективное ожидание появления динамических элементов</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟡 Дополнительные улучшения (Фаза 3)</h3>
+          <p class="description">Расширенные возможности (некоторые выключены по умолчанию)</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optGenerateXPath">
+              <div class="checkbox-info">
+                <strong>Генерировать XPath селекторы</strong>
+                <span class="badge badge-optional">Опционально</span>
+                <p>Дополнительно генерировать XPath для сложных случаев</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optImprovedOverlaySearch" checked>
+              <div class="checkbox-info">
+                <strong>Улучшенный поиск overlay</strong>
+                <p>Поиск dropdown-панелей в overlay-контейнерах (Angular CDK, Material UI и др.)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optValidateBeforeSave" checked>
+              <div class="checkbox-info">
+                <strong>Валидация перед сохранением</strong>
+                <p>Проверять селекторы на динамические части и уникальность</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optEventDebounce" checked>
+              <div class="checkbox-info">
+                <strong>Debounce событий</strong>
+                <p>Объединять быстрые последовательные события</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optEventDebounceDelay">Задержка debounce (мс):</label>
+            <input type="number" id="optEventDebounceDelay" class="input" value="100" min="50" max="500">
+          </div>
+
+          <div class="setting-item">
+            <label for="optClickThrottleMs">Throttle кликов (мс):</label>
+            <input type="number" id="optClickThrottleMs" class="input" value="200" min="100" max="1000">
+            <small>Минимальный интервал между записью кликов</small>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3>🟢 Метрики и автоисправление</h3>
+          <p class="description">Анализ качества и автоматическое улучшение селекторов</p>
+          
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optCalculateMetrics">
+              <div class="checkbox-info">
+                <strong>Расчёт метрик качества</strong>
+                <span class="badge badge-optional">Опционально</span>
+                <p>Рассчитывать стабильность, читаемость и специфичность селекторов</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optAutoFixUnstable">
+              <div class="checkbox-info">
+                <strong>Автоисправление нестабильных</strong>
+                <span class="badge badge-optional">Опционально</span>
+                <p>Автоматически заменять нестабильные селекторы на лучшие альтернативы</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="optMinStabilityScore">Минимальный порог стабильности:</label>
+            <input type="number" id="optMinStabilityScore" class="input" value="70" min="0" max="100">
+            <small>Селекторы ниже этого порога будут автоматически исправлены (0-100)</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- File Management -->
+      <section class="settings-section">
+        <h2>📁 Управление файлами для тестов</h2>
+        
+        <div class="setting-group">
+          <p class="description">Загрузите файлы, которые будут использоваться в автотестах. Файлы сохраняются в расширении и могут быть автоматически вставлены в поля загрузки файлов.</p>
+          
+          <div class="setting-item">
+            <label for="fileUploadInput" class="btn btn-secondary" style="display: inline-block; cursor: pointer;">
+              📤 Загрузить файл
+            </label>
+            <input type="file" id="fileUploadInput" multiple style="display: none;">
+            <small style="display: block; margin-top: 8px; color: #666;">
+              Максимальный размер одного файла: 5MB. Общий лимит хранилища: ~10MB
+            </small>
+          </div>
+
+          <div class="setting-item">
+            <h4>Загруженные файлы:</h4>
+            <div id="uploadedFilesList" class="files-list">
+              <div class="empty-state" style="padding: 20px; text-align: center; color: #999;">
+                Нет загруженных файлов
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Excel Export Settings -->
+      <section class="settings-section">
+        <h2>📊 Экспорт тест-кейсов в Excel</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelExportEnabled">
+              <div class="checkbox-info">
+                <strong>Включить экспорт в Excel</strong>
+                <p>Автоматически создавать Excel файлы с тест-кейсами при записи, воспроизведении или оптимизации тестов</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelAutoExportEnabled">
+              <div class="checkbox-info">
+                <strong>Автоматический экспорт</strong>
+                <p>Выгружать файлы без участия пользователя сразу после записи, прогона или оптимизации</p>
+              </div>
+            </label>
+            <small>По умолчанию отчёты доступны только через кнопку 📊 «Экспорт отчёта» в истории прогонов</small>
+          </div>
+
+          <div class="setting-item">
+            <h4>Когда экспортировать:</h4>
+            <div class="checkbox-grid">
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnRecord" checked>
+                При записи теста
+              </label>
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnPlay" checked>
+                При воспроизведении теста
+              </label>
+              <label class="checkbox-label-small">
+                <input type="checkbox" id="excelExportOnOptimize" checked>
+                После оптимизации теста
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelRecordConsoleErrors">
+              <div class="checkbox-info">
+                <strong>Записывать ошибки консоли</strong>
+                <p>При воспроизведении теста сохранять все ошибки из консоли браузера в Excel (в столбец N напротив соответствующего шага)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excelAppendCollectedData">
+              <div class="checkbox-info">
+                <strong>Дописывать собранные данные</strong>
+                <p>При экспорте накапливать строки (из шагов collect-data) между прогонами. Если выключено — экспортируются только данные текущего прогона.</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportFormat">Формат файла:</label>
+            <select id="excelExportFormat" class="input">
+              <option value="xls">XLS (совместимый CSV в оболочке)</option>
+              <option value="csv">CSV</option>
+              <option value="xlsx">XLSX (настоящий файл Excel)</option>
+            </select>
+            <small>Формат XLS сохраняет CSV с расширением .xls (Excel открывает без предупреждений). Выберите XLSX для полноценного файла Excel или CSV для чистого текста.</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportDelimiter">Разделитель значений (для CSV/XLS):</label>
+            <input type="text" id="excelExportDelimiter" class="input" maxlength="2" placeholder="Например ; или ,">
+            <small>По умолчанию используется точка с запятой ; — смените при необходимости, например на запятую ,</small>
+          </div>
+
+          <div class="setting-item">
+            <label for="excelExportPath">Путь для сохранения (опционально):</label>
+            <input type="text" id="excelExportPath" class="input" placeholder="Оставьте пустым для сохранения в папку Загрузки">
+            <small>Если не указан, файлы будут сохраняться в папку Загрузки браузера</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analysis Settings -->
+      <section class="settings-section">
+        <h2>🔬 Настройки Анализа</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <p style="margin: 0; color: #64748b;">
+                Настройте параметры по умолчанию для всех типов анализа: заполнение полей, профили данных, глобальные правила и экспорт/импорт настроек.
+              </p>
+              
+              <button 
+                id="toggleAnalysisSettings"
+                style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span id="analysisToggleIcon">▼</span>
+                <span>Показать Настройки Анализа</span>
+              </button>
+              
+              <!-- Раскрывающаяся панель настроек -->
+              <div id="analysisSettingsPanel" style="display: none; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 12px;">
+                
+                <!-- 1. Заполнение Полей -->
+                <div style="margin-bottom: 24px;">
+                  <h3 style="font-size: 16px; color: #1e293b; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center;">
+                    📝 Заполнение Полей
+                    <button id="resetFillSettingsBtn" style="padding: 6px 12px; background: #64748b; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">🔄 Сброс</button>
+                  </h3>
+                  
+                  <div style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; margin-bottom: 12px;">
+                    <label style="font-size: 14px; color: #475569; padding-top: 8px;">Режим заполнения:</label>
+                    <select id="fillMode" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <option value="smart">Smart - Умное заполнение</option>
+                      <option value="max">Max - На максимум</option>
+                      <option value="random">Random - Случайно</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; margin-bottom: 12px;">
+                    <label style="font-size: 14px; color: #475569; padding-top: 8px;">Профиль данных:</label>
+                    <select id="fillProfile" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <option value="valid-user">valid-user - Стандартные данные</option>
+                      <option value="edge-case-user">edge-case-user - Граничные значения</option>
+                      <option value="international-user">international-user - Международные</option>
+                      <option value="sql-injection-test">sql-injection-test - SQL Injection</option>
+                      <option value="xss-test">xss-test - XSS тестирование</option>
+                      <option value="unicode-test">unicode-test - Unicode/Emoji</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display: grid; grid-template-columns: 200px 1fr; gap: 12px; margin-bottom: 12px;">
+                    <label style="font-size: 14px; color: #475569; padding-top: 8px;">Заполнять поля:</label>
+                    <select id="fillTarget" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <option value="empty">Только пустые</option>
+                      <option value="all">Все поля</option>
+                      <option value="required">Только обязательные</option>
+                    </select>
+                  </div>
+                  
+                  <div style="margin-top: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+                      <input type="checkbox" id="contextAware" checked>
+                      <span>Автоопределение контекста полей</span>
+                    </label>
+                  </div>
+                  
+                  <div style="margin-top: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+                      <input type="checkbox" id="overwriteFilled">
+                      <span>Перезаписывать заполненные поля</span>
+                    </label>
+                    <p style="font-size: 12px; color: #64748b; margin: 4px 0 0 24px;">Если выключено - пропускаем уже заполненные поля</p>
+                  </div>
+                </div>
+                
+                <!-- 2. Глобальные Правила -->
+                <div style="margin-bottom: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+                  <h3 style="font-size: 16px; color: #1e293b; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center;">
+                    🌍 Глобальные Правила Полей
+                    <div style="display: flex; gap: 8px;">
+                      <button id="exportRulesBtn" style="padding: 6px 12px; background: #64748b; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">📥 Экспорт</button>
+                      <button id="importRulesBtn" style="padding: 6px 12px; background: #64748b; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">📤 Импорт</button>
+                    </div>
+                  </h3>
+                  
+                  <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+                    Правила применяются ко всем шагам анализа. Используйте * и ? для паттернов.
+                  </p>
+                  
+                  <div id="globalRulesList" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px; margin-bottom: 12px; max-height: 200px; overflow-y: auto;">
+                    <p style="color: #94a3b8; text-align: center;">Нет правил. Нажмите "Добавить"</p>
+                  </div>
+                  
+                  <!-- Форма добавления нового правила -->
+                  <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
+                    
+                    <!-- Выбор источника селектора -->
+                    <div style="margin-bottom: 12px;">
+                      <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">
+                        <input type="checkbox" id="useSelectorFromPage" style="margin-right: 6px;">
+                        Выбрать селектор из собранных на странице
+                      </label>
+                    </div>
+                    
+                    <!-- Выбор страницы (показывается когда чекбокс включен) -->
+                    <div id="pageSelectorGroup" style="display: none; margin-bottom: 12px;">
+                      <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Страница:</label>
+                      <select 
+                        id="rulePageSelect" 
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; margin-bottom: 8px;">
+                        <option value="">-- Выберите страницу --</option>
+                      </select>
+                      <small style="display: block; margin-top: 4px; color: #64748b;">Выберите страницу, на которой были собраны селекторы</small>
+                    </div>
+                    
+                    <!-- Выбор селектора из собранных -->
+                    <div id="collectedSelectorGroup" style="display: none; margin-bottom: 12px;">
+                      <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Собранный селектор:</label>
+                      <select 
+                        id="ruleCollectedSelector" 
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;">
+                        <option value="">-- Сначала выберите страницу --</option>
+                      </select>
+                      <small style="display: block; margin-top: 4px; color: #64748b;">Селекторы, собранные анализом страницы</small>
+                    </div>
+                    
+                    <!-- Ручной ввод или выбранный селектор -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                      <div>
+                        <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Селектор:</label>
+                        <input 
+                          type="text" 
+                          id="newRuleSelector" 
+                          placeholder="#username, .email-field"
+                          style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;"
+                        >
+                        <small style="display: block; margin-top: 4px; color: #64748b;">CSS селектор поля</small>
+                      </div>
+                      <div>
+                        <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Значение:</label>
+                        <input 
+                          type="text" 
+                          id="newRuleValue" 
+                          placeholder="User{4}, {email}, текст"
+                          style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;"
+                        >
+                        <small style="display: block; margin-top: 4px; color: #64748b;">Значение или паттерн</small>
+                      </div>
+                    </div>
+                    <button id="addGlobalRuleBtn" style="width: 100%; padding: 10px 16px; background: #6366f1; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer;">➕ Добавить Правило</button>
+                  </div>
+                  
+                  <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 12px; margin-top: 12px; font-size: 13px; color: #1e40af;">
+                    <strong>Примеры паттернов:</strong><br>
+                    • "Авто*" → "Автомобиль", "Автор"<br>
+                    • "Test{5}" → "Testa1b2c" (точно 5 символов)<br>
+                    • "{email}" → "random@gmail.com"<br>
+                    • "{phone}" → "+7 (999) 123-45-67"
+                  </div>
+                </div>
+                
+                <!-- 3. Сохранение -->
+                <div style="padding-top: 24px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px;">
+                  <button id="saveAnalysisSettingsBtn" style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer;">💾 Сохранить Настройки</button>
+                  <button id="closeAnalysisSettingsBtn" style="padding: 12px 24px; background: #64748b; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Свернуть</button>
+                </div>
+                
+              </div>
+              
+              <div style="background: #f1f5f9; padding: 12px; border-radius: 6px; font-size: 13px; color: #475569;">
+                <strong>Возможности:</strong>
+                <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                  <li>Smart Fill с расширенными паттернами (* ? {N} {email} {phone})</li>
+                  <li>6 встроенных профилей + возможность кастомных</li>
+                  <li>Глобальные правила полей для всех тестов</li>
+                  <li>Настройка обработки заполненных полей</li>
+                  <li>Экспорт/Импорт правил в JSON</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <script>
+        // Toggle analysis settings panel
+        function toggleAnalysisSettingsPanel() {
+          const panel = document.getElementById('analysisSettingsPanel');
+          const icon = document.getElementById('analysisToggleIcon');
+          const btn = document.getElementById('toggleAnalysisSettings');
+          
+          if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+            icon.textContent = '▲';
+            btn.querySelector('span:last-child').textContent = 'Скрыть Настройки Анализа';
+            loadAnalysisSettings();
+          } else {
+            panel.style.display = 'none';
+            icon.textContent = '▼';
+            btn.querySelector('span:last-child').textContent = 'Показать Настройки Анализа';
+          }
+        }
+
+        // Load settings
+        function loadAnalysisSettings() {
+          try {
+            const settings = JSON.parse(localStorage.getItem('autotest_analysis_settings_fill') || '{}');
+            document.getElementById('fillMode').value = settings.fillMode || 'smart';
+            document.getElementById('fillProfile').value = settings.profile || 'valid-user';
+            document.getElementById('fillTarget').value = settings.fillTarget || 'empty';
+            document.getElementById('contextAware').checked = settings.contextAware !== false;
+            document.getElementById('overwriteFilled').checked = settings.overwriteFilled || false;
+          } catch (e) {
+            console.error('Error loading settings:', e);
+          }
+          
+          loadGlobalRules();
+        }
+
+        // Save settings
+        function saveAnalysisSettings() {
+          const settings = {
+            fillMode: document.getElementById('fillMode').value,
+            profile: document.getElementById('fillProfile').value,
+            fillTarget: document.getElementById('fillTarget').value,
+            contextAware: document.getElementById('contextAware').checked,
+            overwriteFilled: document.getElementById('overwriteFilled').checked
+          };
+          
+          localStorage.setItem('autotest_analysis_settings_fill', JSON.stringify(settings));
+          alert('✅ Настройки сохранены');
+        }
+
+        // Reset settings
+        function resetFillSettings() {
+          if (!confirm('Сбросить настройки к значениям по умолчанию?')) return;
+          localStorage.removeItem('autotest_analysis_settings_fill');
+          loadAnalysisSettings();
+          alert('✅ Настройки сброшены');
+        }
+
+        // Load global rules
+        function loadGlobalRules() {
+          try {
+            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
+            const container = document.getElementById('globalRulesList');
+            container.innerHTML = '';
+            
+            const entries = Object.entries(rules).filter(([k]) => !k.startsWith('_'));
+            
+            if (entries.length === 0) {
+              container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет правил. Нажмите "Добавить"</p>';
+              return;
+            }
+            
+            entries.forEach(([selector, value]) => {
+              const div = document.createElement('div');
+              div.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+              div.innerHTML = `
+                <input type="text" value="${selector}" placeholder="Селектор" style="flex: 1; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;" onchange="updateRule('${selector}', this.value, null)">
+                <input type="text" value="${value}" placeholder="Значение" style="flex: 1; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;" onchange="updateRule('${selector}', null, this.value)">
+                <button onclick="removeRule('${selector}')" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">🗑️</button>
+              `;
+              container.appendChild(div);
+            });
+          } catch (e) {
+            console.error('Error loading rules:', e);
+          }
+        }
+
+        // Add rule
+        function addGlobalRule() {
+          try {
+            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
+            const newKey = `#field${Object.keys(rules).length + 1}`;
+            rules[newKey] = 'Авто*';
+            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
+            loadGlobalRules();
+          } catch (e) {
+            console.error('Error adding rule:', e);
+          }
+        }
+
+        // Update rule
+        function updateRule(oldSelector, newSelector, newValue) {
+          try {
+            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
+            
+            if (newSelector && newSelector !== oldSelector) {
+              const value = rules[oldSelector];
+              delete rules[oldSelector];
+              rules[newSelector] = value;
+            } else if (newValue !== null) {
+              rules[oldSelector] = newValue;
+            }
+            
+            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
+          } catch (e) {
+            console.error('Error updating rule:', e);
+          }
+        }
+
+        // Remove rule
+        function removeRule(selector) {
+          if (!confirm(`Удалить правило "${selector}"?`)) return;
+          
+          try {
+            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
+            delete rules[selector];
+            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
+            loadGlobalRules();
+          } catch (e) {
+            console.error('Error removing rule:', e);
+          }
+        }
+
+        // Export rules
+        function exportRules() {
+          try {
+            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
+            const data = {
+              rules: rules,
+              exported: new Date().toISOString(),
+              version: '0.9.6.7'
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `field-rules-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('✅ Правила экспортированы');
+          } catch (e) {
+            alert('❌ Ошибка экспорта: ' + e.message);
+          }
+        }
+
+        // Import rules
+        function importRules() {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const data = JSON.parse(event.target.result);
+                if (data.rules) {
+                  localStorage.setItem('autotest_global_rules', JSON.stringify(data.rules));
+                  loadGlobalRules();
+                  alert('✅ Правила импортированы');
+                } else {
+                  alert('❌ Неверный формат файла');
+                }
+              } catch (err) {
+                alert('❌ Ошибка импорта: ' + err.message);
+              }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }
+      </script>
+
+      <!-- Advanced Settings -->
+      <section class="settings-section">
+        <h2>🔧 Расширенные настройки</h2>
+        
+        <div class="setting-group">
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autotestsEnabled" checked>
+              <div class="checkbox-info">
+                <strong>Применение автотестов</strong>
+                <p>Включить интерфейс записи и воспроизведения автотестов в popup</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="verboseLogging">
+              <div class="checkbox-info">
+                <strong>Подробное логирование</strong>
+                <p>Выводить детальную информацию в консоль (для отладки)</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="excludeHiddenElements" checked>
+              <div class="checkbox-info">
+                <strong>Исключать скрытые элементы</strong>
+                <p>Не записывать взаимодействия со скрытыми элементами</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="smartWaits" checked>
+              <div class="checkbox-info">
+                <strong>Умные ожидания</strong>
+                <p>Автоматически добавлять ожидания для динамических элементов</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <div class="button-group">
+        <button id="resetSettings" class="btn btn-secondary">
+          🔄 Сбросить по умолчанию
+        </button>
+        <button id="exportSettings" class="btn btn-secondary">
+          📥 Экспортировать настройки
+        </button>
+        <button id="importSettings" class="btn btn-secondary">
+          📤 Импортировать настройки
+        </button>
+        <button id="saveSettings" class="btn btn-primary">
+          💾 Сохранить настройки
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="settings.js"></script>
+  <script src="settings-ru-lang.js"></script>
+</body>
+</html>

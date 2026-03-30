@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adaptive & Analysis Analytics - AutoTest Recorder</title>
+  <link rel="stylesheet" href="analytics-dashboard.css">
+  <link rel="stylesheet" href="adaptive-analytics.css">
+  <script src="../i18n/i18n.js"></script>
+  <script src="../libs/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🔄 Adaptive & Analysis Analytics</h1>
+      <div class="header-actions">
+        <a id="linkMainAnalytics" href="#" class="btn btn-secondary">📊 Main Analytics</a>
+        <a id="linkPerformance" href="#" class="btn btn-secondary">⚡ Performance</a>
+        <button id="exportCsv" class="btn btn-secondary">📥 CSV</button>
+        <a id="backToSettings" href="#" class="btn btn-secondary">← Settings</a>
+      </div>
+    </header>
+
+    <div id="analyticsDisabled" class="disabled-message hidden">
+      <p>Analytics is disabled. Enable it in extension settings.</p>
+      <a id="openSettings" href="#">Open settings</a>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content">
+      <div id="loadingState" class="loading-state">Loading data...</div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>No adaptive or analysis step data. Run tests with adaptive/analysis steps.</p>
+      </div>
+
+      <div id="chartsSection" class="charts-section hidden">
+        <section class="card summary-card">
+          <h2>Summary</h2>
+          <div id="summaryGrid" class="summary-grid adaptive-summary"></div>
+        </section>
+        <section class="card">
+          <h2>Adaptive steps — iterations & actions</h2>
+          <div class="chart-wrap">
+            <canvas id="chartAdaptive"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Adaptive steps by test</h2>
+          <div class="table-wrap">
+            <table id="adaptiveTable">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Step</th>
+                  <th>Subtype</th>
+                  <th>Runs</th>
+                  <th>Avg iterations</th>
+                  <th>Avg actions</th>
+                  <th>Fields filled</th>
+                  <th>Errors</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Analysis steps — success rate</h2>
+          <div class="table-wrap">
+            <table id="analysisTable">
+              <thead>
+                <tr>
+                  <th>Test</th>
+                  <th>Step</th>
+                  <th>Type</th>
+                  <th>Success</th>
+                  <th>Total</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script src="../shared/utils.js"></script>
+  <script src="adaptive-analytics-dashboard.js"></script>
+</body>
+</html>

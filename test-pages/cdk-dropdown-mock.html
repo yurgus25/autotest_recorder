@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Mock: CDK overlay вне app-select</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 24px; max-width: 640px; }
+    app-select[elementid="type-project"] {
+      display: block;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      background: #f8fafc;
+    }
+    app-select .chevron { float: right; opacity: 0.6; }
+    #status-field {
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .cdk-overlay-container { pointer-events: none; position: fixed; inset: 0; z-index: 1000; }
+    .cdk-overlay-pane {
+      pointer-events: auto;
+      position: absolute;
+      min-width: 280px;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.12);
+      display: none;
+    }
+    .cdk-overlay-pane.open { display: block; }
+    .content-list [role="option"] {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    .content-list [role="option"]:hover { background: #e2e8f0; }
+    h1 { font-size: 1.1rem; margin-top: 0; }
+    p.hint { color: #64748b; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Тест записи: список в overlay, не внутри app-select</h1>
+  <p class="hint">1) Клик по полю ниже — открыть список. 2) Клик по пункту в белой панели. 3) Клик по «Основание».</p>
+
+  <!-- app-select как на целевом сайте + tabindex для a11y / снапшота браузера -->
+  <app-select elementid="type-project" id="type-project" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false">
+    <span class="label">Укажите вид проекта</span>
+    <span class="chevron">▼</span>
+  </app-select>
+
+  <!-- Панель как у Angular CDK: вне дерева app-select -->
+  <div class="cdk-overlay-container">
+    <div id="overlay-pane" class="cdk-overlay-pane" role="dialog">
+      <div class="content-list" role="listbox">
+        <div role="option">Плановый</div>
+        <div role="option">Инициативный</div>
+        <div role="option">По поручению</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status-project" elementid="status-project" role="button" tabindex="0">Основание — выберите</div>
+
+  <script>
+    const trigger = document.getElementById('type-project');
+    const pane = document.getElementById('overlay-pane');
+    function positionPane() {
+      const r = trigger.getBoundingClientRect();
+      pane.style.left = r.left + 'px';
+      pane.style.top = (r.bottom + 4) + 'px';
+    }
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      positionPane();
+      var open = pane.classList.toggle('open');
+      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', function () {
+      pane.classList.remove('open');
+    });
+    pane.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.querySelectorAll('.content-list [role="option"]').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        trigger.querySelector('.label').textContent = 'Укажите вид проекта: ' + opt.textContent.trim();
+        pane.classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>

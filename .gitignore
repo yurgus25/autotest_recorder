@@ -1,0 +1,5 @@
+.cursor/
+*.log
+temp_kr*/
+dist/
+node_modules/

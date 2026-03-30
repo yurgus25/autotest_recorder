@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Performance Report - AutoTest Recorder</title>
+  <link rel="stylesheet" href="performance-dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>⚡ Performance Report</h1>
+      <div class="header-actions">
+        <a id="linkAnalytics" href="#" class="btn btn-secondary" target="_blank" rel="noopener" title="Test analytics">📊 Analytics</a>
+        <a id="linkAdaptive" href="#" class="btn btn-secondary" target="_blank" rel="noopener" title="Adaptive & Analysis">🔄 Adaptive</a>
+        <a href="../help/help.html#performance-analytics" target="_blank" class="btn btn-link" title="Performance Analytics Help">❓ Help</a>
+        <button id="exportJson" class="btn btn-primary" title="Export performance data as JSON">📥 JSON</button>
+        <button id="exportHAR" class="btn btn-primary" title="Export as HAR file for DevTools">📊 HAR</button>
+        <button id="exportCSV" class="btn btn-primary" title="Export as CSV for Excel">📊 CSV</button>
+        <button id="configureBudgets" class="btn btn-secondary" title="Configure performance budgets">⚙️ Budgets</button>
+        <button id="saveBaseline" class="btn btn-secondary" title="Save current data as baseline">💾 Save Baseline</button>
+        <button id="loadBaseline" class="btn btn-secondary" title="Load baseline for comparison">📂 Load Baseline</button>
+      </div>
+    </header>
+
+    <div id="loadingState" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading performance data...</p>
+    </div>
+
+    <div id="emptyState" class="empty-state hidden">
+      <p>No performance data available.</p>
+      <p class="hint">Run a test with "Performance Analysis" step to collect data.</p>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content hidden">
+      <!-- Timeline Section -->
+  <section class="dashboard-section">
+    <h2 class="section-title">📊 Test Timeline</h2>
+    
+    <!-- Comparison Controls -->
+    <div class="comparison-controls" id="comparisonControls" style="display: none;">
+      <div class="comparison-control-row">
+        <select id="baselineSelect" class="baseline-select">
+          <option value="">Select baseline to compare...</option>
+        </select>
+        <button id="compareBtn" class="btn btn-primary">Compare</button>
+        <button id="clearComparisonBtn" class="btn btn-secondary" style="display: none;">Clear Comparison</button>
+      </div>
+    </div>
+    
+    <div class="timeline-chart-container">
+      <canvas id="timelineChart" width="900" height="350"></canvas>
+    </div>
+    <div class="timeline-summary" id="timelineSummary">
+      <!-- Populated by JS -->
+    </div>
+    
+    <!-- Comparison Table -->
+    <div class="comparison-table-container" id="comparisonTableContainer" style="display: none;">
+      <h3>📈 Comparison Results</h3>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Current</th>
+            <th>Baseline</th>
+            <th>Difference</th>
+            <th>Change %</th>
+          </tr>
+        </thead>
+        <tbody id="comparisonTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Web Vitals Summary -->
+      <section class="card web-vitals-summary">
+        <h2>📊 Web Vitals</h2>
+        <div class="vitals-grid">
+          <div class="vital-card" data-vital="lcp">
+            <div class="vital-label">LCP</div>
+            <div class="vital-value" id="lcp-value">-</div>
+            <div class="vital-rating" id="lcp-rating"></div>
+            <div class="vital-description">Largest Contentful Paint</div>
+            <div class="vital-hint">Good: &lt;2.5s, Poor: &gt;4s</div>
+          </div>
+          
+          <div class="vital-card" data-vital="cls">
+            <div class="vital-label">CLS</div>
+            <div class="vital-value" id="cls-value">-</div>
+            <div class="vital-rating" id="cls-rating"></div>
+            <div class="vital-description">Cumulative Layout Shift</div>
+            <div class="vital-hint">Good: &lt;0.1, Poor: &gt;0.25</div>
+          </div>
+          
+          <div class="vital-card" data-vital="inp">
+            <div class="vital-label">INP</div>
+            <div class="vital-value" id="inp-value">-</div>
+            <div class="vital-rating" id="inp-rating"></div>
+            <div class="vital-description">Interaction to Next Paint</div>
+            <div class="vital-hint">Good: &lt;200ms, Poor: &gt;500ms</div>
+          </div>
+          
+          <div class="vital-card" data-vital="ttfb">
+            <div class="vital-label">TTFB</div>
+            <div class="vital-value" id="ttfb-value">-</div>
+            <div class="vital-rating" id="ttfb-rating"></div>
+            <div class="vital-description">Time to First Byte</div>
+            <div class="vital-hint">Good: &lt;800ms, Poor: &gt;1800ms</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Test Timeline -->
+      <section class="card timeline-section">
+        <h2>🕐 Test Timeline</h2>
+        <div id="timeline-container" class="timeline-container">
+          <!-- Steps will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Long Tasks Section -->
+      <section class="card long-tasks-section" id="longTasksSection" style="display: none;">
+        <h2>⚠️ Long Tasks (>50ms)</h2>
+        <p class="section-description">Tasks that blocked the main thread for more than 50ms. These can cause UI freezes and poor user experience.</p>
+        
+        <div class="long-tasks-summary" id="longTasksSummary">
+          <!-- Summary stats populated by JS -->
+        </div>
+        
+        <div class="long-tasks-chart-container">
+          <canvas id="longTasksChart" width="900" height="250"></canvas>
+        </div>
+        
+        <div class="long-tasks-list-container">
+          <h3>📋 Top 10 Long Tasks</h3>
+          <div class="long-tasks-list" id="longTasksList">
+            <!-- List populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Performance Analysis & Recommendations -->
+      <section class="card analysis-section" id="analysisSection" style="display: none;">
+        <h2>🎯 Performance Analysis</h2>
+        
+        <!-- Performance Score -->
+        <div class="performance-score" id="performanceScore">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Budget Violations -->
+        <div class="budget-violations" id="budgetViolations" style="display: none;">
+          <h3>⚠️ Budget Violations</h3>
+          <div id="violationsList"></div>
+        </div>
+
+        <!-- Bottlenecks -->
+        <div class="bottlenecks-section" id="bottlenecksSection" style="display: none;">
+          <h3>🔍 Performance Bottlenecks</h3>
+          <div id="bottlenecksList"></div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="recommendations-section" id="recommendationsSection" style="display: none;">
+          <h3>💡 Recommendations</h3>
+          <div id="recommendationsList"></div>
+        </div>
+      </section>
+
+      <!-- Resource Details -->
+      <section class="card resources-section">
+        <h2>📦 Resource Details</h2>
+        <div class="table-controls">
+          <input type="text" id="searchResources" class="search-input" placeholder="🔍 Filter by name or URL...">
+          <select id="filterType" class="filter-select">
+            <option value="all">All Types</option>
+            <option value="script">Scripts</option>
+            <option value="stylesheet">Stylesheets</option>
+            <option value="img">Images</option>
+            <option value="fetch">Fetch/XHR</option>
+            <option value="font">Fonts</option>
+            <option value="other">Other</option>
+          </select>
+          <select id="sortBy" class="sort-select">
+            <option value="size-desc">Size (largest first)</option>
+            <option value="size-asc">Size (smallest first)</option>
+            <option value="duration-desc">Duration (longest first)</option>
+            <option value="duration-asc">Duration (shortest first)</option>
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="step-asc">Step order</option>
+          </select>
+        </div>
+        
+        <div class="table-wrap">
+          <table id="resourcesTable" class="resources-table">
+            <thead>
+              <tr>
+                <th>Resource Name</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Duration</th>
+                <th>Step</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Resources will be rendered here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="resourcesSummary" class="resources-summary">
+          <span>Total: <strong id="totalResources">0</strong> resources</span>
+          <span>Total Size: <strong id="totalSize">0 KB</strong></span>
+          <span>Avg Duration: <strong id="avgDuration">0 ms</strong></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="../shared/utils.js"></script>
+  <script src="../i18n/i18n.js"></script>
+  <script src="performance-dashboard.js"></script>
+  <script src="timeline-chart.js"></script>
+  <script src="har-export.js"></script>
+  <script src="csv-export.js"></script>
+  <script src="budget-validator.js"></script>
+  <script src="advanced-analysis.js"></script>
+</body>
+</html>

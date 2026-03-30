@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аналитика адаптивных шагов и анализа - AutoTest Recorder</title>
+  <link rel="stylesheet" href="analytics-dashboard.css">
+  <link rel="stylesheet" href="adaptive-analytics.css">
+  <script src="../i18n/i18n.js"></script>
+  <script src="../libs/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🔄 Аналитика адаптивных шагов и анализа</h1>
+      <div class="header-actions">
+        <a id="linkMainAnalytics" href="#" class="btn btn-secondary">📊 Аналитика</a>
+        <a id="linkPerformance" href="#" class="btn btn-secondary">⚡ Производительность</a>
+        <button id="exportCsv" class="btn btn-secondary">📥 CSV</button>
+        <a id="backToSettings" href="#" class="btn btn-secondary">← Настройки</a>
+      </div>
+    </header>
+
+    <div id="analyticsDisabled" class="disabled-message hidden">
+      <p>Аналитика отключена. Включите её в настройках расширения.</p>
+      <a id="openSettings" href="#">Открыть настройки</a>
+    </div>
+
+    <div id="dashboardContent" class="dashboard-content">
+      <div id="loadingState" class="loading-state">Загрузка данных...</div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>Нет данных по адаптивным шагам и анализу. Запустите тесты с такими шагами.</p>
+      </div>
+
+      <div id="chartsSection" class="charts-section hidden">
+        <section class="card summary-card">
+          <h2>Сводка</h2>
+          <div id="summaryGrid" class="summary-grid adaptive-summary"></div>
+        </section>
+        <section class="card">
+          <h2>Адаптивные шаги — итерации и действия</h2>
+          <div class="chart-wrap">
+            <canvas id="chartAdaptive"></canvas>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Адаптивные шаги по тестам</h2>
+          <div class="table-wrap">
+            <table id="adaptiveTable">
+              <thead>
+                <tr>
+                  <th>Тест</th>
+                  <th>Шаг</th>
+                  <th>Подтип</th>
+                  <th>Прогонов</th>
+                  <th>Ср. итераций</th>
+                  <th>Ср. действий</th>
+                  <th>Полей</th>
+                  <th>Ошибок</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Шаги анализа — успешность</h2>
+          <div class="table-wrap">
+            <table id="analysisTable">
+              <thead>
+                <tr>
+                  <th>Тест</th>
+                  <th>Шаг</th>
+                  <th>Тип</th>
+                  <th>Успех</th>
+                  <th>Всего</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script src="../shared/utils.js"></script>
+  <script src="adaptive-analytics-dashboard.js"></script>
+</body>
+</html>

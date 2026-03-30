@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Настройки Анализа</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #f8fafc; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { background: white; padding: 24px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { font-size: 24px; color: #1e293b; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; }
+    .section { background: white; padding: 24px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    h2 { font-size: 18px; color: #1e293b; }
+    .setting-row { display: grid; grid-template-columns: 220px 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+    .setting-label { font-size: 14px; color: #475569; font-weight: 500; padding-top: 8px; }
+    select, input[type="text"], input[type="number"] { width: 100%; max-width: 400px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .help-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary { background: #64748b; color: white; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-small { padding: 6px 12px; font-size: 13px; }
+    .rules-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-top: 12px; }
+    .rule-item { display: flex; gap: 8px; margin-bottom: 8px; }
+    .rule-item input { flex: 1; }
+    .actions { display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 24px; }
+    .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 13px; color: #1e40af; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚙️ Настройки Анализа</h1>
+      <p class="subtitle">Настройте параметры по умолчанию для анализа заполнения полей</p>
+    </header>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>📝 Заполнение Полей</h2>
+        <button class="btn btn-secondary btn-small" id="resetSettingsBtn">🔄 Сброс</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Режим заполнения:</div>
+        <div><select id="fillMode">
+          <option value="smart">Smart - Умное заполнение</option>
+          <option value="max">Max - На максимум</option>
+          <option value="random">Random - Случайно</option>
+        </select></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Профиль данных:</div>
+        <div><select id="fillProfile">
+          <option value="valid-user">valid-user - Стандартные данные</option>
+          <option value="edge-case-user">edge-case-user - Граничные значения</option>
+        </select></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">Заполнять поля:</div>
+        <div><select id="fillTarget">
+          <option value="empty">Только пустые</option>
+          <option value="all">Все поля</option>
+          <option value="required">Только обязательные</option>
+        </select>
+        <div class="help-text">Что делать с уже заполненными полями</div></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"></div>
+        <div><label class="checkbox-label">
+          <input type="checkbox" id="contextAware" checked>
+          <span>Автоопределение контекста полей</span>
+        </label></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"></div>
+        <div><label class="checkbox-label">
+          <input type="checkbox" id="overwriteFilled">
+          <span>Перезаписывать заполненные поля</span>
+        </label>
+        <div class="help-text">Если выключено - пропускаем уже заполненные поля</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>🌍 Глобальные Правила Полей</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-small" id="exportRulesBtn">📥 Экспорт</button>
+          <button class="btn btn-secondary btn-small" id="importRulesBtn">📤 Импорт</button>
+        </div>
+      </div>
+      <p class="help-text">Правила применяются ко всем шагам анализа. Используйте * и ? для паттернов.</p>
+      <div class="rules-box" id="rulesList">
+        <p style="color: #94a3b8; text-align: center;">Нет правил. Нажмите "Добавить Правило"</p>
+      </div>
+      
+      <!-- Форма добавления правила (как в settings_ru.html) -->
+      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-top: 12px;">
+        
+        <!-- Выбор источника селектора -->
+        <div style="margin-bottom: 12px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #475569;">
+            <input type="checkbox" id="useSelectorFromCollected" style="margin-right: 6px; width: 16px; height: 16px;">
+            <span>Выбрать селектор из собранных на странице</span>
+          </label>
+        </div>
+        
+        <!-- Выбор страницы (показывается когда чекбокс включен) -->
+        <div id="collectedPageGroup" style="display: none; margin-bottom: 12px;">
+          <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Страница:</label>
+          <select 
+            id="collectedPageSelect" 
+            style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px;">
+            <option value="">-- Выберите страницу --</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #64748b;">Выберите страницу, на которой были собраны селекторы</small>
+        </div>
+        
+        <!-- Выбор селектора из собранных -->
+        <div id="collectedSelectorGroup" style="display: none; margin-bottom: 12px;">
+          <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Собранный селектор:</label>
+          <select 
+            id="collectedSelectorSelect" 
+            style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;">
+            <option value="">-- Сначала выберите страницу --</option>
+          </select>
+          <small style="display: block; margin-top: 4px; color: #64748b;">Селекторы, собранные анализом страницы</small>
+        </div>
+        
+        <!-- Ручной ввод или выбранный селектор -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Селектор:</label>
+            <input 
+              type="text" 
+              id="newRuleSelector" 
+              placeholder="#username, .email-field"
+              style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;"
+            >
+            <small style="display: block; margin-top: 4px; color: #64748b;">CSS селектор поля</small>
+          </div>
+          <div>
+            <label style="display: block; font-size: 13px; color: #475569; margin-bottom: 6px;">Значение:</label>
+            <input 
+              type="text" 
+              id="newRuleValue" 
+              placeholder="User{4}, {email}, текст"
+              style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; font-family: monospace;"
+            >
+            <small style="display: block; margin-top: 4px; color: #64748b;">Значение или паттерн</small>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-small" id="addRuleBtn" style="width: 100%;">➕ Добавить Правило</button>
+      </div>
+      
+      <div class="info-box">
+        <strong>Примеры паттернов:</strong><br>
+        • "Авто*" → "Автомобиль", "Автор", "Авто80"<br>
+        • "Test?" → "Tests", "Test5"<br>
+        • "User{5}" → "Userab12c" (точно 5 символов)<br>
+        • "Code{3-8}" → "Code12345" (от 3 до 8 символов)<br>
+        • "Test[123]" → "Test2" (один из символов)<br>
+        • "{email}" → "random@gmail.com"<br>
+        • "{phone}" → "+7 (999) 123-45-67"<br>
+        • "{digit}{digit}{digit}" → "582"<br>
+        • "{uppercase:test}" → "TEST"
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="saveSettingsBtn">💾 Сохранить Настройки</button>
+      <button class="btn btn-secondary" id="closeWindowBtn">❌ Закрыть</button>
+    </div>
+  </div>
+
+  <input type="file" id="fileInput" style="display: none;" accept=".json">
+
+  <script src="analysis-settings.js"></script>
+</body>
+</html>

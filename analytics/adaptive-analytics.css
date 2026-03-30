@@ -1,0 +1,17 @@
+/* Дополнительные стили для страницы аналитики адаптивных шагов и анализа */
+
+.adaptive-summary .summary-item.adaptive .value { color: #7c4dff; }
+.adaptive-summary .summary-item.analysis .value { color: #00bcd4; }
+
+#adaptiveTable td:nth-child(5),
+#adaptiveTable td:nth-child(6),
+#adaptiveTable td:nth-child(7),
+#adaptiveTable td:nth-child(8) {
+  text-align: right;
+}
+
+#analysisTable td:nth-child(4),
+#analysisTable td:nth-child(5),
+#analysisTable td:nth-child(6) {
+  text-align: right;
+}

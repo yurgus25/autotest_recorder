@@ -1,0 +1,204 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  background: #2196F3;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: #6c757d;
+}
+
+.disabled-message {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.disabled-message p {
+  margin-bottom: 12px;
+}
+
+.disabled-message a {
+  color: #0d6efd;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+}
+
+.dashboard-content .card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.dashboard-content .card h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 280px;
+}
+
+.heatmap-wrap {
+  overflow-x: auto;
+}
+
+#heatmapContainer {
+  display: grid;
+  gap: 2px;
+  min-width: 400px;
+}
+
+.heatmap-cell {
+  padding: 6px 8px;
+  font-size: 11px;
+  text-align: center;
+  border-radius: 4px;
+  min-width: 32px;
+}
+
+.heatmap-row-label,
+.heatmap-col-label {
+  font-size: 11px;
+  color: #666;
+  padding: 4px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+#stepFailuresTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+#stepFailuresTable th,
+#stepFailuresTable td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+#stepFailuresTable th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+#stepFailuresTable tr:hover {
+  background: #f9f9f9;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.summary-item {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.summary-item .value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1976D2;
+}
+
+.summary-item .label {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.summary-item.danger .value {
+  color: #c62828;
+}
+
+.summary-item.success .value {
+  color: #2e7d32;
+}
+
+@media print {
+  .header-actions,
+  .btn,
+  #backToSettings,
+  #exportCsv,
+  #printPdf {
+    display: none !important;
+  }
+  .header {
+    margin-bottom: 12px;
+  }
+  .card {
+    break-inside: avoid;
+  }
+}

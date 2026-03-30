@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="../i18n/page-router.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoTest Recorder - Fullscreen Mode</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    body {
+      width: 100% !important;
+      min-height: 100vh !important;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    
+    .fullscreen-mode .tests-section {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .fullscreen-mode .tests-section .section-header {
+      flex-shrink: 0;
+    }
+    
+    .fullscreen-mode #testsList {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    
+    .fullscreen-mode .section-header {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .fullscreen-mode .section-header-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+    .fullscreen-mode .section-header h2 {
+      margin: 0;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .fullscreen-mode .section-header .tests-summary {
+      font-size: 13px;
+      color: #555;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 280px;
+    }
+    .fullscreen-mode .tests-count-fullscreen-hidden {
+      display: none !important;
+    }
+    
+    .fullscreen-mode .section-header-buttons-wrap {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      flex: 1;
+      min-width: 0;
+      margin-left: auto;
+      justify-content: flex-end;
+    }
+    
+    .fullscreen-mode .section-header-buttons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    
+    .fullscreen-mode .section-header .tests-count {
+      display: inline;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: #666;
+    }
+    
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      white-space: nowrap;
+      min-height: 32px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar:hover {
+      background: #f0f0f0;
+      border-color: #aaa;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar .btn-fs-icon {
+      flex-shrink: 0;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar.compact-toggle-mini {
+      min-width: 0;
+      max-width: 160px;
+      overflow: hidden;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar.compact-toggle-mini .btn-fs-text {
+      min-width: 0;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar .btn-fs-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+    .fullscreen-mode .section-header .btn-fullscreen-toolbar.active {
+      background: #e8e8e8;
+      border-color: #999;
+    }
+    
+    .fullscreen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    
+    .fullscreen-header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    
+    .fullscreen-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .fullscreen-close {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .fullscreen-close:hover {
+      background: #c82333;
+    }
+    
+    .tests-section {
+      margin-top: 30px;
+      min-height: 0;
+    }
+    
+    .fullscreen-mode .tests-list {
+      display: block;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    
+    .fullscreen-layout {
+      display: grid;
+      gap: 20px;
+      align-items: start;
+      grid-template-columns: 1fr 1fr 1fr;
+      min-width: 0;
+    }
+    
+    .fullscreen-col-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+    }
+    
+    .fullscreen-col-tests {
+      grid-column: 2 / 4;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      min-width: 0;
+    }
+    
+    .fullscreen-col-tests .standalone-tests-wrap {
+      min-height: 0;
+    }
+    
+    .fullscreen-col-tests .test-item {
+      margin-bottom: 0;
+    }
+    
+    @media (max-width: 1000px) {
+      .fullscreen-layout {
+        grid-template-columns: 1fr;
+      }
+      .fullscreen-col-tests {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .test-item {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.dark-theme {
+      background-color: #2c2c2c;
+      color: #e0e0e0;
+    }
+    
+    body.dark-theme .test-item {
+      background-color: #3a3a3a;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    body.dark-theme .fullscreen-header {
+      border-bottom-color: #444;
+    }
+    .fullscreen-mode .fullscreen-hide-test-name {
+      display: none !important;
+    }
+    .fullscreen-mode .fullscreen-hide-advanced-search {
+      display: none !important;
+    }
+    .fullscreen-mode .header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .fullscreen-mode .header-row .status {
+      flex: 1;
+      min-width: 0;
+    }
+    .fullscreen-mode .header-row .fullscreen-row-advanced-search {
+      flex: 0 0 auto;
+      min-width: 500px;
+      padding: 2px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .fullscreen-mode .header-row .fullscreen-row-advanced-search span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      display: inline-block;
+    }
+    .fullscreen-mode .header-row .header-row-right {
+      flex: 1;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+  </style>
+</head>
+<body class="fullscreen-mode">
+  <div class="container">
+    <div class="fullscreen-header">
+      <h1 data-i18n="fullscreenPopup.title">🎯 AutoTest Recorder — Full Screen</h1>
+      <div class="fullscreen-header-actions">
+        <div class="lang-switcher">
+          <button type="button" id="lang-en" class="active">EN</button>
+          <button type="button" id="lang-ru">RU</button>
+        </div>
+        <button id="settingsButton" class="btn-icon settings-btn" data-i18n-title="popup.settings">
+          ⚙️
+        </button>
+        <button id="closeFullscreen" class="fullscreen-close" data-i18n="common.close">✕ Close</button>
+      </div>
+    </div>
+
+    <header class="header">
+      <div class="header-top">
+      </div>
+      <div class="header-row">
+        <div class="status" id="status">
+          <span class="status-indicator" id="statusIndicator"></span>
+          <span id="statusText" data-i18n="popup.ready">Ready</span>
+        </div>
+        <button id="advancedSelectorSearch" class="btn btn-info fullscreen-row-advanced-search" type="button" data-i18n-title="popup.advancedSelectorSearch" title="Advanced selector search"><span data-i18n="popup.advancedSelectorSearch">Advanced selector search</span></button>
+        <div class="header-row-right">
+          <a id="analyticsDashboardButton" class="btn-icon analytics-dashboard-btn hidden" href="#" target="_blank" rel="noopener" data-i18n-title="popup.analyticsDashboard">📊</a>
+          <button id="helpButton" class="btn-icon" data-i18n-title="popup.help">❓</button>
+        </div>
+      </div>
+      <div class="step-progress" id="stepProgress" style="display: none;">
+        <div class="step-info">
+          <span id="stepText">Step 0 of 0</span>
+          <span class="step-type" id="stepType"></span>
+        </div>
+        <div class="step-bar">
+          <div class="step-bar-fill" id="stepBarFill"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="control-group">
+        <button id="startRecording" class="btn btn-primary">
+          <span class="rec-btn-icon">🔴</span><span class="rec-btn-text" data-i18n="popup.startRecording">Start recording</span>
+        </button>
+        <button id="stopRecording" class="btn btn-danger" disabled>
+          <span class="rec-btn-icon">⏹️</span><span class="rec-btn-text" data-i18n="popup.stopRecording">Stop recording</span>
+        </button>
+        <button id="forceStop" class="btn btn-gray" disabled>
+          <span class="rec-btn-icon">⏹️</span><span class="rec-btn-text" data-i18n="popup.stop">Stop</span>
+        </button>
+      </div>
+
+      <div class="control-group fullscreen-hide-test-name">
+        <input 
+          type="text" 
+          id="testName" 
+          data-i18n-placeholder="popup.testNamePlaceholder"
+          placeholder="Test name..." 
+          class="input"
+        >
+      </div>
+
+      <div class="control-group fullscreen-hide-advanced-search">
+        <button class="btn btn-info" style="width: 100%;" data-i18n="popup.advancedSelectorSearch" aria-hidden="true" tabindex="-1">
+          🔍 Advanced selector search
+        </button>
+      </div>
+    </div>
+
+    <div class="tests-section">
+      <div class="section-header">
+        <div class="section-header-title-wrap">
+          <h2 data-i18n="popup.testsSection">📋 Tests</h2>
+          <span id="testsSummary" class="tests-summary" aria-live="polite"></span>
+        </div>
+        <div class="section-header-buttons-wrap">
+          <div class="section-header-buttons">
+            <button id="createTest" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.createTest">
+              <span class="btn-fs-icon">➕</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnCreateTest">Create test</span>
+            </button>
+            <button id="createGroup" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.createGroup">
+              <span class="btn-fs-icon">🧩</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnCreateGroup">Create group</span>
+            </button>
+            <button id="importTest" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.importTest">
+              <span class="btn-fs-icon">📥</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnImport">Import</span>
+            </button>
+            <button id="refreshTests" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.refresh">
+              <span class="btn-fs-icon">🔄</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnRefresh">Refresh</span>
+            </button>
+            <button id="filterFavorites" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.filterFavorites">
+              <span class="btn-fs-icon">⭐</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnFavorites">Favorites</span>
+            </button>
+            <button id="sortTests" class="btn-fullscreen-toolbar" type="button" data-i18n-title="popup.sortTests">
+              <span class="btn-fs-icon">⇅</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnSort">Sort</span>
+            </button>
+            <button id="compactTests" class="btn-fullscreen-toolbar compact-toggle-mini" type="button" data-i18n-title="popup.compactTests">
+              <span class="btn-fs-icon">⊞</span><span class="btn-fs-text" data-i18n="fullscreenPopup.btnCompact">Compact</span>
+            </button>
+          </div>
+        </div>
+        <span id="testsCount" class="tests-count tests-count-fullscreen-hidden" aria-live="polite">0</span>
+        <span class="section-header-spacer" aria-hidden="true"></span>
+      </div>
+      
+      <div id="testsList" class="tests-list">
+        <div class="empty-state" data-i18n="popup.noTests">No saved tests</div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+  <!-- Редактор группы (для кнопки «Создать группу») -->
+  <div id="groupEditorModal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-content group-editor-modal">
+      <div class="modal-header">
+        <h3 data-i18n="popup.groupEditorTitle">Group settings</h3>
+        <button type="button" class="modal-close" id="closeGroupEditorModal" data-i18n-aria-label="common.close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label for="groupEditorName"><span data-i18n="popup.groupNameLabel">Group name</span></label>
+          <input id="groupEditorName" type="text" class="input" />
+        </div>
+        <div class="form-row">
+          <div class="group-color-label" data-i18n="popup.groupColorLabel">Group color</div>
+          <div class="group-color-palette" id="groupEditorPalette"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelGroupEditor" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveGroupEditor" data-i18n="popup.groupSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upgradeModal" class="modal-overlay upgrade-modal hidden" aria-hidden="true">
+    <div class="modal-content upgrade-modal-content">
+      <div class="modal-header">
+        <h3 data-i18n="popup.freeTierLimitTitle">Free tier limit reached</h3>
+        <button type="button" class="modal-close" id="closeUpgradeModal" data-i18n-aria-label="common.close">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="upgradeModalMessage" data-i18n="popup.freeTierLimitMsg">You can store up to 10 tests in the free version.</p>
+        <div class="upgrade-modal-actions">
+          <a id="upgradeModalBtn" href="#" target="_blank" rel="noopener" class="btn btn-primary" data-i18n="popup.upgradePlan">Upgrade to paid plan</a>
+          <button type="button" class="btn btn-secondary" id="closeUpgradeModalBtn" data-i18n="common.close">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../i18n/i18n.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="excel-export.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

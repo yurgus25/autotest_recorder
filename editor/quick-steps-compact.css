@@ -1,0 +1,269 @@
+/* Компактное многоуровневое меню Quick Steps */
+.quick-steps-compact {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 280px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+
+.quick-steps-compact.show {
+  display: block;
+}
+
+/* Группы первого уровня */
+.quick-group {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.quick-group:last-child {
+  border-bottom: none;
+}
+
+.quick-group-header {
+  padding: 10px 16px;
+  background: #f8f9fa;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s;
+}
+
+.quick-group-header:hover {
+  background: #e9ecef;
+}
+
+.quick-group-header .icon {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+.quick-group-header .arrow {
+  transition: transform 0.2s;
+  font-size: 12px;
+  color: #666;
+}
+
+.quick-group.expanded .arrow {
+  transform: rotate(90deg);
+}
+
+/* Список операций внутри группы */
+.quick-operations {
+  display: none;
+  padding: 8px 0;
+}
+
+.quick-group.expanded .quick-operations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 4px;
+  padding: 8px;
+}
+
+.quick-operation {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  color: #333;
+  text-decoration: none;
+}
+
+.quick-operation:hover {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.quick-operation .op-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* Адаптивная сетка для больших экранов */
+@media (min-width: 768px) {
+  .quick-steps-compact {
+    min-width: 400px;
+    max-width: 800px;
+  }
+  
+  .quick-group.expanded .quick-operations {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .quick-steps-compact {
+    max-width: 900px;
+  }
+  
+  .quick-group.expanded .quick-operations {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+/* Поиск внутри Quick Steps */
+.quick-search {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.quick-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.quick-search input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.1);
+}
+
+/* Счетчик операций в группе */
+.ops-count {
+  font-size: 11px;
+  color: #666;
+  font-weight: normal;
+  margin-left: 4px;
+}
+
+/* ============================================================================
+   ЗАБЛОКИРОВАННЫЕ ГРУППЫ И ОПЕРАЦИИ
+   Группы/операции, которые не реализованы в Player или требуют доработки
+   ============================================================================ */
+
+/* Заблокированная группа - серый стиль */
+.quick-group.disabled {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+.quick-group.disabled .quick-group-header {
+  background: #f0f0f0;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.quick-group.disabled .quick-group-header:hover {
+  background: #f0f0f0;
+}
+
+.quick-group.disabled .quick-group-header .icon {
+  filter: grayscale(100%);
+  opacity: 0.6;
+}
+
+.quick-group.disabled .quick-group-header .arrow {
+  display: none;
+}
+
+.quick-group.disabled .quick-operations {
+  display: none !important;
+}
+
+/* Заблокированная отдельная операция */
+.quick-operation.disabled {
+  opacity: 0.4;
+  color: #999;
+  cursor: not-allowed;
+  pointer-events: auto;
+  text-decoration: line-through;
+  text-decoration-color: #ccc;
+}
+
+.quick-operation.disabled:hover {
+  background: transparent;
+  color: #999;
+}
+
+.quick-operation.disabled .op-icon {
+  filter: grayscale(100%);
+  opacity: 0.5;
+}
+
+/* Тултип для заблокированных элементов */
+.quick-group.disabled .quick-group-header::after,
+.quick-operation.disabled::after {
+  content: attr(data-disabled-reason);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #424242;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: normal;
+  white-space: nowrap;
+  z-index: 1001;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  max-width: 250px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.quick-group.disabled .quick-group-header {
+  position: relative;
+}
+
+.quick-operation.disabled {
+  position: relative;
+}
+
+.quick-group.disabled .quick-group-header:hover::after,
+.quick-operation.disabled:hover::after {
+  opacity: 1;
+}
+
+/* Бейдж "Скоро" для заблокированных групп */
+.quick-group.disabled .quick-group-header .soon-badge {
+  background: #616161;
+  color: white;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Пометка для заблокированной операции внутри активной группы */
+.quick-operation.disabled .disabled-mark {
+  display: inline-flex;
+  align-items: center;
+  background: #616161;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
