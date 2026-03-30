@@ -1,34 +1,214 @@
-# AutoTest Recorder & Player
+# 🎬 AutoTest Recorder & Player
 
-Расширение для **Google Chrome** (Manifest V3): запись действий на странице, визуальный редактор сценариев и воспроизведение с умными ожиданиями, логами и скриншотами.
+**Русский** | [English](README_EN.md)
+
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore/search/AutoTest%20Recorder%20%26%20Player) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green.svg)](manifest.json)
+
+**Мощное расширение для браузера** для автоматизации тестирования веб-приложений **без написания кода.** Записывайте действия пользователя, редактируйте тест-кейсы в визуальном редакторе и воспроизводите их автоматически. Подходит для QA, разработчиков и всех, кто хочет сократить рутину ручных проверок.
 
 **Репозиторий:** [github.com/yurgus25/autotest_recorder](https://github.com/yurgus25/autotest_recorder/)
 
-## Текущая версия в этом каталоге
+---
 
-**0.9.7.1** — см. [CHANGELOG.md](CHANGELOG.md) (что нового относительно последней сборки в [Chrome Web Store](https://chrome.google.com/webstore) — в начале файла).
+## Версия и журнал изменений
 
-Кратко на английском: [CHANGELOG_EN.md](CHANGELOG_EN.md).
+Текущая ветка **0.9.7.1** — подробности в [**CHANGELOG.md**](CHANGELOG.md) (в том числе отличия от последней сборки в [Chrome Web Store](https://chrome.google.com/webstore), если вы ставите расширение оттуда).
 
-## Установка из исходников
+Кратко на английском: [**CHANGELOG_EN.md**](CHANGELOG_EN.md).
 
-1. **Вариант A — релиз с GitHub (рекомендуется):** на странице [Releases](https://github.com/yurgus25/autotest_recorder/releases) скачайте архив **`autotest-recorder-<версия>.zip`** у последнего релиза (внутри — готовая папка расширения с `manifest.json` в корне). Распакуйте в любую папку.
-2. **Вариант B — клон репозитория:** `git clone` и используйте корень проекта (не архив из `dist/`, если собираете сами — см. ниже).
-3. Откройте `chrome://extensions/`, включите «Режим разработчика».
-4. «Загрузить распакованное расширение» → укажите **папку**, в которой лежит `manifest.json` (распакованный zip или корень клона).
+---
 
-Архив для Releases собирается workflow [Release extension zip](https://github.com/yurgus25/autotest_recorder/actions) (после пуша тега `v*` или вручную: *Run workflow* → тег `v0.9.7.1`).
+## Установка
 
-## Сборка zip для релиза (Windows)
+### С GitHub Releases (рекомендуется для разработки и тестов без Store)
 
-Только в полном клоне репозитория (в архив релиза папка `scripts` не входит — там только расширение для загрузки в Chrome).
+1. Откройте [**Releases**](https://github.com/yurgus25/autotest_recorder/releases).
+2. Скачайте **`autotest-recorder-<версия>.zip`** у нужного релиза (в архиве — готовая папка расширения, в корне лежит `manifest.json`).
+3. Распакуйте архив в любую папку.
+4. В Chrome откройте `chrome://extensions/`, включите **«Режим разработчика»**.
+5. Нажмите **«Загрузить распакованное расширение»** и укажите **папку**, в которой находится `manifest.json` (не файл zip).
+
+Архив для релизов собирается workflow [**Release extension zip**](https://github.com/yurgus25/autotest_recorder/actions) (пуш тега `v*` или запуск вручную: *Run workflow* → тег, например `v0.9.7.1`).
+
+### Клон репозитория
+
+```bash
+git clone https://github.com/yurgus25/autotest_recorder.git
+cd autotest_recorder
+```
+
+Далее шаги 4–5 как выше, выбрав **корень клона** (где лежит `manifest.json`).
+
+### Сборка zip локально (Windows)
+
+В полном клоне (в готовый zip скрипты сборки не входят — только файлы расширения):
 
 ```powershell
 .\scripts\build-release.ps1
 ```
 
-Файл: `dist/autotest-recorder-<версия>.zip`.
+Результат: `dist/autotest-recorder-<версия>.zip`.
 
-## Лицензия
+---
 
-См. [LICENSE](LICENSE).
+## 💝 Поддержать проект
+
+Если инструмент полезен в работе, вы можете поддержать развитие:
+
+| Способ | Реквизиты |
+|--------|-----------|
+| 💬 **Telegram** | [@autotest_recorder](https://t.me/autotest_recorder) |
+| 👤 **Автор** | Юрий (Iurii) |
+
+---
+
+## ✨ Возможности
+
+### 🎥 Запись действий
+
+- **Автоматическая запись** кликов, ввода, навигации
+- **Умные селекторы** — CSS, XPath, атрибуты, self-healing
+- **Сложные элементы:** dropdown, multiselect, autocomplete, Angular `app-select`, CDK Overlay
+
+### 📝 Визуальный редактор
+
+- **Quick Steps** — готовые операции по группам
+- **Drag & Drop** шагов
+- **Переменные** `{var:name}`
+- **Условия и циклы**, **API-шаги**, аналитика и многое другое
+
+### ▶️ Воспроизведение
+
+- **Умные ожидания**, оптимизация скорости
+- **Скриншоты** и подробные **логи**
+
+### 📊 Аналитика
+
+- История прогонов, графики, экспорт (в т.ч. CSV)
+
+---
+
+## 🚀 Быстрый старт
+
+1. Установите расширение из [Chrome Web Store](https://chrome.google.com/webstore/search/AutoTest%20Recorder%20%26%20Player) **или** из [Releases](https://github.com/yurgus25/autotest_recorder/releases) (см. выше).
+2. Откройте **попап** расширения по иконке.
+3. Нажмите **«Записать»**, выполните сценарий на странице, остановите запись.
+4. Сохраните тест, при необходимости отредактируйте в **редакторе**.
+5. Запустите **воспроизведение** и смотрите логи / скриншоты.
+
+---
+
+## 📋 Поддерживаемые действия (кратко)
+
+| Категория | Примеры |
+|-----------|---------|
+| 🖱️ Клики | click, dblclick, right-click, hover |
+| ⌨️ Ввод | type, clear, сочетания клавиш |
+| 📝 Формы | select, checkbox, radio, file upload |
+| 🧭 Навигация | переход, назад/вперёд, обновление, вкладки |
+| ✅ Проверки | assert (значение, видимость, количество и др.) |
+| ⏳ Ожидание | wait element, wait text, задержки |
+| 📸 Скриншоты | элемент, страница |
+| 🔄 Переменные | set, extract, вычисления |
+| 🌐 API | GET, POST, … с подстановкой переменных |
+| 💻 JavaScript | произвольный код в шаге |
+
+Полный перечень и подтипы — в редакторе и в коде [`shared/action-types.js`](shared/action-types.js).
+
+---
+
+## 🎯 Пример тест-кейса (фрагмент JSON)
+
+```json
+{
+  "name": "Login Test",
+  "actions": [
+    { "type": "navigation", "url": "https://example.com/login" },
+    { "type": "type", "selector": "#email", "value": "test@example.com" },
+    { "type": "type", "selector": "#password", "value": "{var:password}" },
+    { "type": "click", "selector": "button[type=submit]" },
+    { "type": "assert", "subtype": "assert-contains", "selector": ".welcome", "expectedValue": "Welcome" }
+  ]
+}
+```
+
+Подробный формат тест-кейсов см. во встроенной справке [`help/`](help/) и в коде редактора.
+
+---
+
+## 🏗️ Архитектура (упрощённо)
+
+```
+autotest-recorder/
+├── background/              # Service Worker (Manifest V3)
+│   ├── background-sw.js     # основная логика
+│   └── message-handlers-sw.js
+├── content/                 # Content scripts
+│   ├── recorder.js          # запись
+│   ├── player-core.js       # воспроизведение (ядро)
+│   ├── player-handlers-*.js # обработчики действий
+│   ├── selector-engine.js
+│   └── …
+├── editor/                  # Визуальный редактор
+├── popup/                   # Попап расширения
+├── selector-analyzer/       # Анализатор селекторов
+├── shared/                  # Общие модули (типы, утилиты)
+├── i18n/                    # Локализация (RU / EN)
+├── analytics/, screenshots/, settings/, …
+└── manifest.json
+```
+
+---
+
+## 🔧 Технологии
+
+- **Manifest V3**, **Chrome Extensions API** (storage, tabs, scripting, …)
+- **Content scripts**, self-healing селекторы, работа со строгим CSP где применимо
+
+---
+
+## 🗺️ Roadmap (ориентиры)
+
+- Дальнейшее улучшение записи и UI
+- Развитие AI-возможностей, визуального тестирования, облачной синхронизации — см. обсуждения в репозитории
+
+---
+
+## 💎 Premium (планы)
+
+Часть функций может выделяться в расширенную лицензию (группы тестов, расширенный анализ и т.д.) — актуальное поведение смотрите в [`background/feature-flags.js`](background/feature-flags.js) и в интерфейсе расширения.
+
+---
+
+## 📚 Документация
+
+- [**CHANGELOG.md**](CHANGELOG.md) — список изменений по версиям
+- [**help/**](help/) — встроенная справка (HTML)
+- [**background/BUILD.md**](background/BUILD.md) — сборка service worker (esbuild)
+
+---
+
+## 🤝 Участие в разработке
+
+1. Fork репозитория  
+2. Ветка `feature/…`  
+3. Pull Request в `main`
+
+---
+
+## 💬 Поддержка
+
+| Тип | Ссылка |
+|-----|--------|
+| 🐛 Баги / идеи | [Issues](https://github.com/yurgus25/autotest_recorder/issues) |
+| 💬 Telegram | [@autotest_recorder](https://t.me/autotest_recorder) |
+
+---
+
+## 📝 Лицензия
+
+**MIT** — см. файл [LICENSE](LICENSE).
+
+---
+
+**AutoTest Recorder & Player** — автоматизация тестирования без кода.
