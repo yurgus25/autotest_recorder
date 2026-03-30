@@ -1,4 +1,5 @@
 # Собирает zip расширения (как для «Загрузить распакованное») и прикрепляет к GitHub Release.
+# Сборка всегда с ветки main (актуальный manifest и scripts); тег задаёт только имя релиза.
 name: Release extension zip
 
 on:
@@ -19,21 +20,19 @@ jobs:
   attach-zip:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve ref and tag
+      - name: Tag name for release
         id: meta
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "ref=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
             echo "tag_name=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
           else
-            echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
             echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout
+      - name: Checkout main (extension sources + build scripts)
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.meta.outputs.ref }}
+          ref: main
 
       - name: Build zip
         run: bash scripts/build-release.sh
