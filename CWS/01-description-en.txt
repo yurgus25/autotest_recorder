@@ -1,0 +1,28 @@
+AutoTest Recorder & Player is a Google Chrome extension (Manifest V3) for no-code web test automation. Record actions on your site, edit scenarios in a visual editor, and replay them with smart waits, self-healing selectors, rich logs, and screenshots.
+
+WHO IT’S FOR
+• QA engineers who need fast regression flows without maintaining Selenium scripts.
+• Frontend developers testing complex widgets (dropdowns, multiselect, autocomplete, Angular app-select, CDK overlays).
+• Teams that want clear run history, reports, and data export.
+
+RECORDING
+Captures clicks, typing, and navigation. Smart selectors (CSS, XPath, attributes) with self-healing when the DOM changes. Handles complex UI patterns.
+
+VISUAL EDITOR
+• Drag-and-drop steps, Quick Steps groups, variables like {var:name}.
+• Conditions, loops, API steps (GET/POST with variables), and user-authored JavaScript steps for checks (code you enter in the editor runs locally during playback).
+• Analytics and advanced flows — depending on version and settings.
+
+PLAYBACK
+Smart waits, speed tuning, detailed logs, element and full-page screenshots. Optional tab video capture for reports and bug demos.
+
+ANALYTICS & TOOLS
+Run history, charts, CSV export. Selector analyzer, performance and adaptive analytics dashboards — available in the extension UI.
+
+TECHNICAL
+Tests and settings are stored locally in your browser. The extension is meant to run on sites you open for testing (including internal staging and localhost), which requires broad site access as declared in permissions. See the privacy policy in the repository (PRIVACY_EN.md / PRIVACY.md) for permission and data handling details.
+
+LICENSE & SOURCE
+MIT license. Source code and releases on GitHub (see the store listing “Homepage” URL).
+
+Why this extension: one tool to record, edit, and run tests; clear visibility for the team; no separate server required for core workflows; built for Manifest V3.

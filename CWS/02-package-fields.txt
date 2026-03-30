@@ -1,0 +1,9 @@
+# Поля из manifest.json (версия см. в репозитории)
+
+Название:
+AutoTest Recorder & Player
+
+Сводные данные / краткое описание (лимит 132 символа; не превышать):
+No-code web test automation: record, visual editor, playback with smart waits & self-healing. Angular app-select, analyzer tabs.
+
+(Длина строки выше — проверьте при публикации: в manifest.json должно быть ≤132 символов.)

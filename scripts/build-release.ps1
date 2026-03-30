@@ -17,15 +17,16 @@ $staging = Join-Path $env:TEMP $stamp
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory -Path $staging | Out-Null
 
-# Exclude dev / junk; mirror extension root into staging
+# Exclude dev / junk; mirror extension root into staging (Chrome Web Store–friendly: no CI, no build helpers)
 $excludeDirs = @(
-  '.git', '.cursor', 'node_modules', 'dist', 'temp_kr', 'temp_kr2', 'temp_kr_studio',
-  'test-pages', 'scripts'
+  '.git', '.github', '.cursor', 'node_modules', 'dist', 'temp_kr', 'temp_kr2', 'temp_kr_studio',
+  'test-pages', 'scripts', 'CWS'
 )
+$excludeRootFiles = @('.gitignore', 'build-sw.sh')
 Get-ChildItem -Path $root -Force | ForEach-Object {
   $name = $_.Name
   if ($_.PSIsContainer -and ($excludeDirs -contains $name)) { return }
-  if ($name -eq '.gitignore') { return }
+  if (-not $_.PSIsContainer -and ($excludeRootFiles -contains $name)) { return }
   Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $staging $name) -Recurse -Force
 }
 

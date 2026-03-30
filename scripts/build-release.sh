@@ -18,6 +18,7 @@ trap 'rm -rf "$STAGING"' EXIT
 
 rsync -a \
   --exclude='.git/' \
+  --exclude='.github/' \
   --exclude='.cursor/' \
   --exclude='node_modules/' \
   --exclude='dist/' \
@@ -25,8 +26,10 @@ rsync -a \
   --exclude='temp_kr2/' \
   --exclude='temp_kr_studio/' \
   --exclude='test-pages/' \
+  --exclude='CWS/' \
   --exclude='scripts/' \
   --exclude='.gitignore' \
+  --exclude='build-sw.sh' \
   "$ROOT/" "$STAGING/"
 
 OUT="$DIST/autotest-recorder-${VER}.zip"

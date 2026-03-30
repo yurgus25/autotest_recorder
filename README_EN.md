@@ -159,6 +159,19 @@ autotest-recorder/
 
 ---
 
+## 🔐 Privacy & permissions (Chrome Web Store)
+
+Publishing on the [Chrome Web Store](https://chrome.google.com/webstore/devconsole/) requires store copy and a privacy policy that match how the extension actually behaves. Full rationale for sensitive permissions, form-ready paragraphs, and reviewer-facing wording:
+
+- [**PRIVACY_EN.md**](PRIVACY_EN.md) — privacy policy and permission rationale (EN)
+- [**PRIVACY.md**](PRIVACY.md) — Russian version of the same document
+
+Topics covered: **`debugger`** (full-page screenshot via DevTools Protocol), **`tabCapture`** + **`offscreen`** (optional video capture of a test run), **`webRequest`** (request metadata when network monitoring is on), **`<all_urls>`** (tests on user-chosen URLs), **`clipboard`**, **`downloads`**, **`tabs`** / **`scripting`** / **`activeTab`**, and **user-authored JavaScript** in test steps (local execution, not remote code loading).
+
+Official references: [Chrome Web Store program policies](https://developer.chrome.com/docs/webstore/program-policies/), [user data FAQ](https://developer.chrome.com/docs/webstore/user-data/).
+
+---
+
 ## 🗺️ Roadmap
 
 - Continuous improvements to recording, playback, and UI  
@@ -175,6 +188,9 @@ Some features may be gated behind premium / license flags — see [`background/f
 ## 📚 Documentation
 
 - [**CHANGELOG_EN.md**](CHANGELOG_EN.md) / [**CHANGELOG.md**](CHANGELOG.md)
+- [**CWS/**](CWS/) — listing copy, URLs, and asset specs for the [Chrome Web Store](https://chrome.google.com/webstore/devconsole/)
+- [**USER_AGREEMENT_EN.md**](USER_AGREEMENT_EN.md) / [**USER_AGREEMENT.md**](USER_AGREEMENT.md) — terms of service / user agreement
+- [**PRIVACY_EN.md**](PRIVACY_EN.md) / [**PRIVACY.md**](PRIVACY.md) — privacy & Chrome Web Store permission rationale
 - [**help/**](help/) — built-in help pages
 - [**background/BUILD.md**](background/BUILD.md) — service worker build notes
 

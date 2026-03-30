@@ -1,0 +1,34 @@
+{
+  "extensionName": "AutoTest Recorder & Player",
+  "manifestVersion": 3,
+  "versionNote": "См. manifest.json в корне репозитория",
+  "recommendedCategory": "Developer Tools",
+  "recommendedCategoryHintRu": "Инструменты разработчика",
+  "productLanguage": "Многоязычный интерфейс (русский и английский), см. встроенные i18n",
+  "listingLocales": [
+    "ru",
+    "en"
+  ],
+  "urls": {
+    "homepage": "https://github.com/yurgus25/autotest_recorder",
+    "support": "https://github.com/yurgus25/autotest_recorder/issues",
+    "releases": "https://github.com/yurgus25/autotest_recorder/releases",
+    "privacyPolicyEn": "https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md",
+    "privacyPolicyRu": "https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md"
+  },
+  "characterLimits": {
+    "shortDescription": 132,
+    "longDescription": 16000,
+    "urlFields": 2048
+  },
+  "graphicAssets": {
+    "storeIcon": "128 x 128 px",
+    "screenshots": {
+      "count": "min 1, max 5",
+      "size": "1280 x 800 или 640 x 400",
+      "format": "JPEG или 24-бит PNG без альфа-канала"
+    },
+    "smallPromoTile": "440 x 280",
+    "largePromoTile": "1400 x 560"
+  }
+}

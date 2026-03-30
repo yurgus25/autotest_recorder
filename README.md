@@ -167,6 +167,19 @@ autotest-recorder/
 
 ---
 
+## 🔐 Приватность и разрешения (Chrome Web Store)
+
+Публикация в [Chrome Web Store](https://chrome.google.com/webstore/devconsole/) требует согласованного описания и политики конфиденциальности с реальным поведением расширения. Подробные формулировки для формы разработчика, обоснование «сильных» разрешений и готовые абзацы для модерации:
+
+- [**PRIVACY.md**](PRIVACY.md) — политика и обоснование разрешений (RU)
+- [**PRIVACY_EN.md**](PRIVACY_EN.md) — то же на английском (для англоязычной карточки и ответов ревью)
+
+Там же расписано: **`debugger`** (полноразмерный скриншот через DevTools Protocol), **`tabCapture`** + **`offscreen`** (запись видео прогона), **`webRequest`** (метаданные сети при включённом мониторинге), **`<all_urls>`** (тесты на любых URL по выбору пользователя), **`clipboard`**, **`downloads`**, **`tabs`** / **`scripting`** / **`activeTab`**, а также выполнение **пользовательского JavaScript** в шагах теста (локально, не удалённый код).
+
+Официальные требования: [программа Chrome Web Store](https://developer.chrome.com/docs/webstore/program-policies/), [данные пользователей](https://developer.chrome.com/docs/webstore/user-data/).
+
+---
+
 ## 🗺️ Roadmap (ориентиры)
 
 - Дальнейшее улучшение записи и UI
@@ -183,6 +196,9 @@ autotest-recorder/
 ## 📚 Документация
 
 - [**CHANGELOG.md**](CHANGELOG.md) — список изменений по версиям
+- [**CWS/**](CWS/) — тексты, URL и графика для карточки [Chrome Web Store](https://chrome.google.com/webstore/devconsole/)
+- [**USER_AGREEMENT.md**](USER_AGREEMENT.md) / [**USER_AGREEMENT_EN.md**](USER_AGREEMENT_EN.md) — пользовательское соглашение
+- [**PRIVACY.md**](PRIVACY.md) / [**PRIVACY_EN.md**](PRIVACY_EN.md) — конфиденциальность и разрешения для Chrome Web Store
 - [**help/**](help/) — встроенная справка (HTML)
 - [**background/BUILD.md**](background/BUILD.md) — сборка service worker (esbuild)
 

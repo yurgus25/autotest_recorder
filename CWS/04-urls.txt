@@ -1,0 +1,46 @@
+# URL для полей «Дополнительные сведения» (до 2048 символов каждое)
+
+Подставьте в консоль разработчика после публикации файлов в репозитории GitHub.
+Если репозиторий или ветка переименованы — обновите ссылки.
+
+---
+
+## URL главной страницы / ссылка на сайт продукта
+
+https://github.com/yurgus25/autotest_recorder
+
+(Страница репозитория: README, установка, Releases.)
+
+---
+
+## URL службы поддержки
+
+https://github.com/yurgus25/autotest_recorder/issues
+
+(Вопросы, баги, предложения.)
+
+---
+
+## Пользовательское соглашение (при необходимости указать в описании или на сайте)
+
+https://github.com/yurgus25/autotest_recorder/blob/main/USER_AGREEMENT.md
+
+(Английский вариант: `USER_AGREEMENT_EN.md`.)
+
+---
+
+## Политика конфиденциальности (отдельное поле в разделе «Конфиденциальность»)
+
+Английский (часто предпочтителен для международной проверки):
+
+https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md
+
+Русский:
+
+https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md
+
+---
+
+## Релизы (для пользователей, не обязательное поле CWS)
+
+https://github.com/yurgus25/autotest_recorder/releases
