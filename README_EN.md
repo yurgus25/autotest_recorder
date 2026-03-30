@@ -12,9 +12,12 @@ Full Russian changelog: [CHANGELOG.md](CHANGELOG.md).
 
 ## Install from source
 
-1. Clone the repo or unpack a release zip from [Releases](https://github.com/yurgus25/autotest_recorder/releases).
-2. Open `chrome://extensions/`, enable **Developer mode**.
-3. **Load unpacked** → the project root (or unpacked archive folder).
+1. **Option A (recommended):** On [Releases](https://github.com/yurgus25/autotest_recorder/releases), download **`autotest-recorder-<version>.zip`** from the latest release (the zip root contains `manifest.json`). Unzip anywhere.
+2. **Option B:** `git clone` and use the repo root (or build your own zip with `scripts/build-release.ps1` → `dist/`).
+3. Open `chrome://extensions/`, enable **Developer mode**.
+4. **Load unpacked** → pick the folder that **directly** contains `manifest.json` (unzipped release or clone root).
+
+The release zip is built by the [Release extension zip](https://github.com/yurgus25/autotest_recorder/actions) workflow (on `v*` tags or **Run workflow** with tag `v0.9.7.1`).
 
 ## Release zip (Windows)
 
