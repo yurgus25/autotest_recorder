@@ -1,9 +1,39 @@
-# Поля из manifest.json (версия см. в репозитории)
+# Поля для карточки магазина (источник — Chrome i18n)
 
-Название:
+Имя и краткое описание берутся из **`_locales/<locale>/messages.json`** (`extName`, `extDescription`),
+в `manifest.json` указаны `__MSG_extName__` и `__MSG_extDescription__`. Вводить их вручную в Dashboard
+не нужно — CWS читает их из пакета расширения автоматически.
+
+---
+
+## Название (все локали)
+
 AutoTest Recorder & Player
 
-Сводные данные / краткое описание (лимит 132 символа; не превышать):
+---
+
+## Краткое описание EN (en, лимит 132 символа) — 128 симв.
+
 No-code web test automation: record, visual editor, playback with smart waits & self-healing. Angular app-select, analyzer tabs.
 
-(Длина строки выше — проверьте при публикации: в manifest.json должно быть ≤132 символов.)
+---
+
+## Краткое описание RU (ru, лимит 132 символа) — 126 симв.
+
+Тестирование сайтов без кода: запись, редактор, прогон, умные ожидания и self-healing. Angular app-select, анализатор вкладок.
+
+---
+
+## Подсказка иконки (extActionTitle)
+
+EN: AutoTest Recorder & Player
+RU: AutoTest Recorder & Player — запись и воспроизведение тестов
+
+---
+
+## URL политики конфиденциальности (одно поле в Dashboard — EN приоритетен для модерации)
+
+EN: https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md
+RU: https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md
+
+В поле Dashboard вставляйте EN-ссылку: CWS-модерация проводится на английском.

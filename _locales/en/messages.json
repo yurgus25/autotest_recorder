@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "AutoTest Recorder & Player",
+    "description": "Extension name shown in Chrome toolbar, extensions page, and Chrome Web Store (English locale)."
+  },
+  "extDescription": {
+    "message": "No-code web test automation: record, visual editor, playback with smart waits & self-healing. Angular app-select, analyzer tabs.",
+    "description": "Short description for the extension management page and store listing (English). Max 132 characters for store compatibility."
+  },
+  "extActionTitle": {
+    "message": "AutoTest Recorder & Player",
+    "description": "Toolbar icon tooltip (English)."
+  }
+}

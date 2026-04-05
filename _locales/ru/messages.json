@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "AutoTest Recorder & Player",
+    "description": "Имя расширения в Chrome и в магазине (локаль ru)."
+  },
+  "extDescription": {
+    "message": "Тестирование сайтов без кода: запись, редактор, прогон, умные ожидания и self-healing. Angular app-select, анализатор вкладок.",
+    "description": "Краткое описание для страницы расширения и витрины (русский). Не более 132 символов для совместимости с магазином."
+  },
+  "extActionTitle": {
+    "message": "AutoTest Recorder & Player — запись и воспроизведение тестов",
+    "description": "Подсказка при наведении на иконку на панели инструментов (русский)."
+  }
+}
