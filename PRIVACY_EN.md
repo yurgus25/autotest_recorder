@@ -5,7 +5,7 @@
 **Effective date:** 2026-04-05  
 **Extension:** AutoTest Recorder & Player  
 **Chrome Web Store ID:** lafiegkhipdflafdgogmmephankkceol  
-**Publisher contact:** [gushchin@gmail.com](mailto:gushchin@gmail.com)
+**Publisher contact:** [guscshin@gmail.com](mailto:guscshin@gmail.com)
 
 ---
 
@@ -17,13 +17,13 @@
 | **Where stored** | **Locally on your device** (`chrome.storage.local`). No mandatory cloud upload. |
 | **Shared with** | **Nobody by default.** Only the sites/APIs you configure in test steps, plus normal Chrome browser infrastructure. |
 | **Sold or used for ads** | **Never.** |
-| **Contact** | [gushchin@gmail.com](mailto:gushchin@gmail.com) |
+| **Contact** | [guscshin@gmail.com](mailto:guscshin@gmail.com) |
 
 ---
 
 ## 1. Who We Are
 
-**AutoTest Recorder & Player** is a browser extension for recording and replaying automated test scenarios on websites. The publisher is identified on the [Chrome Web Store listing](https://chrome.google.com/webstore/detail/lafiegkhipdflafdgogmmephankkceol) and reachable at [gushchin@gmail.com](mailto:gushchin@gmail.com).
+**AutoTest Recorder & Player** is a browser extension for recording and replaying automated test scenarios on websites. The publisher is identified on the [Chrome Web Store listing](https://chrome.google.com/webstore/detail/lafiegkhipdflafdgogmmephankkceol) and reachable at [guscshin@gmail.com](mailto:guscshin@gmail.com).
 
 ---
 
@@ -108,7 +108,7 @@ Material changes will be reflected in this document with an updated effective da
 
 ## 10. Contact
 
-Privacy questions and data requests: **[gushchin@gmail.com](mailto:gushchin@gmail.com)**
+Privacy questions and data requests: **[guscshin@gmail.com](mailto:guscshin@gmail.com)**
 
 ---
 

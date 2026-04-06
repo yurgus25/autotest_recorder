@@ -12,7 +12,7 @@
 
 ## Версия и журнал изменений
 
-Текущая ветка **0.9.7.1** — подробности в [**CHANGELOG.md**](CHANGELOG.md) (в том числе отличия от последней сборки в [Chrome Web Store](https://chrome.google.com/webstore), если вы ставите расширение оттуда).
+Текущая ветка **0.9.7.2** — подробности в [**CHANGELOG.md**](CHANGELOG.md) (в том числе отличия от последней сборки в [Chrome Web Store](https://chrome.google.com/webstore), если вы ставите расширение оттуда).
 
 Кратко на английском: [**CHANGELOG_EN.md**](CHANGELOG_EN.md).
 
@@ -28,7 +28,7 @@
 4. В Chrome откройте `chrome://extensions/`, включите **«Режим разработчика»**.
 5. Нажмите **«Загрузить распакованное расширение»** и укажите **папку**, в которой находится `manifest.json` (не файл zip).
 
-Архив для релизов собирается workflow [**Release extension zip**](https://github.com/yurgus25/autotest_recorder/actions) (пуш тега `v*` или запуск вручную: *Run workflow* → тег, например `v0.9.7.1`).
+Архив для релизов собирается workflow [**Release extension zip**](https://github.com/yurgus25/autotest_recorder/actions) (пуш тега `v*` или запуск вручную: *Run workflow* → тег, например `v0.9.7.2`).
 
 ### Клон репозитория
 
@@ -153,7 +153,9 @@ autotest-recorder/
 ├── popup/                   # Попап расширения
 ├── selector-analyzer/       # Анализатор селекторов
 ├── shared/                  # Общие модули (типы, утилиты)
-├── i18n/                    # Локализация (RU / EN)
+├── _locales/                # Имя и описание для Chrome (en / ru), см. chrome.i18n
+├── browser-mcp/             # JSON-шаблоны для Cursor Browser MCP + см. README
+├── i18n/                    # Локализация UI (en.json / ru.json, i18n.js)
 ├── analytics/, screenshots/, settings/, …
 └── manifest.json
 ```
@@ -189,7 +191,7 @@ autotest-recorder/
 
 ## 💎 Premium (планы)
 
-Часть функций может выделяться в расширенную лицензию (группы тестов, расширенный анализ и т.д.) — актуальное поведение смотрите в [`background/feature-flags.js`](background/feature-flags.js) и в интерфейсе расширения.
+Часть функций может выделяться в расширенную лицензию (группы тестов, расширенный анализ и т.д.) — актуальное поведение смотрите в [`background/feature-flags.js`](background/feature-flags.js) и в интерфейсе расширения. Варианты монетизации и перехода с полностью бесплатной модели: [**docs/COMMERCIAL_STRATEGY.md**](docs/COMMERCIAL_STRATEGY.md).
 
 ---
 
@@ -218,6 +220,7 @@ autotest-recorder/
 |-----|--------|
 | 🐛 Баги / идеи | [Issues](https://github.com/yurgus25/autotest_recorder/issues) |
 | 💬 Telegram | [@autotest_recorder](https://t.me/autotest_recorder) |
+| 🔐 Конфиденциальность | [guscshin@gmail.com](mailto:guscshin@gmail.com) — см. [PRIVACY.md](PRIVACY.md) §10 |
 
 ---
 

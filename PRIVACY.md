@@ -5,7 +5,7 @@
 **Дата вступления в силу:** 05.04.2026  
 **Расширение:** AutoTest Recorder & Player  
 **Идентификатор в Chrome Web Store:** lafiegkhipdflafdgogmmephankkceol  
-**Контакт издателя:** [gushchin@gmail.com](mailto:gushchin@gmail.com)
+**Контакт издателя:** [guscshin@gmail.com](mailto:guscshin@gmail.com)
 
 ---
 
@@ -17,13 +17,13 @@
 | **Где хранятся** | **Локально на вашем устройстве** (`chrome.storage.local`). Обязательной загрузки в облако нет. |
 | **Кому передаются** | **Никому по умолчанию.** Только сайтам и API, которые вы задаёте в шагах теста, плюс стандартная инфраструктура браузера Chrome. |
 | **Продаются или используются для рекламы** | **Никогда.** |
-| **Контакт** | [gushchin@gmail.com](mailto:gushchin@gmail.com) |
+| **Контакт** | [guscshin@gmail.com](mailto:guscshin@gmail.com) |
 
 ---
 
 ## 1. Кто отвечает за расширение
 
-**AutoTest Recorder & Player** — расширение для браузера, предназначенное для записи и воспроизведения автоматизированных тестовых сценариев на сайтах. Издатель указан в [карточке Chrome Web Store](https://chrome.google.com/webstore/detail/lafiegkhipdflafdgogmmephankkceol) и доступен по адресу [gushchin@gmail.com](mailto:gushchin@gmail.com).
+**AutoTest Recorder & Player** — расширение для браузера, предназначенное для записи и воспроизведения автоматизированных тестовых сценариев на сайтах. Издатель указан в [карточке Chrome Web Store](https://chrome.google.com/webstore/detail/lafiegkhipdflafdgogmmephankkceol) и доступен по адресу [guscshin@gmail.com](mailto:guscshin@gmail.com).
 
 ---
 
@@ -108,7 +108,7 @@
 
 ## 10. Контакты
 
-Вопросы о конфиденциальности и обработке данных: **[gushchin@gmail.com](mailto:gushchin@gmail.com)**
+Вопросы о конфиденциальности и обработке данных: **[guscshin@gmail.com](mailto:guscshin@gmail.com)**
 
 ---
 

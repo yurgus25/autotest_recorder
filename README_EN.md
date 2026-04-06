@@ -12,7 +12,7 @@ A **Google Chrome** extension (**Manifest V3**) for **no-code** web test automat
 
 ## Version & changelog
 
-Current tree **0.9.7.1** — see [**CHANGELOG_EN.md**](CHANGELOG_EN.md) and [**CHANGELOG.md**](CHANGELOG.md) (including differences vs the latest [Chrome Web Store](https://chrome.google.com/webstore) build if you install from there).
+Current tree **0.9.7.2** — see [**CHANGELOG_EN.md**](CHANGELOG_EN.md) and [**CHANGELOG.md**](CHANGELOG.md) (including differences vs the latest [Chrome Web Store](https://chrome.google.com/webstore) build if you install from there).
 
 ---
 
@@ -26,7 +26,7 @@ Current tree **0.9.7.1** — see [**CHANGELOG_EN.md**](CHANGELOG_EN.md) and [**C
 4. Open `chrome://extensions/`, enable **Developer mode**.
 5. Click **Load unpacked** and select the folder that **contains** `manifest.json` (not the `.zip` file itself).
 
-The release zip is produced by the [**Release extension zip**](https://github.com/yurgus25/autotest_recorder/actions) workflow (push a `v*` tag or **Run workflow** with a tag such as `v0.9.7.1`).
+The release zip is produced by the [**Release extension zip**](https://github.com/yurgus25/autotest_recorder/actions) workflow (push a `v*` tag or **Run workflow** with a tag such as `v0.9.7.2`).
 
 ### Clone the repository
 
@@ -146,6 +146,8 @@ autotest-recorder/
 ├── popup/
 ├── selector-analyzer/
 ├── shared/
+├── _locales/                # Chrome manifest strings (en / ru); see chrome.i18n
+├── browser-mcp/             # Cursor Browser MCP JSON templates (see README)
 ├── i18n/
 └── manifest.json
 ```
@@ -181,7 +183,7 @@ Official references: [Chrome Web Store program policies](https://developer.chrom
 
 ## 💎 Premium (planned)
 
-Some features may be gated behind premium / license flags — see [`background/feature-flags.js`](background/feature-flags.js) and the in-app UI.
+Some features may be gated behind premium / license flags — see [`background/feature-flags.js`](background/feature-flags.js) and the in-app UI. Monetization options (Russian doc): [**docs/COMMERCIAL_STRATEGY.md**](docs/COMMERCIAL_STRATEGY.md).
 
 ---
 
@@ -210,6 +212,7 @@ Some features may be gated behind premium / license flags — see [`background/f
 |------|------|
 | 🐛 Issues / ideas | [GitHub Issues](https://github.com/yurgus25/autotest_recorder/issues) |
 | 💬 Telegram | [@autotest_recorder](https://t.me/autotest_recorder) |
+| 🔐 Privacy | [guscshin@gmail.com](mailto:guscshin@gmail.com) — see [PRIVACY_EN.md](PRIVACY_EN.md) §10 |
 
 ---
 
