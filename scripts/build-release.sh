@@ -27,6 +27,7 @@ rsync -a \
   --exclude='temp_kr_studio/' \
   --exclude='test-pages/' \
   --exclude='CWS/' \
+  --exclude='browser-mcp/' \
   --exclude='scripts/' \
   --exclude='.gitignore' \
   --exclude='build-sw.sh' \

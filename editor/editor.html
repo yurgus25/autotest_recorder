@@ -51,6 +51,12 @@
           <button id="parallelRun" class="btn btn-small btn-run-parallel" title="Run in parallel in multiple tabs">
             ⚡ Parallel run
           </button>
+          <button id="dataDrivenRun" class="btn btn-small btn-run-data" title="Run the same test for each CSV row (data-driven)">
+            📊 Data-driven
+          </button>
+          <button type="button" id="dataDrivenExportReportBtn" class="btn btn-small btn-run-data" disabled title="Export last data-driven run as CSV">
+            📄 Data-driven CSV
+          </button>
         </div>
       </div>
       <div id="testMetadata" class="test-metadata"></div>
@@ -622,6 +628,31 @@
     </div>
   </div>
 
+  <!-- Data-driven run (CSV) -->
+  <div id="dataDrivenModal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3 id="dataDrivenModalTitle">Data-driven run (CSV)</h3>
+        <button type="button" class="modal-close" id="closeDataDrivenModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom: 12px; color: #555; font-size: 13px;" id="dataDrivenHint">
+          First line: column headers. Each column name becomes a variable — use <code>{var:email}</code> in URLs, inputs, and assertions. Max 50 rows per run.
+        </p>
+        <label for="dataDrivenCsvInput" style="display:block;margin-bottom:6px;font-weight:600;">CSV</label>
+        <textarea id="dataDrivenCsvInput" class="input" rows="10" style="width:100%;font-family:monospace;font-size:12px;" placeholder="email,password&#10;user1@example.com,secret1&#10;user2@example.com,secret2"></textarea>
+        <small id="dataDrivenRowCount" style="display:block;margin-top:8px;color:#666;"></small>
+        <div id="dataDrivenPreview" style="margin-top:12px;overflow:auto;max-height:220px;"></div>
+      </div>
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 8px;">
+        <button type="button" id="dataDrivenExportReportModalBtn" class="btn btn-secondary" disabled title="Export last data-driven report">📄 Export report (CSV)</button>
+        <button type="button" id="dataDrivenParseBtn" class="btn btn-secondary">Preview</button>
+        <button type="button" id="dataDrivenRunOptimizedBtn" class="btn btn-primary">Run (optimized)</button>
+        <button type="button" id="dataDrivenRunFullBtn" class="btn btn-secondary">Run (full)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal for API test import -->
   <div id="importApiModal" class="modal">
     <div class="modal-content modal-large">
@@ -696,6 +727,7 @@
   <script src="editor-action-modal.js"></script>
   <script src="editor-save.js"></script>
   <script src="editor-ui-helpers.js"></script>
+  <script src="editor-data-driven.js"></script>
   <script src="editor-metadata.js"></script>
   <script src="editor-control-flow.js"></script>
   <script src="editor-variables.js"></script>

@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/autotest-recorder/browser-mcp/recipe-schema.json",
+  "title": "Cursor Browser MCP recipe fragment",
+  "type": "object",
+  "properties": {
+    "meta": { "type": "object" },
+    "templates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["mcp", "arguments"],
+        "properties": {
+          "description": { "type": "string" },
+          "mcp": { "type": "string" },
+          "arguments": { "type": "object" }
+        }
+      }
+    },
+    "exampleSequence": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

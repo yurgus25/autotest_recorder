@@ -143,6 +143,7 @@ class TestManager {
     this.totalSteps = 0;
     this.stepType = null;
     this.playbackState = null; // Состояние воспроизведения для восстановления
+    this.playbackTabId = null; // Вкладка, где идёт воспроизведение (для сброса при закрытии)
     this.recordInsertIndex = null; // Индекс для вставки записанных действий в существующий тест
     this.recordedActionsCount = 0; // Счетчик записанных действий
     this.recordMarkerActionIndex = null; // Индекс действия с маркером записи
@@ -154,6 +155,7 @@ class TestManager {
     this.groupContext = {};           // переменные, передаваемые между тестами группы
     this.groupRunMode = 'optimized';
     this.groupDebugMode = false;
+    this.dataDrivenState = null;
     this.messageRegistry = new MessageRegistry(this);
     this.init();
   }
@@ -306,6 +308,46 @@ class TestManager {
     registerBackgroundMessageHandlers(this, this.messageRegistry);
     
     console.log('✅ Background script инициализирован, слушатель сообщений установлен');
+  }
+
+  onPlaybackTabRemoved(tabId) {
+    if (!this.isPlaying || this.playbackTabId == null || this.playbackTabId !== tabId) {
+      return;
+    }
+    const testId = this.playbackState?.test?.id;
+    const testName = this.playbackState?.test?.name;
+    this.playbackTabId = null;
+    (async () => {
+      try {
+        if (testId) await this.stopVideoRecordingIfActive(testId);
+      } catch (e) { /* ignore */ }
+      this.isPlaying = false;
+      this.currentStep = 0;
+      this.totalSteps = 0;
+      this.stepType = null;
+      this.playbackState = null;
+      try {
+        await chrome.storage.local.remove('playbackState');
+      } catch (e) { /* ignore */ }
+      try {
+        await this.broadcast({
+          type: 'TEST_COMPLETED',
+          testId: testId || '',
+          testName,
+          success: false,
+          error: 'Вкладка воспроизведения закрыта'
+        });
+      } catch (e) { /* ignore */ }
+      try {
+        await this.broadcast({
+          type: 'STEP_PROGRESS_UPDATE',
+          step: 0,
+          total: 0,
+          stepType: null,
+          testId
+        });
+      } catch (e) { /* ignore */ }
+    })();
   }
 
   async handleMessage(message, sender, sendResponse) {
@@ -492,12 +534,20 @@ class TestManager {
             const analysisModule = await _ensureAnalysisModule();
             let { tabId, analysisType, url, fillOptions, containerSelector, targetValue } = message;
             
-            // Check feature flag
+            const actionName = self.ActionCatalog ? self.ActionCatalog.RUN_ANALYSIS : 'analysis.run';
+            const accessDecision = self.AccessPolicy && self.AccessPolicy.can
+              ? await self.AccessPolicy.can(actionName, { analysisType })
+              : { allowed: true };
             const isEnabled = await FeatureFlags.isEnabled('ANALYSIS_STEP');
-            if (!isEnabled) {
+            if (!accessDecision.allowed || !isEnabled) {
               safeSendResponse({
                 success: false,
-                error: 'Analysis feature is not enabled. Please upgrade to Pro.'
+                error: accessDecision.allowed
+                  ? 'Analysis feature is not enabled. Please upgrade to Pro.'
+                  : 'TIER_REQUIRED',
+                requiredTier: accessDecision.requiredTier || 'premium',
+                tier: accessDecision.tier || 'free',
+                action: actionName
               });
               return;
             }
@@ -738,6 +788,21 @@ class TestManager {
           }
           return;
         }
+        case 'CHECK_ACCESS': {
+          try {
+            const action = message?.action || '';
+            const context = message?.context || null;
+            if (!self.AccessPolicy || !self.AccessPolicy.can) {
+              safeSendResponse({ success: true, allowed: true, action });
+              return;
+            }
+            const decision = await self.AccessPolicy.can(action, context);
+            safeSendResponse({ success: true, ...decision });
+          } catch (e) {
+            safeSendResponse({ success: false, error: e.message });
+          }
+          return;
+        }
 
         case 'TEST_STEP_PROGRESS':
           break;
@@ -800,11 +865,6 @@ class TestManager {
       runMode = hasOptimization ? 'optimized' : 'full';
     }
 
-    this.isPlaying = true;
-    this.currentStep = 0;
-    this.totalSteps = 0;
-    this.stepType = null;
-    this.playbackState = null; // Сбрасываем предыдущее состояние
     // При запуске из редактора передаётся текущий тест (message.test) — используем его,
     // чтобы учитывать снятие скрытия шагов без обязательного сохранения.
     let testToPlay = message.test && message.test.id === message.testId
@@ -813,6 +873,38 @@ class TestManager {
     if (!testToPlay) {
       safeSendResponse({ success: false, error: 'Test not found' });
       return;
+    }
+
+    const actionsForRun = (testToPlay.actions || []).filter(action => {
+      return runMode === 'full' ? true : !action.hidden;
+    });
+    if (actionsForRun.length === 0) {
+      safeSendResponse({ success: false, error: 'NO_STEPS_TO_PLAY' });
+      return;
+    }
+
+    this.isPlaying = true;
+    this.currentStep = 0;
+    this.totalSteps = 0;
+    this.stepType = null;
+    this.playbackState = null; // Сбрасываем предыдущее состояние
+
+    if (!message.dataDrivenStart && !message._fromDataDrivenQueue && this.dataDrivenState) {
+      this.dataDrivenState = null;
+    }
+    if (message.dataDrivenStart && Array.isArray(message.dataDrivenRows) && message.dataDrivenRows.length > 0) {
+      const MAX_DATA_DRIVEN_ROWS = 50;
+      const rows = message.dataDrivenRows.slice(0, MAX_DATA_DRIVEN_ROWS);
+      this.dataDrivenState = {
+        testId: message.testId,
+        rows,
+        index: 0,
+        mode: runMode,
+        debugMode: !!message.debugMode,
+        test: message.test && message.test.id === message.testId ? message.test : testToPlay,
+        results: []
+      };
+      message.groupContext = { ...(message.groupContext || {}), ...rows[0] };
     }
 
     let testToSend = testToPlay;
@@ -826,15 +918,16 @@ class TestManager {
     }
 
     const playPayloadBase = { type: 'PLAY_TEST', test: testToSend, mode: runMode, debugMode: message.debugMode || false };
+    if (this.dataDrivenState && String(this.dataDrivenState.testId) === String(message.testId)) {
+      playPayloadBase.dataDrivenRowIndex = this.dataDrivenState.index;
+      playPayloadBase.dataDrivenRowTotal = this.dataDrivenState.rows.length;
+    }
     if (message.isGroupRun) {
       playPayloadBase.isGroupRun = true;
       playPayloadBase.groupRunCurrentIndex = message.groupRunCurrentIndex;
       playPayloadBase.groupRunTotal = message.groupRunTotal;
     }
 
-    const actionsForRun = (testToPlay.actions || []).filter(action => {
-      return runMode === 'full' ? true : !action.hidden;
-    });
     this.totalSteps = actionsForRun.length;
     // Сохраняем начальное состояние воспроизведения
     this.playbackState = {
@@ -845,9 +938,7 @@ class TestManager {
     };
 
     // Проверяем, есть ли в тесте действия, требующие визуального интерфейса
-    const actionsToCheck = (testToPlay.actions || []).filter(action => {
-      return runMode === 'full' ? true : !action.hidden;
-    });
+    const actionsToCheck = actionsForRun;
 
     const visualActionTypes = ['click', 'dblclick', 'input', 'change', 'scroll', 'navigation', 'keyboard', 'javascript', 'screenshot', 'adaptive', 'analysis'];
     const hasVisualActions = actionsToCheck.some(action => {
@@ -877,8 +968,9 @@ class TestManager {
     // URL для выбора вкладки берём только из шагов навигации (переход, новая вкладка).
     // Шаги анализа (получить селекторы, заполнить поля) не переходят по URL — они выполняются на текущей странице.
     const firstActionWithUrl = testToPlay.actions?.find(action => {
-      if (!action.url && !action.value) return false;
-      const url = (action.url || action.value || '').trim();
+      const rawUrl = action.url != null && action.url !== '' ? action.url : action.value;
+      if (rawUrl == null || rawUrl === '') return false;
+      const url = String(rawUrl).trim();
       if (!url) return false;
       if (url.startsWith('chrome-extension://') || url.startsWith('chrome://') || url.startsWith('edge://')) return false;
       if (url.includes('/editor/editor.html') || url.includes('editor_ru.html')) return false;
@@ -889,8 +981,8 @@ class TestManager {
     });
     const urlForTab = firstActionWithUrl?.url || firstActionWithUrl?.value;
     const normalizeUrl = (raw) => {
-      if (!raw || typeof raw !== 'string') return null;
-      const s = raw.trim();
+      if (raw == null || raw === '') return null;
+      const s = String(raw).trim();
       if (!s) return null;
       if (/^https?:\/\//i.test(s)) return s;
       if (s.startsWith('//')) return 'https:' + s;
@@ -905,7 +997,8 @@ class TestManager {
     const firstVisibleAction = actionsToCheck[0];
     const isFirstActionNewTab = firstVisibleAction?.type === 'navigation' && firstVisibleAction?.subtype === 'new-tab';
     if (hasVisualActions && isFirstActionNewTab) {
-      const newTabUrl = normalizeUrl(firstVisibleAction.url || firstVisibleAction.value) || 'about:blank';
+      const newTabRaw = firstVisibleAction.url != null && firstVisibleAction.url !== '' ? firstVisibleAction.url : firstVisibleAction.value;
+      const newTabUrl = normalizeUrl(newTabRaw) || 'about:blank';
       try {
         console.log(`🔗 [Background] Первый шаг new-tab — открываю одну вкладку ${newTabUrl} и передаю RESUME_TEST`);
         const newTab = await chrome.tabs.create({ url: newTabUrl, active: true });
@@ -1160,17 +1253,19 @@ class TestManager {
         }
       } else {
         const firstValidUrl = testToPlay.actions?.find(action => {
-          if (!action.url) return false;
-          return !action.url.startsWith('chrome-extension://') &&
-            !action.url.startsWith('chrome://') &&
-            !action.url.startsWith('edge://') &&
-            !action.url.includes('/editor/editor.html');
+          const u = action.url == null ? '' : String(action.url).trim();
+          if (!u) return false;
+          return !u.startsWith('chrome-extension://') &&
+            !u.startsWith('chrome://') &&
+            !u.startsWith('edge://') &&
+            !u.includes('/editor/editor.html');
         })?.url;
 
-        if (firstValidUrl) {
-          console.log(`📂 Открываю новую вкладку с первым найденным URL: ${firstValidUrl}`);
+        const tabUrlFromFirst = normalizeUrl(firstValidUrl != null ? String(firstValidUrl) : '');
+        if (tabUrlFromFirst) {
+          console.log(`📂 Открываю новую вкладку с первым найденным URL: ${tabUrlFromFirst}`);
           try {
-            const newTab = await chrome.tabs.create({ url: firstValidUrl });
+            const newTab = await chrome.tabs.create({ url: tabUrlFromFirst });
             await new Promise(resolve => setTimeout(resolve, 1500));
             this.startVideoRecordingIfEnabled(message.testId, testToPlay.name, newTab.id).catch(() => {});
             try {
@@ -4243,6 +4338,7 @@ chrome.webRequest.onErrorOccurred.addListener(
  */
 chrome.tabs.onRemoved.addListener((tabId) => {
   networkRequests.delete(tabId);
+  testManager.onPlaybackTabRemoved(tabId);
 });
 
 console.log('[Background] Network monitoring initialized');

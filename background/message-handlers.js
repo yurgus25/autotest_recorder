@@ -49,6 +49,20 @@ const FREE_TIER_TEST_LIMIT = 10;
 /** Включить проверку лимитов бесплатного тарифа. false = Фаза 1 (без лимитов). */
 const ENABLE_FREEMIUM_LIMITS = false;
 
+async function requireAccess(action, sendResponse) {
+  if (!self.AccessPolicy || !self.AccessPolicy.can) return true;
+  const decision = await self.AccessPolicy.can(action);
+  if (decision.allowed) return true;
+  sendResponse({
+    success: false,
+    error: 'TIER_REQUIRED',
+    requiredTier: decision.requiredTier,
+    tier: decision.tier,
+    action: decision.action
+  });
+  return false;
+}
+
 /** Поиск теста по id (Map может хранить ключ как строку или число после load/save). */
 function getTestById(manager, testId) {
   if (testId == null) return undefined;
@@ -441,11 +455,19 @@ function registerBackgroundMessageHandlers(manager, registry) {
     try {
       const testsArray = Array.from(manager.tests.values());
       const groupsArray = Array.from(manager.testGroups?.values?.() || []);
+      const license = self.AccessPolicy && self.AccessPolicy.getLicense
+        ? await self.AccessPolicy.getLicense()
+        : { tier: 'free', valid: false };
+      const capabilities = self.AccessPolicy && self.AccessPolicy.getCapabilities
+        ? self.AccessPolicy.getCapabilities(license)
+        : { tier: 'free' };
       console.log(`📋 Запрос списка тестов: найдено ${testsArray.length} тестов, ${groupsArray.length} групп`);
       sendResponse({
         success: true,
         tests: testsArray,
         groups: groupsArray,
+        tier: capabilities.tier || 'free',
+        capabilities,
         freeTierLimit: FREE_TIER_TEST_LIMIT,
         limitsEnabled: ENABLE_FREEMIUM_LIMITS
       });
@@ -545,7 +567,13 @@ function registerBackgroundMessageHandlers(manager, registry) {
     try {
       const testId = String(message.testId);
       manager.tests.delete(testId);
+      if (/^\d+$/.test(testId)) {
+        manager.tests.delete(Number(testId));
+      }
       manager.testHistory.delete(testId);
+      if (/^\d+$/.test(testId)) {
+        manager.testHistory.delete(Number(testId));
+      }
 
       // Удаляем тест из всех групп, где он присутствует
       let groupsChanged = false;
@@ -699,6 +727,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
       manager.totalSteps = 0;
       manager.stepType = null;
       manager.playbackState = null;
+      manager.playbackTabId = null;
       try {
         await chrome.storage.local.remove('playbackState');
         console.log('✅ Состояние воспроизведения очищено из storage');
@@ -732,6 +761,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
       manager.totalSteps = 0;
       manager.stepType = null;
       manager.playbackState = null;
+      manager.playbackTabId = null;
       try {
         await chrome.storage.local.remove('playbackState');
         console.log('✅ Состояние воспроизведения очищено из storage');
@@ -934,7 +964,10 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
   });
 
-  registry.register('SAVE_PLAYBACK_STATE', async ({ message, sendResponse }) => {
+  registry.register('SAVE_PLAYBACK_STATE', async ({ message, sender, sendResponse }) => {
+    if (sender?.tab?.id != null) {
+      manager.playbackTabId = sender.tab.id;
+    }
     console.log('💾 Сохранение состояния воспроизведения:', {
       testId: message.test?.id,
       testName: message.test?.name,
@@ -1213,6 +1246,9 @@ function registerBackgroundMessageHandlers(manager, registry) {
 
   registry.register('START_RECORDING', async ({ message, sendResponse }) => {
     console.log('🎬 Обработка START_RECORDING...');
+    if (!await requireAccess(self.ActionCatalog ? self.ActionCatalog.START_RECORDING : 'recording.start', sendResponse)) {
+      return;
+    }
     if (manager.isRecording) {
       sendResponse({ success: false, error: 'Запись уже идет' });
       return;
@@ -1529,6 +1565,9 @@ function registerBackgroundMessageHandlers(manager, registry) {
 
   /** Порядок шагов (actions) сохраняется строго как передан — без сортировки и переупорядочивания. */
   registry.register('UPDATE_TEST', async ({ message, sendResponse }) => {
+    if (!await requireAccess(self.ActionCatalog ? self.ActionCatalog.UPDATE_TEST : 'test.update', sendResponse)) {
+      return;
+    }
     const updatedTest = message.test;
     const isNewTest = !manager.tests.has(updatedTest.id);
     if (ENABLE_FREEMIUM_LIMITS && isNewTest && manager.tests.size >= FREE_TIER_TEST_LIMIT) {
@@ -1540,15 +1579,59 @@ function registerBackgroundMessageHandlers(manager, registry) {
       return;
     }
     const actionsOrdered = Array.isArray(updatedTest.actions) ? [...updatedTest.actions] : [];
+    const prevTest = manager.tests.get(String(updatedTest.id));
+    let mergedExt = updatedTest.extensionAssets;
+    if (prevTest?.extensionAssets && typeof prevTest.extensionAssets === 'object') {
+      const inc = mergedExt && typeof mergedExt === 'object' ? mergedExt : {};
+      mergedExt = { ...prevTest.extensionAssets, ...inc };
+      mergedExt.visualRegressionBaselines = {
+        ...(prevTest.extensionAssets.visualRegressionBaselines || {}),
+        ...((inc.visualRegressionBaselines || {}))
+      };
+    }
     manager.tests.set(updatedTest.id, {
       ...updatedTest,
       actions: actionsOrdered,
+      extensionAssets: mergedExt,
       updatedAt: new Date().toISOString()
     });
     await manager.saveTests();
 
     await manager.triggerExcelExport(updatedTest.id, 'save');
 
+    sendResponse({ success: true });
+  });
+
+  registry.register('MERGE_TEST_EXTENSION_ASSETS', async ({ message, sendResponse }) => {
+    if (!await requireAccess(self.ActionCatalog ? self.ActionCatalog.UPDATE_TEST : 'test.update', sendResponse)) {
+      return;
+    }
+    const testId = String(message.testId || '');
+    const assets = message.assets;
+    if (!testId || !assets || typeof assets !== 'object') {
+      sendResponse({ success: false, error: 'Invalid testId or assets' });
+      return;
+    }
+    const test = manager.tests.get(testId);
+    if (!test) {
+      sendResponse({ success: false, error: 'Test not found' });
+      return;
+    }
+    test.extensionAssets = { ...(test.extensionAssets || {}) };
+    const incoming = assets;
+    if (incoming.visualRegressionBaselines && typeof incoming.visualRegressionBaselines === 'object') {
+      test.extensionAssets.visualRegressionBaselines = {
+        ...(test.extensionAssets.visualRegressionBaselines || {}),
+        ...incoming.visualRegressionBaselines
+      };
+    }
+    for (const key of Object.keys(incoming)) {
+      if (key !== 'visualRegressionBaselines') {
+        test.extensionAssets[key] = incoming[key];
+      }
+    }
+    test.updatedAt = new Date().toISOString();
+    await manager.saveTests();
     sendResponse({ success: true });
   });
 
@@ -1770,7 +1853,10 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
   });
 
-  registry.register('TEST_STEP_PROGRESS', async ({ message, sendResponse }) => {
+  registry.register('TEST_STEP_PROGRESS', async ({ message, sender, sendResponse }) => {
+    if (sender?.tab?.id != null) {
+      manager.playbackTabId = sender.tab.id;
+    }
     manager.currentStep = message.step;
     manager.totalSteps = message.total;
     manager.stepType = message.stepType;
@@ -1784,7 +1870,10 @@ function registerBackgroundMessageHandlers(manager, registry) {
     sendResponse({ success: true });
   });
 
-  registry.register('TEST_STEP_COMPLETED', async ({ message, sendResponse }) => {
+  registry.register('TEST_STEP_COMPLETED', async ({ message, sender, sendResponse }) => {
+    if (sender?.tab?.id != null) {
+      manager.playbackTabId = sender.tab.id;
+    }
     if (!manager.completedSteps) {
       manager.completedSteps = new Map();
     }
@@ -1831,6 +1920,49 @@ function registerBackgroundMessageHandlers(manager, registry) {
     const runMode = message.runMode || 'optimized';
     const optimizationSummary = message.optimizationSummary || {};
     let suppressCompletionPopup = false;
+
+    if (manager.dataDrivenState && String(manager.dataDrivenState.testId) === String(message.testId)) {
+      const st = manager.dataDrivenState;
+      const durationMs = typeof message.durationMs === 'number' ? message.durationMs : 0;
+      const stepsCompleted = typeof message.stepsCompleted === 'number' ? message.stepsCompleted : 0;
+      const stepsTotal = typeof message.stepsTotal === 'number' ? message.stepsTotal : 0;
+      st.results.push({
+        rowIndex: st.index,
+        row: st.rows[st.index],
+        success: message.success,
+        error: message.error || null,
+        stepsCompleted,
+        stepsTotal,
+        durationMs
+      });
+      st.index++;
+      if (st.index < st.rows.length) {
+        suppressCompletionPopup = true;
+        manager.isPlaying = true;
+        manager.handlePlayTest({
+          testId: st.testId,
+          test: st.test,
+          mode: st.mode,
+          debugMode: st.debugMode,
+          groupContext: { ...st.rows[st.index] },
+          _fromDataDrivenQueue: true
+        }, () => {});
+        sendResponse({ success: true, suppressCompletionPopup: true });
+        return;
+      }
+      const summary = {
+        testId: st.testId,
+        testName: manager.tests.get(String(st.testId))?.name || '',
+        totalRows: st.rows.length,
+        results: st.results.slice(),
+        allPassed: st.results.every(r => r.success)
+      };
+      manager.dataDrivenState = null;
+      manager.broadcast({
+        type: 'DATA_DRIVEN_RUN_COMPLETED',
+        summary
+      }).catch(() => {});
+    }
 
     if (manager.currentGroupId) {
       suppressCompletionPopup = true;
@@ -1921,6 +2053,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
     manager.totalSteps = 0;
     manager.stepType = null;
     manager.playbackState = null;
+    manager.playbackTabId = null;
     try {
       await chrome.storage.local.remove('playbackState');
       console.log('✅ Состояние воспроизведения очищено из storage после завершения теста');

@@ -171,6 +171,7 @@ TestEditor.prototype.renderActionItem = function(action, index, visibleStepNumbe
   const isAutoOptimized = !!optimizationMeta;
   const hasRecordMarker = action.recordMarker === true; // Явная проверка на true для совместимости со старыми тестами
   const typeBadge = this.getActionTypeBadge(action.type, action);
+  const typeIconChar = this.getActionTypeIcon(action.type, action.subtype);
   const primarySelector = this.getPrimarySelector(action);
   const selectorInfo = this.getSelectorInfo(primarySelector);
   const reserveStats = this.getSelectorReserveStats(action);
@@ -225,17 +226,21 @@ TestEditor.prototype.renderActionItem = function(action, index, visibleStepNumbe
             ${isCollapsed ? '#' : '# '}${visibleStepNumber}
           </span>
           <span class="drag-handle">☰</span>
-          <span class="action-type-badge ${action.type} ${action.subtype ? action.subtype : ''}">${this.getActionTypeIcon(action.type, action.subtype)} ${typeBadge}</span>
+          <span class="action-type-badge ${action.type} ${action.subtype ? action.subtype : ''}" title="${this.escapeHtml(typeIconChar + ' ' + typeBadge)}"><span class="action-type-icon" aria-hidden="true">${typeIconChar}</span><span class="action-type-label">${typeBadge}</span></span>
           ${(action.fieldLabel && this.showFieldLabels) ? `<span class="action-field-label" title="${this.t('editorUI.fieldLabelTooltip') || 'Field label'}">${this.escapeHtml(action.fieldLabel)}</span>` : ''}
           ${optimizationBadge}
           ${gigaChatBadge}
           ${isCollapsed ? `
             <span class="action-summary" title="${action.type === 'api' ? 
               this.escapeHtml((action.api?.method || 'GET') + ' ' + (action.api?.url || '')) : 
-              this.escapeHtml(selectorInfo) + ' | ' + this.escapeHtml(actionValue)}">
+              this.escapeHtml(String(selectorInfo)) + ' | ' + this.escapeHtml(String(actionValue))}">
               ${action.type === 'api' ? 
                 `🌐 ${this.escapeHtml((action.api?.method || 'GET') + ' ' + (action.api?.url || '').substring(0, 60))}${(action.api?.url || '').length > 60 ? '...' : ''}` :
-                `${this.escapeHtml(selectorInfo.substring(0, 60))}${selectorInfo.length > 60 ? '...' : ''} • ${this.escapeHtml(actionValue.substring(0, 40))}${actionValue.length > 40 ? '...' : ''}`
+                (() => {
+                  const si = String(selectorInfo || '');
+                  const av = String(actionValue || '');
+                  return `${this.escapeHtml(si.substring(0, 60))}${si.length > 60 ? '...' : ''} • ${this.escapeHtml(av.substring(0, 40))}${av.length > 40 ? '...' : ''}`;
+                })()
               }
             </span>
           ` : ''}

@@ -40,6 +40,21 @@
   };
   const FREE_TIER_TEST_LIMIT = 10;
   const ENABLE_FREEMIUM_LIMITS = false;
+  function requireAccess(action, sendResponse2) {
+    return __async(this, null, function* () {
+      if (!self.AccessPolicy || !self.AccessPolicy.can) return true;
+      const decision = yield self.AccessPolicy.can(action);
+      if (decision.allowed) return true;
+      sendResponse2({
+        success: false,
+        error: "TIER_REQUIRED",
+        requiredTier: decision.requiredTier,
+        tier: decision.tier,
+        action: decision.action
+      });
+      return false;
+    });
+  }
   function getTestById(manager2, testId) {
     if (testId == null) return void 0;
     return manager2.tests.get(testId) || manager2.tests.get(String(testId)) || (typeof testId === "string" && /^\d+$/.test(testId) ? manager2.tests.get(Number(testId)) : void 0);
@@ -329,11 +344,15 @@
       try {
         const testsArray = Array.from(manager.tests.values());
         const groupsArray = Array.from(((_b = (_a = manager.testGroups) == null ? void 0 : _a.values) == null ? void 0 : _b.call(_a)) || []);
+        const license = self.AccessPolicy && self.AccessPolicy.getLicense ? yield self.AccessPolicy.getLicense() : { tier: "free", valid: false };
+        const capabilities = self.AccessPolicy && self.AccessPolicy.getCapabilities ? self.AccessPolicy.getCapabilities(license) : { tier: "free" };
         console.log(`\u{1F4CB} \u0417\u0430\u043F\u0440\u043E\u0441 \u0441\u043F\u0438\u0441\u043A\u0430 \u0442\u0435\u0441\u0442\u043E\u0432: \u043D\u0430\u0439\u0434\u0435\u043D\u043E ${testsArray.length} \u0442\u0435\u0441\u0442\u043E\u0432, ${groupsArray.length} \u0433\u0440\u0443\u043F\u043F`);
         sendResponse2({
           success: true,
           tests: testsArray,
           groups: groupsArray,
+          tier: capabilities.tier || "free",
+          capabilities,
           freeTierLimit: FREE_TIER_TEST_LIMIT,
           limitsEnabled: ENABLE_FREEMIUM_LIMITS
         });
@@ -416,7 +435,13 @@
       try {
         const testId = String(message2.testId);
         manager.tests.delete(testId);
+        if (/^\d+$/.test(testId)) {
+          manager.tests.delete(Number(testId));
+        }
         manager.testHistory.delete(testId);
+        if (/^\d+$/.test(testId)) {
+          manager.testHistory.delete(Number(testId));
+        }
         let groupsChanged = false;
         if (manager.testGroups && manager.testGroups.size > 0) {
           for (const [groupId, group] of manager.testGroups.entries()) {
@@ -551,6 +576,7 @@
         manager.totalSteps = 0;
         manager.stepType = null;
         manager.playbackState = null;
+        manager.playbackTabId = null;
         try {
           yield chrome.storage.local.remove("playbackState");
           console.log("\u2705 \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E\u0447\u0438\u0449\u0435\u043D\u043E \u0438\u0437 storage");
@@ -583,6 +609,7 @@
         manager.totalSteps = 0;
         manager.stepType = null;
         manager.playbackState = null;
+        manager.playbackTabId = null;
         try {
           yield chrome.storage.local.remove("playbackState");
           console.log("\u2705 \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E\u0447\u0438\u0449\u0435\u043D\u043E \u0438\u0437 storage");
@@ -759,8 +786,11 @@
         sendResponse2({ success: false, error: error.message });
       }
     }));
-    registry.register("SAVE_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e, _f, _g, _h;
+    registry.register("SAVE_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _tab3;
+      if (((_tab3 = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab3.id) != null) {
+        manager.playbackTabId = sender2.tab.id;
+      }
       console.log("\u{1F4BE} \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F:", {
         testId: (_a = message2.test) == null ? void 0 : _a.id,
         testName: (_b = message2.test) == null ? void 0 : _b.name,
@@ -978,6 +1008,9 @@
     }));
     registry.register("START_RECORDING", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
       console.log("\u{1F3AC} \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 START_RECORDING...");
+      if (!(yield requireAccess(self.ActionCatalog ? self.ActionCatalog.START_RECORDING : "recording.start", sendResponse2))) {
+        return;
+      }
       if (manager.isRecording) {
         sendResponse2({ success: false, error: "\u0417\u0430\u043F\u0438\u0441\u044C \u0443\u0436\u0435 \u0438\u0434\u0435\u0442" });
         return;
@@ -1231,6 +1264,9 @@
       }
     }));
     registry.register("UPDATE_TEST", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
+      if (!(yield requireAccess(self.ActionCatalog ? self.ActionCatalog.UPDATE_TEST : "test.update", sendResponse2))) {
+        return;
+      }
       const updatedTest = message2.test;
       const isNewTest = !manager.tests.has(updatedTest.id);
       if (ENABLE_FREEMIUM_LIMITS && isNewTest && manager.tests.size >= FREE_TIER_TEST_LIMIT) {
@@ -1242,12 +1278,57 @@
         return;
       }
       const actionsOrdered = Array.isArray(updatedTest.actions) ? [...updatedTest.actions] : [];
+      const prevTest = manager.tests.get(String(updatedTest.id));
+      let mergedExt = updatedTest.extensionAssets;
+      if (prevTest != null && prevTest.extensionAssets && typeof prevTest.extensionAssets === "object") {
+        const inc = mergedExt && typeof mergedExt === "object" ? mergedExt : {};
+        mergedExt = __spreadValues(__spreadValues({}, prevTest.extensionAssets), inc);
+        if (inc.visualRegressionBaselines && typeof inc.visualRegressionBaselines === "object" || prevTest.extensionAssets.visualRegressionBaselines) {
+          mergedExt.visualRegressionBaselines = __spreadValues(
+            __spreadValues({}, prevTest.extensionAssets.visualRegressionBaselines || {}),
+            (inc.visualRegressionBaselines || {})
+          );
+        }
+      }
       manager.tests.set(updatedTest.id, __spreadProps(__spreadValues({}, updatedTest), {
         actions: actionsOrdered,
+        extensionAssets: mergedExt,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       }));
       yield manager.saveTests();
       yield manager.triggerExcelExport(updatedTest.id, "save");
+      sendResponse2({ success: true });
+    }));
+    registry.register("MERGE_TEST_EXTENSION_ASSETS", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
+      if (!(yield requireAccess(self.ActionCatalog ? self.ActionCatalog.UPDATE_TEST : "test.update", sendResponse2))) {
+        return;
+      }
+      const testId = String(message2.testId || "");
+      const assets = message2.assets;
+      if (!testId || !assets || typeof assets !== "object") {
+        sendResponse2({ success: false, error: "Invalid testId or assets" });
+        return;
+      }
+      const test = manager.tests.get(testId);
+      if (!test) {
+        sendResponse2({ success: false, error: "Test not found" });
+        return;
+      }
+      test.extensionAssets = __spreadValues({}, test.extensionAssets || {});
+      const incoming = assets;
+      if (incoming.visualRegressionBaselines && typeof incoming.visualRegressionBaselines === "object") {
+        test.extensionAssets.visualRegressionBaselines = __spreadValues(
+          __spreadValues({}, test.extensionAssets.visualRegressionBaselines || {}),
+          incoming.visualRegressionBaselines
+        );
+      }
+      for (const key of Object.keys(incoming)) {
+        if (key !== "visualRegressionBaselines") {
+          test.extensionAssets[key] = incoming[key];
+        }
+      }
+      test.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+      yield manager.saveTests();
       sendResponse2({ success: true });
     }));
     registry.register("SELECTOR_FOUND_DURING_PLAYBACK", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
@@ -1435,7 +1516,11 @@
         });
       }
     }));
-    registry.register("TEST_STEP_PROGRESS", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
+    registry.register("TEST_STEP_PROGRESS", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
+      var _tab;
+      if (((_tab = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab.id) != null) {
+        manager.playbackTabId = sender2.tab.id;
+      }
       manager.currentStep = message2.step;
       manager.totalSteps = message2.total;
       manager.stepType = message2.stepType;
@@ -1449,7 +1534,11 @@
       });
       sendResponse2({ success: true });
     }));
-    registry.register("TEST_STEP_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
+    registry.register("TEST_STEP_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
+      var _tab2;
+      if (((_tab2 = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab2.id) != null) {
+        manager.playbackTabId = sender2.tab.id;
+      }
       if (!manager.completedSteps) {
         manager.completedSteps = /* @__PURE__ */ new Map();
       }
@@ -1490,11 +1579,55 @@
       sendResponse2({ success: true });
     }));
     registry.register("TEST_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e;
       yield manager.stopVideoRecordingIfActive(message2.testId);
       const runMode = message2.runMode || "optimized";
       const optimizationSummary = message2.optimizationSummary || {};
       let suppressCompletionPopup = false;
+      if (manager.dataDrivenState && String(manager.dataDrivenState.testId) === String(message2.testId)) {
+        const st = manager.dataDrivenState;
+        const durationMs = typeof message2.durationMs === "number" ? message2.durationMs : 0;
+        const stepsCompleted = typeof message2.stepsCompleted === "number" ? message2.stepsCompleted : 0;
+        const stepsTotal = typeof message2.stepsTotal === "number" ? message2.stepsTotal : 0;
+        st.results.push({
+          rowIndex: st.index,
+          row: st.rows[st.index],
+          success: message2.success,
+          error: message2.error || null,
+          stepsCompleted,
+          stepsTotal,
+          durationMs
+        });
+        st.index++;
+        if (st.index < st.rows.length) {
+          suppressCompletionPopup = true;
+          manager.isPlaying = true;
+          manager.handlePlayTest({
+            testId: st.testId,
+            test: st.test,
+            mode: st.mode,
+            debugMode: st.debugMode,
+            groupContext: __spreadValues({}, st.rows[st.index]),
+            _fromDataDrivenQueue: true
+          }, () => {
+          });
+          sendResponse2({ success: true, suppressCompletionPopup: true });
+          return;
+        }
+        const summary = {
+          testId: st.testId,
+          testName: ((_e = manager.tests.get(String(st.testId))) == null ? void 0 : _e.name) || "",
+          totalRows: st.rows.length,
+          results: st.results.slice(),
+          allPassed: st.results.every((r) => r.success)
+        };
+        manager.dataDrivenState = null;
+        manager.broadcast({
+          type: "DATA_DRIVEN_RUN_COMPLETED",
+          summary
+        }).catch(() => {
+        });
+      }
       if (manager.currentGroupId) {
         suppressCompletionPopup = true;
         const group = manager.testGroups.get(manager.currentGroupId);
@@ -1582,6 +1715,7 @@
       manager.totalSteps = 0;
       manager.stepType = null;
       manager.playbackState = null;
+      manager.playbackTabId = null;
       try {
         yield chrome.storage.local.remove("playbackState");
         console.log("\u2705 \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E\u0447\u0438\u0449\u0435\u043D\u043E \u0438\u0437 storage \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u0441\u0442\u0430");

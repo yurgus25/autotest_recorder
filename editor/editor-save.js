@@ -71,7 +71,8 @@ TestEditor.prototype.saveAction = function() {
   const mediaNeedsNoSelector = actionType === 'media';
   const chainNeedsNoSelector = actionType === 'chain';
   const datepickerNeedsNoSelector = actionType === 'datepicker';
-  if (!selectorValue && actionType !== 'scroll' && actionType !== 'navigation' && actionType !== 'wait' && actionType !== 'keyboard' && actionType !== 'api' && actionType !== 'variable' && actionType !== 'setVariable' && actionType !== 'javascript' && actionType !== 'cookie' && actionType !== 'analysis' && !screenshotSkipsSelector && !adaptiveSkipsMainSelector && !clipboardNeedsNoSelector && !networkNeedsNoSelector && !deviceNeedsNoSelector && !mediaNeedsNoSelector && !chainNeedsNoSelector && !datepickerNeedsNoSelector) {
+  const visualRegressionViewport = actionType === 'assertion' && subtype === 'assert-visual-regression' && document.getElementById('visualRegressionScope')?.value === 'viewport';
+  if (!selectorValue && actionType !== 'scroll' && actionType !== 'navigation' && actionType !== 'wait' && actionType !== 'keyboard' && actionType !== 'api' && actionType !== 'variable' && actionType !== 'setVariable' && actionType !== 'javascript' && actionType !== 'cookie' && actionType !== 'analysis' && !screenshotSkipsSelector && !adaptiveSkipsMainSelector && !clipboardNeedsNoSelector && !networkNeedsNoSelector && !deviceNeedsNoSelector && !mediaNeedsNoSelector && !chainNeedsNoSelector && !datepickerNeedsNoSelector && !visualRegressionViewport) {
     alert(this.t('editorUI.specifySelector'));
     return;
   }
@@ -146,7 +147,7 @@ TestEditor.prototype.saveAction = function() {
   const tableNeedsSel = actionType === 'table'; // Таблицы всегда требуют селектор (селектор таблицы)
   const dragNeedsSel = actionType === 'drag'; // Drag всегда требует селектор (исходный элемент)
   
-  if (actionType !== 'scroll' && actionType !== 'navigation' && actionType !== 'wait' && actionType !== 'api' && actionType !== 'variable' && actionType !== 'setVariable' && actionType !== 'javascript' && actionType !== 'cookie' && actionType !== 'network' && actionType !== 'device' && actionType !== 'media' && actionType !== 'chain' && actionType !== 'datepicker' && !screenshotNoSelector && ((actionType !== 'clipboard' || clipboardNeedsSel) || tableNeedsSel || dragNeedsSel)) {
+  if (actionType !== 'scroll' && actionType !== 'navigation' && actionType !== 'wait' && actionType !== 'api' && actionType !== 'variable' && actionType !== 'setVariable' && actionType !== 'javascript' && actionType !== 'cookie' && actionType !== 'network' && actionType !== 'device' && actionType !== 'media' && actionType !== 'chain' && actionType !== 'datepicker' && !screenshotNoSelector && !visualRegressionViewport && ((actionType !== 'clipboard' || clipboardNeedsSel) || tableNeedsSel || dragNeedsSel)) {
     if (actionType === 'keyboard') {
       // Для keyboard селектор опционален (если не глобальное действие)
       const isGlobal = document.getElementById('keyboardGlobal').checked;

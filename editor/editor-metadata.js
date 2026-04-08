@@ -233,6 +233,10 @@ TestEditor.prototype.exportToJSON = function() {
       preconditions: this.test.preconditions || [],
       url: this.test.url || ''
     };
+    // Расширение: эталоны визуальной регрессии и др. (при импорте можно опционально отбрасывать)
+    if (this.test.extensionAssets && typeof this.test.extensionAssets === 'object' && Object.keys(this.test.extensionAssets).length > 0) {
+      exportData.extensionAssets = JSON.parse(JSON.stringify(this.test.extensionAssets));
+    }
 
     // Проверяем структуру перед экспортом
     if (!exportData.actions || !Array.isArray(exportData.actions)) {
@@ -325,6 +329,10 @@ TestEditor.prototype.importTest = function() {
           updatedAt: new Date().toISOString(),
           lastEditedBy: importedData.lastEditedBy || 'user'
         };
+        // extensionAssets: визуальные эталоны и др.; при «чистом» импорте шаринга можно не передавать в JSON
+        if (importedData.extensionAssets && typeof importedData.extensionAssets === 'object') {
+          newTest.extensionAssets = JSON.parse(JSON.stringify(importedData.extensionAssets));
+        }
         
         // Сохраняем тест через background
         const response = await chrome.runtime.sendMessage({

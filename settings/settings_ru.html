@@ -254,6 +254,13 @@
             </label>
           </div>
         </div>
+        <div class="setting-group" id="onboarding-settings">
+          <h3 data-i18n="settings.onboardingSection">Приветственный мастер</h3>
+          <p class="description" data-i18n="settings.onboardingShowAgainDesc">Сбрасывает одноразовый флаг. Откройте popup расширения, чтобы снова увидеть подсказки.</p>
+          <div class="setting-item">
+            <button type="button" id="showOnboardingWizardAgain" class="btn btn-secondary" data-i18n="settings.onboardingShowAgain">Показать мастер снова</button>
+          </div>
+        </div>
       </section>
 
       <!-- Performance Settings -->
@@ -879,192 +886,6 @@
           </div>
         </div>
       </section>
-
-      <script>
-        // Toggle analysis settings panel
-        function toggleAnalysisSettingsPanel() {
-          const panel = document.getElementById('analysisSettingsPanel');
-          const icon = document.getElementById('analysisToggleIcon');
-          const btn = document.getElementById('toggleAnalysisSettings');
-          
-          if (panel.style.display === 'none') {
-            panel.style.display = 'block';
-            icon.textContent = '▲';
-            btn.querySelector('span:last-child').textContent = 'Скрыть Настройки Анализа';
-            loadAnalysisSettings();
-          } else {
-            panel.style.display = 'none';
-            icon.textContent = '▼';
-            btn.querySelector('span:last-child').textContent = 'Показать Настройки Анализа';
-          }
-        }
-
-        // Load settings
-        function loadAnalysisSettings() {
-          try {
-            const settings = JSON.parse(localStorage.getItem('autotest_analysis_settings_fill') || '{}');
-            document.getElementById('fillMode').value = settings.fillMode || 'smart';
-            document.getElementById('fillProfile').value = settings.profile || 'valid-user';
-            document.getElementById('fillTarget').value = settings.fillTarget || 'empty';
-            document.getElementById('contextAware').checked = settings.contextAware !== false;
-            document.getElementById('overwriteFilled').checked = settings.overwriteFilled || false;
-          } catch (e) {
-            console.error('Error loading settings:', e);
-          }
-          
-          loadGlobalRules();
-        }
-
-        // Save settings
-        function saveAnalysisSettings() {
-          const settings = {
-            fillMode: document.getElementById('fillMode').value,
-            profile: document.getElementById('fillProfile').value,
-            fillTarget: document.getElementById('fillTarget').value,
-            contextAware: document.getElementById('contextAware').checked,
-            overwriteFilled: document.getElementById('overwriteFilled').checked
-          };
-          
-          localStorage.setItem('autotest_analysis_settings_fill', JSON.stringify(settings));
-          alert('✅ Настройки сохранены');
-        }
-
-        // Reset settings
-        function resetFillSettings() {
-          if (!confirm('Сбросить настройки к значениям по умолчанию?')) return;
-          localStorage.removeItem('autotest_analysis_settings_fill');
-          loadAnalysisSettings();
-          alert('✅ Настройки сброшены');
-        }
-
-        // Load global rules
-        function loadGlobalRules() {
-          try {
-            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
-            const container = document.getElementById('globalRulesList');
-            container.innerHTML = '';
-            
-            const entries = Object.entries(rules).filter(([k]) => !k.startsWith('_'));
-            
-            if (entries.length === 0) {
-              container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет правил. Нажмите "Добавить"</p>';
-              return;
-            }
-            
-            entries.forEach(([selector, value]) => {
-              const div = document.createElement('div');
-              div.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
-              div.innerHTML = `
-                <input type="text" value="${selector}" placeholder="Селектор" style="flex: 1; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;" onchange="updateRule('${selector}', this.value, null)">
-                <input type="text" value="${value}" placeholder="Значение" style="flex: 1; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;" onchange="updateRule('${selector}', null, this.value)">
-                <button onclick="removeRule('${selector}')" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; font-size: 13px; cursor: pointer;">🗑️</button>
-              `;
-              container.appendChild(div);
-            });
-          } catch (e) {
-            console.error('Error loading rules:', e);
-          }
-        }
-
-        // Add rule
-        function addGlobalRule() {
-          try {
-            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
-            const newKey = `#field${Object.keys(rules).length + 1}`;
-            rules[newKey] = 'Авто*';
-            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
-            loadGlobalRules();
-          } catch (e) {
-            console.error('Error adding rule:', e);
-          }
-        }
-
-        // Update rule
-        function updateRule(oldSelector, newSelector, newValue) {
-          try {
-            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
-            
-            if (newSelector && newSelector !== oldSelector) {
-              const value = rules[oldSelector];
-              delete rules[oldSelector];
-              rules[newSelector] = value;
-            } else if (newValue !== null) {
-              rules[oldSelector] = newValue;
-            }
-            
-            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
-          } catch (e) {
-            console.error('Error updating rule:', e);
-          }
-        }
-
-        // Remove rule
-        function removeRule(selector) {
-          if (!confirm(`Удалить правило "${selector}"?`)) return;
-          
-          try {
-            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
-            delete rules[selector];
-            localStorage.setItem('autotest_global_rules', JSON.stringify(rules));
-            loadGlobalRules();
-          } catch (e) {
-            console.error('Error removing rule:', e);
-          }
-        }
-
-        // Export rules
-        function exportRules() {
-          try {
-            const rules = JSON.parse(localStorage.getItem('autotest_global_rules') || '{}');
-            const data = {
-              rules: rules,
-              exported: new Date().toISOString(),
-              version: '0.9.6.7'
-            };
-            
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `field-rules-${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            alert('✅ Правила экспортированы');
-          } catch (e) {
-            alert('❌ Ошибка экспорта: ' + e.message);
-          }
-        }
-
-        // Import rules
-        function importRules() {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.json';
-          input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              try {
-                const data = JSON.parse(event.target.result);
-                if (data.rules) {
-                  localStorage.setItem('autotest_global_rules', JSON.stringify(data.rules));
-                  loadGlobalRules();
-                  alert('✅ Правила импортированы');
-                } else {
-                  alert('❌ Неверный формат файла');
-                }
-              } catch (err) {
-                alert('❌ Ошибка импорта: ' + err.message);
-              }
-            };
-            reader.readAsText(file);
-          };
-          input.click();
-        }
-      </script>
 
       <!-- Advanced Settings -->
       <section class="settings-section">

@@ -406,6 +406,20 @@ class SettingsManager {
       window.close();
     });
 
+    const showOnboardingAgainBtn = document.getElementById('showOnboardingWizardAgain');
+    if (showOnboardingAgainBtn) {
+      showOnboardingAgainBtn.addEventListener('click', async () => {
+        try {
+          await chrome.storage.local.remove('onboardingWizardV1CompletedAt');
+          const msg = window.i18n ? window.i18n.t('settings.onboardingResetDone') : 'Done. Open the extension popup to see the wizard.';
+          this.showNotification(msg, 'success');
+        } catch (e) {
+          console.warn('[Settings] onboarding reset', e);
+          this.showNotification(String(e.message || e), 'error');
+        }
+      });
+    }
+
     // Save button
     document.getElementById('saveSettings').addEventListener('click', () => {
       this.collectFormData();
@@ -987,21 +1001,56 @@ const settingsManager = new SettingsManager();
 // === ФУНКЦИИ ДЛЯ ПАНЕЛИ НАСТРОЕК АНАЛИЗА ===
 
 /**
+ * Подставить в форму сохранённые analysisSettings из chrome.storage (без inline script в HTML — CSP MV3).
+ */
+function loadAnalysisFormFromStorage(done) {
+  chrome.storage.local.get(['analysisSettings'], (res) => {
+    const s = res && res.analysisSettings ? res.analysisSettings : {};
+    try {
+      const fm = document.getElementById('fillMode');
+      if (fm && s.fillMode) fm.value = s.fillMode;
+      const fp = document.getElementById('fillProfile');
+      if (fp && s.fillProfile) fp.value = s.fillProfile;
+      const ft = document.getElementById('fillTarget');
+      if (ft && s.fillTarget) ft.value = s.fillTarget;
+      const ca = document.getElementById('contextAware');
+      if (ca) ca.checked = s.contextAware !== false;
+      const ow = document.getElementById('overwriteFilled');
+      if (ow) ow.checked = !!s.overwriteFilled;
+    } catch (e) {
+      console.warn('[Settings] loadAnalysisFormFromStorage', e);
+    }
+    if (typeof done === 'function') done();
+  });
+}
+
+/**
  * Переключение видимости панели настроек анализа
  */
 function toggleAnalysisSettingsPanel() {
   const panel = document.getElementById('analysisSettingsPanel');
   const icon = document.getElementById('analysisToggleIcon');
   const button = document.getElementById('toggleAnalysisSettings');
-  
-  if (panel.style.display === 'none') {
+  if (!panel || !icon || !button) return;
+
+  const labelOpen = button.querySelector('span:last-child');
+  const isRu = (document.documentElement.lang || '').toLowerCase().startsWith('ru');
+
+  if (panel.style.display === 'none' || !panel.style.display) {
     panel.style.display = 'block';
     icon.textContent = '▲';
-    button.querySelector('span:last-child').textContent = 'Скрыть Настройки Анализа';
+    if (labelOpen) {
+      labelOpen.textContent = isRu ? 'Скрыть Настройки Анализа' : 'Hide Analysis Settings';
+    }
+    loadAnalysisFormFromStorage(() => {
+      if (typeof updateRulesList === 'function') updateRulesList();
+    });
   } else {
     panel.style.display = 'none';
     icon.textContent = '▼';
-    button.querySelector('span:last-child').textContent = 'Показать Настройки Анализа';
+    if (labelOpen) {
+      labelOpen.textContent = isRu ? 'Показать Настройки Анализа' : 'Show Analysis Settings';
+    }
   }
 }
 

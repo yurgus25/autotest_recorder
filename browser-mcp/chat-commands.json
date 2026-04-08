@@ -1,0 +1,65 @@
+{
+  "$schema": "./recipe-schema.json",
+  "meta": {
+    "project": "AutoTest Recorder",
+    "purpose": "Шаблоны шагов для агента Cursor: вызывать MCP cursor-ide-browser по командам из чата. Подставляйте ref из свежего browser_snapshot.",
+    "harnessUrl": "http://127.0.0.1:9876/mcp-harness.html",
+    "note": "Сначала запустите scripts/serve-test-pages.ps1"
+  },
+  "templates": {
+    "openHarness": {
+      "description": "Открыть страницу harness в Browser MCP",
+      "mcp": "browser_navigate",
+      "arguments": {
+        "url": "http://127.0.0.1:9876/mcp-harness.html"
+      }
+    },
+    "snapshot": {
+      "description": "Снять структуру страницы (обязательно перед click/fill)",
+      "mcp": "browser_snapshot",
+      "arguments": {}
+    },
+    "fillChatText": {
+      "description": "Вставить текст из чата в многострочное поле (ref взять из snapshot)",
+      "mcp": "browser_fill",
+      "arguments": {
+        "element": "Multiline textarea for chat paste / Многострочный текст",
+        "ref": "REPLACE_WITH_REF_FROM_SNAPSHOT",
+        "text": "REPLACE_WITH_CHAT_TEXT"
+      }
+    },
+    "fillTitle": {
+      "description": "Заполнить заголовок сценария",
+      "mcp": "browser_fill",
+      "arguments": {
+        "element": "Scenario title input / Заголовок сценария",
+        "ref": "REPLACE_WITH_REF_FROM_SNAPSHOT",
+        "text": "REPLACE_WITH_TITLE"
+      }
+    },
+    "clickBuildJson": {
+      "description": "Нажать «Собрать JSON сценария»",
+      "mcp": "browser_click",
+      "arguments": {
+        "element": "Button Собрать JSON сценария",
+        "ref": "REPLACE_WITH_REF_FROM_SNAPSHOT"
+      }
+    },
+    "clickMarkCheck1": {
+      "description": "Отметить чеклист пункт 1",
+      "mcp": "browser_click",
+      "arguments": {
+        "element": "Button Отметить пункт 1",
+        "ref": "REPLACE_WITH_REF_FROM_SNAPSHOT"
+      }
+    }
+  },
+  "exampleSequence": [
+    "openHarness",
+    "snapshot",
+    "fillChatText",
+    "fillTitle",
+    "snapshot",
+    "clickBuildJson"
+  ]
+}

@@ -1,5 +1,32 @@
 # Журнал изменений (changes)
 
+## 2026-04-02 (v0.9.7.4) 🎬 Воспроизведение: закрытие вкладки и шаг NAVIGATE
+
+- **Версия:** `manifest.json` **0.9.7.4**; обновлены `changes.md`, `versions.txt`.
+- **Закрытие вкладки во время прогона:** в фоне ведётся `playbackTabId`; при `tabs.onRemoved` для этой вкладки — сброс состояния воспроизведения, очистка `playbackState`, рассылка `TEST_COMPLETED` (ошибка «Вкладка воспроизведения закрыта») и сброс прогресса в popup.
+- **Шаг навигации:** перед `location.replace` ожидается ответ на `TEST_STEP_COMPLETED`, чтобы сообщение успело дойти до выгрузки страницы.
+- **Файлы:** `background/background-sw.js`, `background/background.js`, `background/message-handlers-sw.js`, `background/message-handlers.js`, `content/player-handlers-extended.js`.
+- **Артефакт:** `.\scripts\build-release.ps1` → `dist/autotest-recorder-0.9.7.4.zip`.
+
+## 2026-04-01 (v0.9.7.3) ⚡ Popup: быстрый список тестов
+
+- **Версия:** `manifest.json` **0.9.7.3**; обновлены `changes.md`, `versions.txt`.
+- **Список тестов в popup:** отрисовка из `chrome.storage.local` до ответа service worker (`paintTestsFromStorage`, общий разбор с fallback); затем синхронизация через `GET_TESTS` с более короткими ретраями; если список уже показан из storage и фон не ответил — оставляем данные из storage без экрана ошибки.
+- **Init popup:** ранний показ списка сразу после настроек/проверки автотестов (до длинной привязки обработчиков); в конце — `Promise.all` для `applyTierVisibility`, `loadState`, `loadTests`; проверки тарифа по `[data-access-action]` — параллельные `CHECK_ACCESS`.
+- **Рефакторинг:** `TESTS_STORAGE_KEYS`, `applyTestsPayloadFromStored`, переиспользование в fallback.
+- **Артефакт:** `.\scripts\build-release.ps1` → `dist/autotest-recorder-0.9.7.3.zip`.
+
+## 2026-04-01 (v0.9.7.2) 📦 Data-driven, визуальная регрессия (lite), онбординг
+
+- **Версия:** `manifest.json` **0.9.7.2**; журналы и README обновлены.
+- **Data-driven (CSV/таблицы):** прогон теста по строкам CSV с подстановкой в контекст переменных группы (лимит строк для превью); фоновая очередь и событие завершения с сводкой по строкам; в редакторе — модалка, кнопка запуска, тост по итогу.
+- **Экспорт отчёта data-driven:** кнопки выгрузки CSV (pass/fail по строкам, UTF‑8 BOM); отчёт привязан к текущему тесту; позже может быть ограничен Premium.
+- **Visual regression lite:** эталоны в **`test.extensionAssets.visualRegressionBaselines`** (перенос с JSON теста); плеер читает сначала из теста, затем legacy `chrome.storage`; сообщение **`MERGE_TEST_EXTENSION_ASSETS`**; при **`UPDATE_TEST`** из редактора **`extensionAssets` сливается** с уже сохранённым тестом, чтобы не затирать эталоны после прогона; экспорт/импорт JSON через `editor-metadata` (импорт в будущем сможет опционально отбрасывать assets).
+- **Онбординг:** мастер первого запуска в popup + шаблоны; в **настройках** — **«Показать снова»** (сброс `onboardingWizardV1CompletedAt` в `chrome.storage.local`).
+- **Feature flags:** заготовки **`DATA_DRIVEN_BULK`**, **`VISUAL_REGRESSION_LITE`** (`fallbackEnabled: true` для превью до paywall).
+- **Файлы (ключевые):** `background/background*.js`, `background/message-handlers*.js`, `content/player-handlers-form.js`, `editor/editor-data-driven.js`, `editor/editor-core.js`, `editor/editor-metadata.js`, `editor/editor.html`, `editor/editor_ru.html`, `popup/popup-onboarding.js` (и связанные popup), `settings/settings*.html`, `settings/settings.js`, `i18n/en.json`, `i18n/ru.json`.
+- **Артефакт:** `.\scripts\build-release.ps1` → `dist/autotest-recorder-0.9.7.2.zip`.
+
 ## 2026-03-30 (v0.9.7.1) 📦 Сборка GitHub после аудита исходников
 
 - **Версия:** `manifest.json` **0.9.7.1**; журналы и README обновлены.

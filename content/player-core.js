@@ -432,7 +432,7 @@ class TestPlayer {
       ]);
       this.supportedSubtypes = {
         wait: new Set(['wait-value', 'wait-option', 'wait-options-count', 'wait-enabled', 'wait-until', 'wait-visible', 'wait-hidden', 'wait-exists', 'wait-not-exists']),
-        assert: new Set(['assert-value', 'assert-contains', 'assert-count', 'assert-disabled', 'assert-multiselect', 'assert-visible', 'assert-hidden', 'assert-exists', 'assert-not-exists']),
+        assert: new Set(['assert-value', 'assert-contains', 'assert-count', 'assert-disabled', 'assert-multiselect', 'assert-visible', 'assert-hidden', 'assert-exists', 'assert-not-exists', 'assert-visual-regression']),
         scroll: new Set(['scroll-element', 'scroll-top', 'scroll-bottom']),
         navigation: new Set(['nav-url', 'nav-refresh', 'nav-back', 'nav-forward', 'new-tab', 'switch-tab', 'close-tab', 'nav-get-url']),
         click: new Set(['click', 'right-click', 'double-click', 'dropdown-select', 'dropdown-multiselect', 'dropdown-deselect', 'dropdown-select-all', 'dropdown-clear-all', 'dropdown-toggle-all', 'dropdown-copy', 'dropdown-paste', 'dropdown-reorder']),
@@ -1063,6 +1063,17 @@ class TestPlayer {
   // ========================================================================
 
   /**
+   * Скриншоты «до/после» каждого шага — тяжёлые (захват всей вкладки + диск).
+   * Для wait и screenshot они почти не дают диагностики, зато раздувают прогон на десятки секунд.
+   */
+  shouldAutoCaptureStepScreenshots(action) {
+    if (!action || !action.type) return true;
+    if (action.type === 'wait') return false;
+    if (action.type === 'screenshot') return false;
+    return true;
+  }
+
+  /**
    * Выполняет массив действий последовательно
    * @param {Array} actions - Массив действий для выполнения (runtimeActions или remainingActions)
    * @param {Array} allActions - Полный массив всех действий теста (для вычисления общего количества)
@@ -1176,11 +1187,14 @@ class TestPlayer {
       // Сбрасываем ошибки консоли для нового шага
       this.consoleErrors = [];
 
-      // Скриншот ДО действия
+      const autoStepShots = this.shouldAutoCaptureStepScreenshots(action);
+      // Скриншот ДО действия (пропуск для wait/screenshot — см. shouldAutoCaptureStepScreenshots)
       let beforeScreenshot = null;
-      try {
-        beforeScreenshot = await this.takeScreenshot();
-      } catch (e) { /* ignore */ }
+      if (autoStepShots) {
+        try {
+          beforeScreenshot = await this.takeScreenshot();
+        } catch (e) { /* ignore */ }
+      }
 
       const stepStartTime = Date.now();
       let stepSuccess = true;
@@ -1338,11 +1352,13 @@ class TestPlayer {
         }).catch(() => {});
       } catch (e) { /* ignore */ }
 
-      // Скриншот ПОСЛЕ действия
+      // Скриншот ПОСЛЕ действия (те же исключения, что и для «до»)
       let afterScreenshot = null;
-      try {
-        afterScreenshot = await this.takeScreenshot();
-      } catch (e) { /* ignore */ }
+      if (autoStepShots) {
+        try {
+          afterScreenshot = await this.takeScreenshot();
+        } catch (e) { /* ignore */ }
+      }
 
       // Сохраняем шаг в историю
       this.ensureRunHistoryInitialized();

@@ -51,6 +51,12 @@
           <button id="parallelRun" class="btn btn-small btn-run-parallel" title="Запустить параллельно в нескольких вкладках">
             ⚡ Параллельный прогон
           </button>
+          <button id="dataDrivenRun" class="btn btn-small btn-run-data" title="Прогон сценария по строкам CSV (data-driven)">
+            📊 Data-driven
+          </button>
+          <button type="button" id="dataDrivenExportReportBtn" class="btn btn-small btn-run-data" disabled title="Экспорт последнего data-driven прогона в CSV">
+            📄 Data-driven CSV
+          </button>
         </div>
       </div>
       <div id="testMetadata" class="test-metadata"></div>
@@ -623,6 +629,30 @@
   </div>
 
   <!-- Модальное окно для импорта API тестов -->
+  <div id="dataDrivenModal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3 id="dataDrivenModalTitle">Прогон по данным (CSV)</h3>
+        <button type="button" class="modal-close" id="closeDataDrivenModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom: 12px; color: #555; font-size: 13px;" id="dataDrivenHint">
+          Первая строка — заголовки столбцов. Имя столбца = переменная в шагах: <code>{var:email}</code>. Не более 50 строк за прогон.
+        </p>
+        <label for="dataDrivenCsvInput" style="display:block;margin-bottom:6px;font-weight:600;">CSV</label>
+        <textarea id="dataDrivenCsvInput" class="input" rows="10" style="width:100%;font-family:monospace;font-size:12px;" placeholder="email,password&#10;user1@example.com,secret1"></textarea>
+        <small id="dataDrivenRowCount" style="display:block;margin-top:8px;color:#666;"></small>
+        <div id="dataDrivenPreview" style="margin-top:12px;overflow:auto;max-height:220px;"></div>
+      </div>
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 8px;">
+        <button type="button" id="dataDrivenExportReportModalBtn" class="btn btn-secondary" disabled title="Экспорт отчёта data-driven">📄 Экспорт отчёта (CSV)</button>
+        <button type="button" id="dataDrivenParseBtn" class="btn btn-secondary">Предпросмотр</button>
+        <button type="button" id="dataDrivenRunOptimizedBtn" class="btn btn-primary">Запуск (оптимизированный)</button>
+        <button type="button" id="dataDrivenRunFullBtn" class="btn btn-secondary">Запуск (полный)</button>
+      </div>
+    </div>
+  </div>
+
   <div id="importApiModal" class="modal">
     <div class="modal-content modal-large">
       <div class="modal-header">
@@ -696,6 +726,7 @@
   <script src="editor-action-modal.js"></script>
   <script src="editor-save.js"></script>
   <script src="editor-ui-helpers.js"></script>
+  <script src="editor-data-driven.js"></script>
   <script src="editor-metadata.js"></script>
   <script src="editor-control-flow.js"></script>
   <script src="editor-variables.js"></script>

@@ -45,6 +45,8 @@ class TestEditor {
     // Кэшированные селекторы из Analysis
     this.cachedSelectors = [];
     this.cachedSelectorsUrl = null;
+    /** Последний отчёт data-driven (для экспорта CSV); сбрасывается при смене теста. */
+    this.lastDataDrivenReport = null;
 
     // Контракт поддерживаемых действий (загружается из shared/action-types.js)
     // ИСПРАВЛЕНИЕ #30: Используем единый источник истины
@@ -64,7 +66,7 @@ class TestEditor {
       ]);
       this.runtimeSupportedSubtypes = {
         wait: new Set(['wait-value', 'wait-option', 'wait-options-count', 'wait-enabled', 'wait-until', 'wait-visible', 'wait-hidden', 'wait-exists', 'wait-not-exists']),
-        assertion: new Set(['assert-value', 'assert-contains', 'assert-count', 'assert-disabled', 'assert-multiselect', 'assert-visible', 'assert-hidden', 'assert-exists', 'assert-not-exists']),
+        assertion: new Set(['assert-value', 'assert-contains', 'assert-count', 'assert-disabled', 'assert-multiselect', 'assert-visible', 'assert-hidden', 'assert-exists', 'assert-not-exists', 'assert-visual-regression']),
         scroll: new Set(['scroll-element', 'scroll-top', 'scroll-bottom']),
         navigation: new Set(['nav-url', 'nav-refresh', 'nav-back', 'nav-forward', 'new-tab', 'switch-tab', 'close-tab', 'nav-get-url']),
         click: new Set(['click', 'right-click', 'double-click', 'dropdown-select', 'dropdown-multiselect', 'dropdown-deselect', 'dropdown-select-all', 'dropdown-clear-all', 'dropdown-toggle-all', 'dropdown-copy', 'dropdown-paste', 'dropdown-reorder']),
@@ -113,7 +115,10 @@ class TestEditor {
 
     // Загружаем тест
     await this.loadTest(testId);
-    
+    if (!this.test) {
+      return;
+    }
+
     // Обновляем кнопку группировки после загрузки теста
     this.updateGroupingButton();
 
@@ -152,6 +157,9 @@ class TestEditor {
     this.parallelRunBtn = document.getElementById('parallelRun');
     if (this.parallelRunBtn) {
       this.parallelRunBtn.addEventListener('click', () => this.playTestParallel());
+    }
+    if (typeof this.initDataDrivenModal === 'function') {
+      this.initDataDrivenModal();
     }
 
     // Инициализация быстрых шагов
@@ -327,10 +335,12 @@ class TestEditor {
     this.loadVariables();
     
     // Инициализация переменных сценария (новая система)
-    if (!this.test.variables) {
+    if (this.test && !this.test.variables) {
       this.test.variables = {};
     }
-    this.renderVariablesPanel();
+    if (this.test) {
+      this.renderVariablesPanel();
+    }
 
     // Закрытие модального окна по клику вне его
     document.getElementById('actionModal').addEventListener('click', (e) => {
@@ -961,6 +971,21 @@ class TestEditor {
         } else {
           this.showToast(this.t('editorUI.recordingStopped'), 'success');
         }
+      } else if (message.type === 'DATA_DRIVEN_RUN_COMPLETED' && this.test && message.summary && String(message.summary.testId) === String(this.test.id)) {
+        const s = message.summary;
+        this.lastDataDrivenReport = s;
+        if (typeof this.updateDataDrivenExportUi === 'function') {
+          this.updateDataDrivenExportUi();
+        }
+        const ok = s.allPassed;
+        const n = s.totalRows || 0;
+        const failed = (s.results || []).filter(r => !r.success).length;
+        this.showToast(
+          ok
+            ? this.t('editorUI.dataDrivenAllPassed', { count: n })
+            : this.t('editorUI.dataDrivenSomeFailed', { total: n, failed }),
+          ok ? 'success' : 'warning'
+        );
       } else if (message.type === 'TEST_COMPLETED' && this.test && message.testId === this.test.id) {
         if (message.adaptiveRunResults && Array.isArray(message.adaptiveRunResults) && this.test.actions) {
           message.adaptiveRunResults.forEach((result, idx) => {
@@ -1013,6 +1038,9 @@ class TestEditor {
 
   async loadTest(testId, options = {}) {
     const { silent = false } = options;
+    if (this.lastDataDrivenReport && String(this.lastDataDrivenReport.testId) !== String(testId)) {
+      this.lastDataDrivenReport = null;
+    }
     const actionsList = document.getElementById('actionsList');
     const maxRetries = 3;
     let lastError = null;
@@ -1054,6 +1082,7 @@ class TestEditor {
           this.renderMetadata();
           this.refreshOptimizationUI();
           this.loadTestGroupContext().catch(() => {});
+          if (typeof this.updateDataDrivenExportUi === 'function') this.updateDataDrivenExportUi();
           return;
         }
 
@@ -1076,6 +1105,7 @@ class TestEditor {
               this.renderMetadata();
               this.refreshOptimizationUI();
               this.loadTestGroupContext().catch(() => {});
+              if (typeof this.updateDataDrivenExportUi === 'function') this.updateDataDrivenExportUi();
               return;
             }
           } catch (storageErr) {

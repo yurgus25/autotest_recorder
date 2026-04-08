@@ -1844,10 +1844,25 @@ body.dark-theme .condition-block.collapsed .condition-branch::before {
   flex-shrink: 0;
 }
 
+/* В свёрнутом режиме строка шага узкая: длинный текст бейджа + сводка обрезались из‑за overflow.
+   Оставляем только эмодзи типа (📸 и т.д.) — полное название в title у бейджа. */
+.action-type-badge .action-type-icon {
+  margin-right: 0.35em;
+}
+
+.action-item.collapsed .action-type-badge .action-type-label {
+  display: none;
+}
+
+.action-item.collapsed .action-type-badge .action-type-icon {
+  margin-right: 0;
+}
+
 .action-item.collapsed .action-type-badge {
-  padding: 3px 10px;
+  padding: 4px 8px;
   font-size: 11px;
   border-radius: 10px;
+  text-transform: none;
 }
 
 .action-type-badge.click {
@@ -5007,3 +5022,26 @@ body.dark-theme .page-grabber-table tr:hover {
 .localstorage-variable-item:hover { background: #f5f5f5 !important; }
 .search-step-result-item { cursor: pointer; }
 .search-step-result-item:hover { background: #e5e7eb !important; }
+
+.data-driven-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-driven-preview-table th,
+.data-driven-preview-table td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  text-align: left;
+}
+.data-driven-preview-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+body.dark-theme .data-driven-preview-table th {
+  background: #333;
+  border-color: #444;
+}
+body.dark-theme .data-driven-preview-table td {
+  border-color: #444;
+}

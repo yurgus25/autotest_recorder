@@ -88,7 +88,8 @@ const SUPPORTED_SUBTYPES = {
     'assert-visible',      // Проверка видимости элемента
     'assert-hidden',       // Проверка что элемент скрыт
     'assert-exists',       // Проверка существования в DOM
-    'assert-not-exists'    // Проверка отсутствия в DOM
+    'assert-not-exists',   // Проверка отсутствия в DOM
+    'assert-visual-regression' // Сравнение скриншота с эталоном (lite)
   ]),
   assertion: new Set([    // Дублирование для Editor
     'assert-value',
@@ -99,7 +100,8 @@ const SUPPORTED_SUBTYPES = {
     'assert-visible',
     'assert-hidden',
     'assert-exists',
-    'assert-not-exists'
+    'assert-not-exists',
+    'assert-visual-regression'
   ]),
   
   // Scroll - прокрутка

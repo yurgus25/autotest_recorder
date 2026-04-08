@@ -1014,7 +1014,8 @@ TestPlayer.prototype.navigateToUrl = async function(url, actionIndexInOriginalAr
   const navStep = (actionIndexInOriginalArray !== undefined ? actionIndexInOriginalArray : this.currentActionIndex) + 1;
   const navTotal = this.getRuntimeActions(this.currentTest?.actions || []).length;
   try {
-    chrome.runtime.sendMessage({
+    // Ждём ответ фона до replace: иначе вкладка выгружается и сообщение может не дойти.
+    await chrome.runtime.sendMessage({
       type: 'TEST_STEP_COMPLETED',
       testId: this.currentTest?.id,
       step: navStep,

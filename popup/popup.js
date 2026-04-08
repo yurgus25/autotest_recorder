@@ -12,6 +12,8 @@ class PopupController {
       testsLoadError: null,
       freeTierLimit: 10,
       limitsEnabled: false,
+      tier: 'free',
+      capabilities: {},
       currentStep: 0,
       totalSteps: 0,
       stepType: null,
@@ -111,6 +113,12 @@ class PopupController {
 
       await this.loadPluginSettings();
       await this.checkAutotestsEnabled();
+      // Список из storage сразу — не ждём конца init и привязки сотен обработчиков
+      try {
+        await this.paintTestsFromStorage();
+      } catch (e) {
+        console.warn('[Popup] early paintTestsFromStorage', e);
+      }
     } catch (initError) {
       console.error('❌ [Popup] Settings load error (continuing):', initError);
       // Не прерываем — popup остаётся работоспособным
@@ -561,7 +569,9 @@ class PopupController {
       if (!fromGroupId) await this._addTestToGroup(toGroupId, fromTestId);
     });
 
-    // Слушаем обновления шагов теста и завершения теста
+    // Слушаем обновления шагов теста и завершения теста.
+    // Важно: не возвращать true для неизвестных type — иначе Chrome ждёт sendResponse от этого слушателя,
+    // а ответы на sendMessage из popup (DELETE_TEST, GET_TESTS и т.д.) не доходят до вызывающего кода.
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === 'STEP_PROGRESS_UPDATE') {
         this.state.currentStep = message.step;
@@ -570,6 +580,7 @@ class PopupController {
         this.markPlaybackActivity();
         this.updateUI();
         sendResponse({ success: true });
+        return false;
       } else if (message.type === 'STEP_COMPLETED_UPDATE') {
         // Обновляем информацию о завершенных шагах
         if (!this.state.completedSteps) {
@@ -604,6 +615,7 @@ class PopupController {
         this.markPlaybackActivity();
         this.updateUI();
         sendResponse({ success: true });
+        return false;
       } else if (message.type === 'TEST_COMPLETED') {
         // Тест завершен. Если идёт прогон группы — не сбрасываем состояние (оно сбросится по GROUP_COMPLETED).
         if (!this.state.playingGroupId) {
@@ -663,6 +675,7 @@ class PopupController {
         }, 2000); // Увеличена задержка до 2 секунд для сохранения истории
         
         sendResponse({ success: true });
+        return false;
       } else if (message.type === 'GROUP_COMPLETED') {
         // Группа завершена — сбрасываем состояние воспроизведения и оформление
         this.state.isPlaying = false;
@@ -681,13 +694,25 @@ class PopupController {
           } catch (_) {}
         }, 500);
         sendResponse({ success: true });
+        return false;
       }
-      return true;
+      return false;
     });
 
-    // Загружаем состояние и тесты
-    await this.loadState();
-    await this.loadTests();
+    // Состояние записи/воспроизведения, список тестов и видимость по тарифу — параллельно
+    // (список сначала рисуется из chrome.storage.local внутри loadTests, без ожидания service worker).
+    await Promise.all([
+      this.applyTierVisibility(),
+      this.loadState(),
+      this.loadTests()
+    ]);
+
+    window.popupControllerInstance = this;
+    if (window.AutoTestOnboarding && typeof window.AutoTestOnboarding.maybeShow === 'function') {
+      setTimeout(function() {
+        window.AutoTestOnboarding.maybeShow();
+      }, 400);
+    }
 
     // Инициализируем индикатор памяти
     this.initStorageIndicator();
@@ -757,37 +782,102 @@ class PopupController {
     }
   }
 
-  async loadTests(maxRetries = 3, retryDelay = 500) {
-    this.state.testsLoadState = 'loading';
+  static get TESTS_STORAGE_KEYS() {
+    return [
+      'tests', 'testGroups',
+      'favoriteTestIds', 'favoriteGroupIds', 'compactTests', 'filterFavorites', 'sortOrder'
+    ];
+  }
+
+  /** Наполняет state.tests / группы / избранное из результата chrome.storage.local.get */
+  applyTestsPayloadFromStored(stored) {
+    const testsObj = stored.tests && typeof stored.tests === 'object' ? stored.tests : {};
+    const tests = Object.values(testsObj).filter((t) => t && typeof t === 'object' && t.id != null);
+    const groupsObj = stored.testGroups && typeof stored.testGroups === 'object' ? stored.testGroups : {};
+    const groups = Object.values(groupsObj).filter((g) => g && typeof g === 'object' && g.id != null);
+
+    this.state.tests = tests;
+    this.state.testGroups = groups;
+
+    this.state.favoriteTestIds = new Set(Array.isArray(stored.favoriteTestIds) ? stored.favoriteTestIds : []);
+    this.state.favoriteGroupIds = new Set(Array.isArray(stored.favoriteGroupIds) ? stored.favoriteGroupIds : []);
+    if (stored.compactTests === true) this.state.compactTests = true;
+    if (typeof stored.filterFavorites === 'boolean') this.state.filterFavorites = stored.filterFavorites;
+    if (stored.sortOrder === 'newFirst' || stored.sortOrder === 'oldFirst') this.state.sortOrder = stored.sortOrder;
+  }
+
+  /**
+   * Мгновенно показать список из chrome.storage.local (без ожидания service worker).
+   */
+  async paintTestsFromStorage() {
+    const stored = await chrome.storage.local.get(PopupController.TESTS_STORAGE_KEYS);
+    this.applyTestsPayloadFromStored(stored);
+    this.state.testsLoadState = 'success';
     this.state.testsLoadError = null;
     this.renderTests();
+    this.updateUI();
+  }
+
+  /**
+   * Если service worker ещё не ответил на GET_TESTS, поднимаем список из chrome.storage.local
+   * (тот же источник, что и у фона после save) — без лишнего экрана «Не удалось загрузить».
+   */
+  async loadTestsFromStorageFallback() {
+    try {
+      const stored = await chrome.storage.local.get(PopupController.TESTS_STORAGE_KEYS);
+      this.applyTestsPayloadFromStored(stored);
+
+      this.state.testsLoadState = 'success';
+      this.state.testsLoadError = null;
+
+      console.log(`✅ [Popup] Список из storage: ${this.state.tests.length} тестов (фон не ответил вовремя или недоступен)`);
+      await this.applyTierVisibility();
+      this.renderTests();
+      this.updateUI();
+      return true;
+    } catch (e) {
+      console.warn('[Popup] loadTestsFromStorageFallback', e);
+      return false;
+    }
+  }
+
+  async loadTests(maxRetries = 5, retryDelay = 100) {
+    const fatalErrors = new Set(['FREE_TIER_LIMIT', 'TIER_REQUIRED']);
+
+    try {
+      await this.paintTestsFromStorage();
+    } catch (e) {
+      console.warn('[Popup] paintTestsFromStorage failed', e);
+      this.state.testsLoadState = 'loading';
+      this.state.testsLoadError = null;
+      this.renderTests();
+    }
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         if (!chrome.runtime?.id) {
           if (attempt < maxRetries - 1) {
-            console.log(`⏳ Extension context недействителен, повторная попытка ${attempt + 1}/${maxRetries}...`);
-            await this.delay(retryDelay);
+            console.log(`⏳ Extension context недействителен, повтор ${attempt + 1}/${maxRetries}…`);
+            await this.delay(retryDelay + attempt * 60);
             continue;
           }
-          this.state.testsLoadState = 'error';
-          this.state.testsLoadError = this.t('popup.extensionRestarting');
-          this.state.tests = [];
-          this.renderTests();
-          return;
+          break;
         }
 
-        console.log(`📋 Запрос списка тестов... (попытка ${attempt + 1}/${maxRetries})`);
+        if (attempt > 0) {
+          console.log(`📋 Запрос списка тестов… (попытка ${attempt + 1}/${maxRetries})`);
+        }
         const response = await chrome.runtime.sendMessage({ type: 'GET_TESTS' });
 
         if (response && response.success) {
           this.state.testsLoadState = 'success';
           this.state.testsLoadError = null;
           this.state.tests = response.tests || [];
-          // Группы тестов (группировка списка и запуск групп)
           this.state.testGroups = response.groups || [];
           if (response.freeTierLimit !== undefined) this.state.freeTierLimit = response.freeTierLimit;
           if (response.limitsEnabled !== undefined) this.state.limitsEnabled = response.limitsEnabled;
+          if (response.tier) this.state.tier = response.tier;
+          if (response.capabilities) this.state.capabilities = response.capabilities;
           try {
             const stored = await chrome.storage.local.get(['favoriteTestIds', 'favoriteGroupIds', 'compactTests', 'filterFavorites', 'sortOrder']);
             this.state.favoriteTestIds = new Set(Array.isArray(stored.favoriteTestIds) ? stored.favoriteTestIds : []);
@@ -800,36 +890,60 @@ class PopupController {
             this.state.favoriteGroupIds = new Set();
           }
           console.log(`✅ Загружено ${this.state.tests.length} тестов`);
+          await this.applyTierVisibility();
           this.renderTests();
-          // После загрузки тестов и групп можем пересчитать оформление полосы прогресса (цвет группы)
           this.updateUI();
           return;
         }
 
-        this.state.testsLoadState = 'error';
-        this.state.testsLoadError = response?.error || this.t('popup.loadTestsFailed');
-        this.state.tests = [];
-        this.renderTests();
-        return;
-      } catch (error) {
-        if (error.message && error.message.includes('Receiving end does not exist')) {
-          if (attempt < maxRetries - 1) {
-            await this.delay(retryDelay);
-            continue;
-          }
+        const errCode = response && response.error ? String(response.error) : '';
+        if (fatalErrors.has(errCode)) {
           this.state.testsLoadState = 'error';
-          this.state.testsLoadError = this.t('popup.backgroundNotResponding');
+          this.state.testsLoadError = response.error || this.t('popup.loadTestsFailed');
           this.state.tests = [];
           this.renderTests();
           return;
         }
-        this.state.testsLoadState = 'error';
-        this.state.testsLoadError = error.message || this.t('popup.loadTestsError');
-        this.state.tests = [];
-        this.renderTests();
-        return;
+
+        if (attempt < maxRetries - 1) {
+          console.warn(`⚠️ GET_TESTS без успеха (попытка ${attempt + 1}/${maxRetries}), повтор…`, response);
+          await this.delay(retryDelay + attempt * 60);
+          continue;
+        }
+        break;
+      } catch (error) {
+        const msg = error && error.message ? String(error.message) : '';
+        if (attempt < maxRetries - 1) {
+          if (msg.includes('Receiving end does not exist')) {
+            console.warn(`⚠️ Фон не готов (попытка ${attempt + 1}/${maxRetries})`);
+          } else {
+            console.warn(`⚠️ Ошибка GET_TESTS (попытка ${attempt + 1}/${maxRetries}):`, msg || error);
+          }
+          await this.delay(retryDelay + attempt * 60);
+          continue;
+        }
+        break;
       }
     }
+
+    if (this.state.testsLoadState === 'success' && Array.isArray(this.state.tests)) {
+      console.log(`✅ [Popup] Оставляем список из storage (${this.state.tests.length} тестов), фон не ответил`);
+      await this.applyTierVisibility();
+      this.renderTests();
+      this.updateUI();
+      return;
+    }
+
+    if (await this.loadTestsFromStorageFallback()) {
+      return;
+    }
+
+    this.state.testsLoadState = 'error';
+    this.state.testsLoadError = !chrome.runtime?.id
+      ? this.t('popup.extensionRestarting')
+      : this.t('popup.backgroundNotResponding');
+    this.state.tests = [];
+    this.renderTests();
   }
 
   delay(ms) {
@@ -1003,14 +1117,25 @@ class PopupController {
   async playTest(testId) {
     // Очищаем завершенные шаги при начале нового теста
     this.state.completedSteps = [];
-    this.showToast(this.t('popup.refreshPageWarning'), 'warning');
     // Одиночный тест — полоса стандартная, не цвет группы
     this.state.playingGroupId = null;
-    
+
     if (this.state.isPlaying && !this.state.isPaused) {
       alert(this.t('popup.alertAlreadyPlaying'));
       return;
     }
+
+    const test = (this.state.tests || []).find((t) => String(t.id) === String(testId));
+    if (test) {
+      const runMode = test.optimization?.optimizedAvailable === true ? 'optimized' : 'full';
+      const actionsForRun = (test.actions || []).filter((a) => (runMode === 'full' ? true : !a.hidden));
+      if (actionsForRun.length === 0) {
+        this.showToast(this.t('popup.noStepsToPlay'), 'warning');
+        return;
+      }
+    }
+
+    this.showToast(this.t('popup.refreshPageWarning'), 'warning');
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -1031,11 +1156,21 @@ class PopupController {
           this.loadState();
         }, 5000);
       } else {
-        alert(this.t('popup.alertPlaybackError', {msg: response.error || this.t('common.unknownError')}));
+        if (response.error === 'NO_STEPS_TO_PLAY') {
+          this.showToast(this.t('popup.noStepsToPlay'), 'warning');
+        } else {
+          const hint = window.i18n && typeof window.i18n.playbackUserMessage === 'function'
+            ? window.i18n.playbackUserMessage(response.error)
+            : this.t('popup.playbackHintGeneric');
+          alert(hint);
+        }
       }
     } catch (error) {
       console.error('Error playing test:', error);
-      alert(this.t('popup.alertPlaybackFailed'));
+      const hint = window.i18n && typeof window.i18n.playbackUserMessage === 'function'
+        ? window.i18n.playbackUserMessage(error && error.message)
+        : this.t('popup.alertPlaybackFailed');
+      alert(hint);
     }
   }
 
@@ -1245,6 +1380,10 @@ class PopupController {
             const stepDurationStr = this.formatDuration(step.duration);
             const stepSuccessIcon = step.success ? '✓' : '✗';
             const stepSuccessClass = step.success ? 'step-success' : 'step-error';
+            const shotHint = this.escapeHtml(this.t('popup.stepScreenshotHint'));
+            const shotBadge = this.stepHistoryHasScreenshot(step)
+              ? `<span class="step-screenshot-indicator" title="${shotHint}">📷</span>`
+              : '';
             
             const expectedSelector = step.expectedSelector || 'N/A';
             const actualSelector = step.actualSelector || step.expectedSelector || 'N/A';
@@ -1273,6 +1412,7 @@ class PopupController {
                   <span class="step-number">${this.t('popup.stepNumber', {n: step.stepNumber})}</span>
                   <span class="step-type">${this.getActionTypeLabel(step.actionType || step.type)}</span>
                   <span class="step-status ${stepSuccessClass}">${stepSuccessIcon}</span>
+                  ${shotBadge}
                   <span class="step-duration">${stepDurationStr}</span>
                 </div>
                 <div class="step-details">
@@ -1660,6 +1800,17 @@ class PopupController {
     return this.getActionTypeIcon(type);
   }
 
+  /** Есть ли у шага в истории сохранённый скриншот (данные или путь на диске). */
+  stepHistoryHasScreenshot(step) {
+    if (!step || typeof step !== 'object') return false;
+    if (step.screenshot || step.beforeScreenshot || step.afterScreenshot) return true;
+    if (step.screenshotPath || step.beforeScreenshotPath || step.afterScreenshotPath || step.errorScreenshotPath) return true;
+    const sc = step.screenshotComparison;
+    if (sc && (sc.diffImage || sc.diffImagePath)) return true;
+    if (step.screenshotComparisonView || step.screenshotComparisonViewPath) return true;
+    return false;
+  }
+
   formatDuration(ms) {
     if (!ms) return '0' + this.t('common.ms');
     if (ms < 1000) return `${ms}` + this.t('common.ms');
@@ -1709,24 +1860,132 @@ class PopupController {
   }
 
   async deleteTest(testId) {
-    if (!confirm(this.t('editor.deleteConfirm'))) {
+    if (!confirm(this.t('popup.confirmDeleteTest'))) {
       return;
     }
 
-    try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'DELETE_TEST',
-        testId: testId
-      });
+    const id = String(testId);
+    const maxRetries = 6;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (!chrome.runtime?.id) {
+          if (attempt < maxRetries - 1) {
+            await this.delay(250 + attempt * 120);
+            continue;
+          }
+          break;
+        }
+        const response = await chrome.runtime.sendMessage({
+          type: 'DELETE_TEST',
+          testId: id
+        });
 
-      if (response.success) {
-        await this.loadTests();
-      } else {
-        alert(this.t('common.error'));
+        if (response && response.success) {
+          await this.loadTests();
+          return;
+        }
+        if (response && !response.success && attempt === maxRetries - 1) {
+          alert(response.error || this.t('common.error'));
+          return;
+        }
+      } catch (error) {
+        console.warn(`DELETE_TEST attempt ${attempt + 1}/${maxRetries}:`, error);
+        if (attempt < maxRetries - 1) {
+          await this.delay(250 + attempt * 120);
+          continue;
+        }
       }
-    } catch (error) {
-      console.error('Error deleting test:', error);
-      alert(this.t('common.error'));
+    }
+
+    if (await this.deleteTestStorageFallback(id)) {
+      await this.loadTestsFromStorageFallback();
+      this.showToast(this.t('popup.testDeletedOffline'), 'warning');
+      return;
+    }
+
+    alert(this.t('common.error'));
+  }
+
+  /**
+   * Если service worker не ответил, удаляем тест из chrome.storage.local (как делает фон после DELETE_TEST).
+   */
+  async deleteTestStorageFallback(testId) {
+    const id = String(testId);
+    try {
+      const stored = await chrome.storage.local.get(['tests', 'testGroups', 'testHistory']);
+      const testsObj =
+        stored.tests && typeof stored.tests === 'object' ? { ...stored.tests } : {};
+      let removed = false;
+      if (testsObj[id] != null) {
+        delete testsObj[id];
+        removed = true;
+      } else if (/^\d+$/.test(id)) {
+        const n = Number(id);
+        if (testsObj[n] != null) {
+          delete testsObj[n];
+          removed = true;
+        }
+      }
+      if (!removed) {
+        for (const k of Object.keys(testsObj)) {
+          const t = testsObj[k];
+          if (t && (String(t.id) === id || String(k) === id)) {
+            delete testsObj[k];
+            removed = true;
+            break;
+          }
+        }
+      }
+      if (!removed) return false;
+
+      await chrome.storage.local.set({ tests: testsObj });
+
+      const groupsObj =
+        stored.testGroups && typeof stored.testGroups === 'object'
+          ? { ...stored.testGroups }
+          : {};
+      let groupsChanged = false;
+      for (const [gid, g] of Object.entries(groupsObj)) {
+        if (g && Array.isArray(g.testIds)) {
+          const filtered = g.testIds.filter((tid) => String(tid) !== id);
+          if (filtered.length !== g.testIds.length) {
+            groupsObj[gid] = {
+              ...g,
+              testIds: filtered,
+              updatedAt: new Date().toISOString()
+            };
+            groupsChanged = true;
+          }
+        }
+      }
+      if (groupsChanged) {
+        await chrome.storage.local.set({ testGroups: groupsObj });
+      }
+
+      const hist =
+        stored.testHistory && typeof stored.testHistory === 'object'
+          ? { ...stored.testHistory }
+          : {};
+      let histChanged = false;
+      if (hist[id] != null) {
+        delete hist[id];
+        histChanged = true;
+      }
+      if (/^\d+$/.test(id)) {
+        const n = Number(id);
+        if (hist[n] != null) {
+          delete hist[n];
+          histChanged = true;
+        }
+      }
+      if (histChanged) {
+        await chrome.storage.local.set({ testHistory: hist });
+      }
+
+      return true;
+    } catch (e) {
+      console.warn('[Popup] deleteTestStorageFallback', e);
+      return false;
     }
   }
 
@@ -1880,6 +2139,7 @@ class PopupController {
 
   async renderTests() {
     const testsList = document.getElementById('testsList');
+    if (!testsList) return;
     testsList.classList.remove('skeleton');
     testsList.classList.toggle('tests-list-compact', !!this.state.compactTests);
     this.updateTestsHeaderButtons();
@@ -3540,13 +3800,14 @@ class PopupController {
   /**
    * Показывает или скрывает кнопку перехода на дашборд аналитики в зависимости от настройки.
    */
-  updateAnalyticsDashboardButton() {
+  async updateAnalyticsDashboardButton() {
     const btn = document.getElementById('analyticsDashboardButton');
     if (!btn) return;
     const enabled = this.pluginSettings?.analytics?.enabled === true;
+    const access = await this.requestAccessDecision('analytics.view');
     const url = chrome.runtime.getURL('analytics/analytics-dashboard.html');
     btn.href = url;
-    if (enabled) {
+    if (enabled && access.allowed !== false) {
       btn.classList.remove('hidden');
     } else {
       btn.classList.add('hidden');
@@ -3699,7 +3960,42 @@ class PopupController {
         this.checkAutotestsEnabled();
         console.log('✅ Настройки обновлены:', this.pluginSettings);
       }
+      if (namespace === 'local' && (changes.license || changes.tierAccessRolloutEnabled)) {
+        this.applyTierVisibility();
+      }
     });
+  }
+
+  async requestAccessDecision(action) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'CHECK_ACCESS',
+        action,
+        context: { source: 'popup' }
+      });
+      if (!response?.success) return { allowed: true };
+      return response;
+    } catch (_) {
+      return { allowed: true };
+    }
+  }
+
+  async applyTierVisibility() {
+    try {
+      const nodes = document.querySelectorAll('[data-access-action]');
+      await Promise.all(
+        Array.from(nodes).map(async (node) => {
+          const action = node.getAttribute('data-access-action');
+          if (!action) return;
+          const decision = await this.requestAccessDecision(action);
+          const shouldShow = decision.allowed !== false;
+          node.classList.toggle('hidden', !shouldShow);
+          node.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        })
+      );
+    } catch (error) {
+      console.warn('[Popup] applyTierVisibility failed:', error);
+    }
   }
 
   /**

@@ -2,6 +2,34 @@
   AutoTest Recorder & Player - История изменений
 ═══════════════════════════════════════════════════════════════════════════════
 
+Версия 0.9.7.4 (2026-04-02) 🎬 Воспроизведение: вкладка и NAVIGATE
+───────────────────────────────────────────────────────────────────────────────
+• manifest 0.9.7.4
+• playbackTabId + tabs.onRemoved: при закрытии вкладки прогона — TEST_COMPLETED (ошибка), сброс isPlaying / playbackState
+• navigate: await TEST_STEP_COMPLETED до location.replace
+• background* + message-handlers* + content/player-handlers-extended.js
+• dist/autotest-recorder-0.9.7.4.zip
+
+───────────────────────────────────────────────────────────────────────────────
+Версия 0.9.7.3 (2026-04-01) ⚡ Popup: быстрый список тестов
+───────────────────────────────────────────────────────────────────────────────
+• manifest 0.9.7.3
+• Список тестов: сначала chrome.storage.local, потом GET_TESTS; короче ретраи; при успехе из storage не показывать «фон не отвечает»
+• Init: ранний paint списка после настроек; Promise.all(applyTierVisibility, loadState, loadTests); параллельные CHECK_ACCESS в applyTierVisibility
+• popup/popup.js: TESTS_STORAGE_KEYS, applyTestsPayloadFromStored
+• dist/autotest-recorder-0.9.7.3.zip
+
+───────────────────────────────────────────────────────────────────────────────
+Версия 0.9.7.2 (2026-04-01) 📦 Roadmap: data-driven, visual regression lite, онбординг
+───────────────────────────────────────────────────────────────────────────────
+• manifest 0.9.7.2
+• Data-driven: прогон по строкам CSV → переменные контекста, очередь в background, сводка по строкам; редактор — UI + экспорт отчёта CSV (pass/fail; позже Premium)
+• Visual regression lite: эталоны в extensionAssets.visualRegressionBaselines (JSON теста); MERGE_TEST_EXTENSION_ASSETS; UPDATE_TEST сохраняет/мержит extensionAssets; плеер: тест → legacy storage
+• Онбординг: мастер + шаблоны; настройки — «Показать снова» (сброс onboardingWizardV1CompletedAt)
+• Feature flags: DATA_DRIVEN_BULK, VISUAL_REGRESSION_LITE (preview)
+• dist/autotest-recorder-0.9.7.2.zip
+
+───────────────────────────────────────────────────────────────────────────────
 Версия 0.9.7.1 (2026-03-30) 📦 Сборка GitHub: аудит исходников + 0.9.7.1
 ───────────────────────────────────────────────────────────────────────────────
 • manifest 0.9.7.1; CHANGELOG / README; нейтральные формулировки; плеер app-select без глобального пути; FormControl по form + кастомные предки; .gitignore; build-release исключает temp_kr2; dist/autotest-recorder-0.9.7.1.zip

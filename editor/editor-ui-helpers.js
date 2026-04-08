@@ -367,7 +367,12 @@ TestEditor.prototype.playTest = async function(mode = null, options = {}) {
     const actionsToCheck = (this.test.actions || []).filter(action => {
       return actualMode === 'full' ? true : !action.hidden;
     });
-    
+
+    if (actionsToCheck.length === 0) {
+      this.showToast(this.t ? this.t('popup.noStepsToPlay') : 'This test has no steps to run.', 'warning');
+      return;
+    }
+
     const hasVisualActions = actionsToCheck.some(action => {
       if (visualActionTypes.includes(action.type)) {
         return true;
@@ -431,11 +436,21 @@ TestEditor.prototype.playTest = async function(mode = null, options = {}) {
         alert(this.t('editorUI.runStarted', { mode: modeLabel }));
       }
     } else {
-      alert(this.t('editorUI.playbackError') + ': ' + (response.error || this.t('common.unknownError')));
+      if (response.error === 'NO_STEPS_TO_PLAY') {
+        this.showToast(this.t ? this.t('popup.noStepsToPlay') : 'This test has no steps to run.', 'warning');
+      } else {
+        const hint = typeof window !== 'undefined' && window.i18n && typeof window.i18n.playbackUserMessage === 'function'
+          ? window.i18n.playbackUserMessage(response.error)
+          : ((this.t ? this.t('editorUI.playbackError') : 'Playback error') + ': ' + (response.error || ''));
+        alert(hint);
+      }
     }
   } catch (error) {
     console.error('Error playing test:', error);
-    alert(this.t('editorUI.playbackError2'));
+    const hint = typeof window !== 'undefined' && window.i18n && typeof window.i18n.playbackUserMessage === 'function'
+      ? window.i18n.playbackUserMessage(error && error.message)
+      : this.t('editorUI.playbackError2');
+    alert(hint);
   }
 }
 

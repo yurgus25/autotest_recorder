@@ -9,6 +9,10 @@
  * - Extensible: add new languages by adding JSON files
  * 
  * Supported languages: en, ru (more can be added)
+ *
+ * Chrome-native locale: manifest name/description use __MSG_*__ from _locales/
+ * (see default_locale in manifest.json). Initial language aligns with
+ * chrome.i18n.getUILanguage() when no saved preference exists.
  */
 
 class I18n {
@@ -136,6 +140,44 @@ class I18n {
   }
 
   /**
+   * Превращает техническое сообщение об ошибке запуска/воспроизведения в короткую подсказку для пользователя.
+   * Детали ошибки остаются в консоли (см. вызовы console.warn в обработчиках).
+   * @param {string|undefined|null} technicalError
+   * @returns {string}
+   */
+  playbackUserMessage(technicalError) {
+    const msg = String(technicalError == null ? '' : technicalError);
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[AutoTest] Playback technical detail:', technicalError);
+    }
+    if (!msg.trim()) {
+      return this.t('popup.playbackHintGeneric');
+    }
+    if (/trim is not a function/i.test(msg)) {
+      return this.t('popup.playbackHintInvalidUrlField');
+    }
+    if (/is not a function/i.test(msg) && /(url|value|selector|stringify|startsWith)/i.test(msg)) {
+      return this.t('popup.playbackHintInvalidStepField');
+    }
+    if (/Receiving end does not exist|Could not establish connection/i.test(msg)) {
+      return this.t('popup.playbackHintExtensionBusy');
+    }
+    if (/NO_STEPS_TO_PLAY/i.test(msg)) {
+      return this.t('popup.noStepsToPlay');
+    }
+    if (/Test not found/i.test(msg)) {
+      return this.t('popup.playbackHintTestMissing');
+    }
+    if (/No active tab found|Failed to send message to tab|Failed to open tab/i.test(msg)) {
+      return this.t('popup.playbackHintNeedTab');
+    }
+    if (/Нет вкладки|не удалось отправить|Не удалось открыть вкладку/i.test(msg)) {
+      return this.t('popup.playbackHintNeedTab');
+    }
+    return this.t('popup.playbackHintGeneric');
+  }
+
+  /**
    * Apply translations to all DOM elements with data-i18n attributes
    * Supports:
    *   data-i18n="key"              → textContent
@@ -203,9 +245,20 @@ class I18n {
   // ─── Private ───
 
   _detectBrowserLang() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') {
+        const ui = chrome.i18n.getUILanguage() || '';
+        const base = (ui.split(/[-_]/)[0] || '').toLowerCase();
+        if (this.getSupportedLanguages().includes(base)) {
+          return base;
+        }
+      }
+    } catch (e) {
+      /* content/offscreen contexts without chrome.i18n */
+    }
     const langs = navigator.languages || [navigator.language || navigator.userLanguage || 'en'];
     for (const lang of langs) {
-      const code = lang.split('-')[0].toLowerCase();
+      const code = (lang.split('-')[0] || '').toLowerCase();
       if (this.getSupportedLanguages().includes(code)) {
         return code;
       }

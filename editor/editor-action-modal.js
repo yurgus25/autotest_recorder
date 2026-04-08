@@ -344,7 +344,24 @@ TestEditor.prototype.getActionFormHTML = function(action) {
         <option value="assert-count" ${action.subtype === 'assert-count' ? 'selected' : ''}>🔢 ${this.t('editorUI.assertCount') || 'Count'}</option>
         <option value="assert-disabled" ${action.subtype === 'assert-disabled' ? 'selected' : ''}>🔘 ${this.t('editorUI.assertDisabled') || 'State'}</option>
         <option value="assert-multiselect" ${action.subtype === 'assert-multiselect' ? 'selected' : ''}>☑️ ${this.t('editorUI.assertMultiselect') || 'Multiselect'}</option>
+        <option value="assert-visual-regression" ${action.subtype === 'assert-visual-regression' ? 'selected' : ''}>📸 ${this.t('editorUI.assertVisualRegression') || 'Visual regression (lite)'}</option>
       </select>
+    </div>
+
+    <div class="form-group" id="visualRegressionOptionsGroup" style="display: none;">
+      <label>${this.t('editorUI.visualRegressionScope') || 'Capture scope'}</label>
+      <select id="visualRegressionScope">
+        <option value="viewport">${this.t('editorUI.visualRegressionScopeViewport') || 'Viewport'}</option>
+        <option value="element">${this.t('editorUI.visualRegressionScopeElement') || 'Element'}</option>
+      </select>
+      <label style="margin-top:10px;display:block;">${this.t('editorUI.visualRegressionMaxDiff') || 'Max diff %'}</label>
+      <input type="number" id="visualRegressionMaxDiff" class="input" min="0.01" max="100" step="0.01" value="0.5">
+      <label style="margin-top:10px;display:block;">${this.t('editorUI.visualRegressionPixelThreshold') || 'Pixel threshold'}</label>
+      <input type="number" id="visualRegressionPixelThreshold" class="input" min="0.01" max="1" step="0.01" value="0.12">
+      <label style="margin-top:10px;display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="visualRegressionUpdateBaseline">
+        <span>${this.t('editorUI.visualRegressionUpdateBaseline') || 'Update baseline'}</span>
+      </label>
     </div>
 
     <!-- Выпадающее меню подтипов для Clipboard -->
@@ -1687,7 +1704,7 @@ TestEditor.prototype.updateFormForActionType = function(subtype = null) {
     'variableUrlPatternGroup', 'variableSelectorGroup', 'variableExtractTypeGroup',
     'variableSetValueGroup', 'variableCalculateGroup',
     'switchTabGroup', 'navSubtypeGroup', 'navGetUrlGroup',
-    'waitSubtypeGroup', 'assertSubtypeGroup',
+    'waitSubtypeGroup', 'assertSubtypeGroup', 'visualRegressionOptionsGroup',
     'clipboardSubtypeGroup', 'clipboardVariableNameGroup', 'clipboardTextGroup',
     'networkSubtypeGroup', 'networkUrlPatternGroup', 'networkTimeoutGroup', 'networkIdleTimeGroup',
     'networkExpectedStatusGroup', 'networkSaveToVariableGroup',
@@ -2539,8 +2556,23 @@ TestEditor.prototype.applyWaitSubtype = function(subtype) {
 TestEditor.prototype.applyAssertionSubtype = function(subtype) {
   const selectorGroup = document.getElementById('selectorGroup');
   const selectorValueGroup = document.getElementById('selectorValueGroup');
-  
-  // Для всех assertions нужен селектор
+  const vrGroup = document.getElementById('visualRegressionOptionsGroup');
+  if (vrGroup) vrGroup.style.display = subtype === 'assert-visual-regression' ? 'block' : 'none';
+
+  if (subtype === 'assert-visual-regression') {
+    const scopeEl = document.getElementById('visualRegressionScope');
+    if (scopeEl && !scopeEl.dataset.listenerAttached) {
+      scopeEl.dataset.listenerAttached = '1';
+      scopeEl.addEventListener('change', () => this.applyAssertionSubtype('assert-visual-regression'));
+    }
+    const scope = scopeEl?.value || 'element';
+    const needSel = scope === 'element';
+    if (selectorGroup) selectorGroup.classList.toggle('hidden', !needSel);
+    if (selectorValueGroup) selectorValueGroup.classList.toggle('hidden', !needSel);
+    return;
+  }
+
+  // Для остальных assertions нужен селектор
   if (selectorGroup) selectorGroup.classList.remove('hidden');
   if (selectorValueGroup) selectorValueGroup.classList.remove('hidden');
   
@@ -2602,6 +2634,17 @@ TestEditor.prototype.populateSubtypeFieldsFromAction = function(subtype) {
       if (urlEl) urlEl.value = st.urlPattern || '';
       if (titleEl) titleEl.value = st.titlePattern || '';
       this.updateSwitchTabModeVisibility?.();
+      break;
+    }
+    case 'assert-visual-regression': {
+      const sc = document.getElementById('visualRegressionScope');
+      if (sc) sc.value = action.visualRegressionScope || 'element';
+      const md = document.getElementById('visualRegressionMaxDiff');
+      if (md) md.value = action.maxDiffPercent != null ? String(action.maxDiffPercent) : '0.5';
+      const pt = document.getElementById('visualRegressionPixelThreshold');
+      if (pt) pt.value = action.visualRegressionPixelThreshold != null ? String(action.visualRegressionPixelThreshold) : '0.12';
+      const ub = document.getElementById('visualRegressionUpdateBaseline');
+      if (ub) ub.checked = action.visualRegressionUpdateBaseline === true;
       break;
     }
     default:
@@ -3241,7 +3284,15 @@ TestEditor.prototype.validateAssertionSubtype = function(subtype) {
   const result = { valid: true, message: '' };
   const selectorValue = document.getElementById('selectorValue')?.value;
   
-  // Для всех assertions нужен селектор
+  if (subtype === 'assert-visual-regression') {
+    const scope = document.getElementById('visualRegressionScope')?.value || 'element';
+    if (scope === 'element' && !selectorValue) {
+      return { valid: false, message: this.t('editorUI.selectorRequired') || 'Укажите селектор элемента' };
+    }
+    return result;
+  }
+
+  // Для остальных assertions нужен селектор
   if (!selectorValue) {
     return { valid: false, message: 'Укажите селектор элемента' };
   }
@@ -3402,6 +3453,24 @@ TestEditor.prototype.saveAssertionSubtypeFields = function(action, subtype) {
       const valuesText = document.getElementById('expectedValues')?.value;
       action.expectedValues = valuesText.split('\n').map(v => v.trim()).filter(v => v);
       break;
+
+    case 'assert-visual-regression': {
+      action.visualRegressionScope = document.getElementById('visualRegressionScope')?.value || 'element';
+      action.maxDiffPercent = parseFloat(document.getElementById('visualRegressionMaxDiff')?.value) || 0.5;
+      action.visualRegressionPixelThreshold = parseFloat(document.getElementById('visualRegressionPixelThreshold')?.value) || 0.12;
+      action.visualRegressionUpdateBaseline = document.getElementById('visualRegressionUpdateBaseline')?.checked === true;
+      const existingAssert = this.currentEditingAction >= 0 && this.test?.actions
+        ? this.test.actions[this.currentEditingAction]
+        : null;
+      if (!action.visualRegressionKey) {
+        action.visualRegressionKey = existingAssert?.visualRegressionKey
+          || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      }
+      if (action.visualRegressionScope === 'viewport') {
+        action.selector = null;
+      }
+      break;
+    }
   }
 }
 

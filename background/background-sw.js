@@ -214,6 +214,7 @@
       this.totalSteps = 0;
       this.stepType = null;
       this.playbackState = null;
+      this.playbackTabId = null;
       this.recordInsertIndex = null;
       this.recordedActionsCount = 0;
       this.recordMarkerActionIndex = null;
@@ -225,6 +226,7 @@
       this.groupContext = {};
       this.groupRunMode = "optimized";
       this.groupDebugMode = false;
+      this.dataDrivenState = null;
       this.messageRegistry = new MessageRegistry(this);
       this.init();
     }
@@ -352,6 +354,51 @@
         });
         registerBackgroundMessageHandlers(this, this.messageRegistry);
         console.log("\u2705 Background script \u0438\u043D\u0438\u0446\u0438\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D, \u0441\u043B\u0443\u0448\u0430\u0442\u0435\u043B\u044C \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D");
+      });
+    }
+    onPlaybackTabRemoved(tabId) {
+      var _a, _b, _c, _d;
+      if (!this.isPlaying || this.playbackTabId == null || this.playbackTabId !== tabId) {
+        return;
+      }
+      const testId = (_b = (_a = this.playbackState) == null ? void 0 : _a.test) == null ? void 0 : _b.id;
+      const testName = (_d = (_c = this.playbackState) == null ? void 0 : _c.test) == null ? void 0 : _d.name;
+      this.playbackTabId = null;
+      const self = this;
+      __async(null, null, function* () {
+        try {
+          if (testId) yield self.stopVideoRecordingIfActive(testId);
+        } catch (e) {
+        }
+        self.isPlaying = false;
+        self.currentStep = 0;
+        self.totalSteps = 0;
+        self.stepType = null;
+        self.playbackState = null;
+        try {
+          yield chrome.storage.local.remove("playbackState");
+        } catch (e) {
+        }
+        try {
+          yield self.broadcast({
+            type: "TEST_COMPLETED",
+            testId: testId || "",
+            testName,
+            success: false,
+            error: "\u0412\u043A\u043B\u0430\u0434\u043A\u0430 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u0437\u0430\u043A\u0440\u044B\u0442\u0430"
+          });
+        } catch (e) {
+        }
+        try {
+          yield self.broadcast({
+            type: "STEP_PROGRESS_UPDATE",
+            step: 0,
+            total: 0,
+            stepType: null,
+            testId: testId
+          });
+        } catch (e) {
+        }
       });
     }
     handleMessage(message, sender, sendResponse) {
@@ -512,11 +559,16 @@
                 }
                 const analysisModule = yield _ensureAnalysisModule();
                 let { tabId, analysisType, url, fillOptions, containerSelector, targetValue } = message;
+                const actionName = self.ActionCatalog ? self.ActionCatalog.RUN_ANALYSIS : "analysis.run";
+                const accessDecision = self.AccessPolicy && self.AccessPolicy.can ? yield self.AccessPolicy.can(actionName, { analysisType }) : { allowed: true };
                 const isEnabled = yield FeatureFlags.isEnabled("ANALYSIS_STEP");
-                if (!isEnabled) {
+                if (!accessDecision.allowed || !isEnabled) {
                   safeSendResponse({
                     success: false,
-                    error: "Analysis feature is not enabled. Please upgrade to Pro."
+                    error: accessDecision.allowed ? "Analysis feature is not enabled. Please upgrade to Pro." : "TIER_REQUIRED",
+                    requiredTier: accessDecision.requiredTier || "premium",
+                    tier: accessDecision.tier || "free",
+                    action: actionName
                   });
                   return;
                 }
@@ -730,6 +782,21 @@
               }
               return;
             }
+            case "CHECK_ACCESS": {
+              try {
+                const action = (message == null ? void 0 : message.action) || "";
+                const context = (message == null ? void 0 : message.context) || null;
+                if (!self.AccessPolicy || !self.AccessPolicy.can) {
+                  safeSendResponse({ success: true, allowed: true, action });
+                  return;
+                }
+                const decision = yield self.AccessPolicy.can(action, context);
+                safeSendResponse(__spreadValues({ success: true }, decision));
+              } catch (e) {
+                safeSendResponse({ success: false, error: e.message });
+              }
+              return;
+            }
             case "TEST_STEP_PROGRESS":
               break;
             case "TEST_STEP_COMPLETED":
@@ -781,17 +848,41 @@
           const hasOptimization = ((_a = testToCheck == null ? void 0 : testToCheck.optimization) == null ? void 0 : _a.optimizedAvailable) === true;
           runMode = hasOptimization ? "optimized" : "full";
         }
-        this.isPlaying = true;
-        this.currentStep = 0;
-        this.totalSteps = 0;
-        this.stepType = null;
-        this.playbackState = null;
         let testToPlay = message.test && message.test.id === message.testId
           ? message.test
           : this.tests.get(message.testId);
         if (!testToPlay) {
           safeSendResponse({ success: false, error: "Test not found" });
           return;
+        }
+        const actionsForRun = (testToPlay.actions || []).filter((action) => {
+          return runMode === "full" ? true : !action.hidden;
+        });
+        if (actionsForRun.length === 0) {
+          safeSendResponse({ success: false, error: "NO_STEPS_TO_PLAY" });
+          return;
+        }
+        this.isPlaying = true;
+        this.currentStep = 0;
+        this.totalSteps = 0;
+        this.stepType = null;
+        this.playbackState = null;
+        if (!message.dataDrivenStart && !message._fromDataDrivenQueue && this.dataDrivenState) {
+          this.dataDrivenState = null;
+        }
+        if (message.dataDrivenStart && Array.isArray(message.dataDrivenRows) && message.dataDrivenRows.length > 0) {
+          const MAX_DATA_DRIVEN_ROWS = 50;
+          const rows = message.dataDrivenRows.slice(0, MAX_DATA_DRIVEN_ROWS);
+          this.dataDrivenState = {
+            testId: message.testId,
+            rows,
+            index: 0,
+            mode: runMode,
+            debugMode: !!message.debugMode,
+            test: message.test && message.test.id === message.testId ? message.test : testToPlay,
+            results: []
+          };
+          message.groupContext = __spreadValues(__spreadValues({}, message.groupContext || {}), rows[0]);
         }
         let testToSend = testToPlay;
         if (message.groupContext && typeof message.groupContext === "object" && Object.keys(message.groupContext).length > 0) {
@@ -803,14 +894,15 @@
           testToSend = __spreadProps(__spreadValues({}, testToPlay), { variables: merged });
         }
         const playPayloadBase = { type: "PLAY_TEST", test: testToSend, mode: runMode, debugMode: message.debugMode || false };
+        if (this.dataDrivenState && String(this.dataDrivenState.testId) === String(message.testId)) {
+          playPayloadBase.dataDrivenRowIndex = this.dataDrivenState.index;
+          playPayloadBase.dataDrivenRowTotal = this.dataDrivenState.rows.length;
+        }
         if (message.isGroupRun) {
           playPayloadBase.isGroupRun = true;
           playPayloadBase.groupRunCurrentIndex = message.groupRunCurrentIndex;
           playPayloadBase.groupRunTotal = message.groupRunTotal;
         }
-        const actionsForRun = (testToPlay.actions || []).filter((action) => {
-          return runMode === "full" ? true : !action.hidden;
-        });
         this.totalSteps = actionsForRun.length;
         this.playbackState = {
           test: testToPlay,
@@ -818,9 +910,7 @@
           nextUrl: null,
           runMode
         };
-        const actionsToCheck = (testToPlay.actions || []).filter((action) => {
-          return runMode === "full" ? true : !action.hidden;
-        });
+        const actionsToCheck = actionsForRun;
         const visualActionTypes = ["click", "dblclick", "input", "change", "scroll", "navigation", "keyboard", "javascript", "screenshot", "adaptive", "analysis"];
         const hasVisualActions = actionsToCheck.some((action) => {
           if (visualActionTypes.includes(action.type)) {
@@ -843,8 +933,9 @@
           return false;
         });
         const firstActionWithUrl = (_b = testToPlay.actions) == null ? void 0 : _b.find((action) => {
-          if (!action.url && !action.value) return false;
-          const url = (action.url || action.value || "").trim();
+          const rawUrl = action.url != null && action.url !== "" ? action.url : action.value;
+          if (rawUrl == null || rawUrl === "") return false;
+          const url = String(rawUrl).trim();
           if (!url) return false;
           if (url.startsWith("chrome-extension://") || url.startsWith("chrome://") || url.startsWith("edge://")) return false;
           if (url.includes("/editor/editor.html") || url.includes("editor_ru.html")) return false;
@@ -854,8 +945,8 @@
         });
         const urlForTab = (firstActionWithUrl == null ? void 0 : firstActionWithUrl.url) || (firstActionWithUrl == null ? void 0 : firstActionWithUrl.value);
         const normalizeUrl = (raw) => {
-          if (!raw || typeof raw !== "string") return null;
-          const s = raw.trim();
+          if (raw == null || raw === "") return null;
+          const s = String(raw).trim();
           if (!s) return null;
           if (/^https?:\/\//i.test(s)) return s;
           if (s.startsWith("//")) return "https:" + s;
@@ -866,7 +957,8 @@
         const firstVisibleAction = actionsToCheck[0];
         const isFirstActionNewTab = (firstVisibleAction == null ? void 0 : firstVisibleAction.type) === "navigation" && (firstVisibleAction == null ? void 0 : firstVisibleAction.subtype) === "new-tab";
         if (hasVisualActions && isFirstActionNewTab) {
-          const newTabUrl = normalizeUrl(firstVisibleAction.url || firstVisibleAction.value) || "about:blank";
+          const newTabRaw = firstVisibleAction.url != null && firstVisibleAction.url !== "" ? firstVisibleAction.url : firstVisibleAction.value;
+          const newTabUrl = normalizeUrl(newTabRaw) || "about:blank";
           try {
             console.log(`\u{1F517} [Background] \u041F\u0435\u0440\u0432\u044B\u0439 \u0448\u0430\u0433 new-tab \u2014 \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u043E\u0434\u043D\u0443 \u0432\u043A\u043B\u0430\u0434\u043A\u0443 ${newTabUrl} \u0438 \u043F\u0435\u0440\u0435\u0434\u0430\u044E RESUME_TEST`);
             const newTab = yield chrome.tabs.create({ url: newTabUrl, active: true });
@@ -1087,13 +1179,15 @@
             }
           } else {
             const firstValidUrl = (_r = (_q = testToPlay.actions) == null ? void 0 : _q.find((action) => {
-              if (!action.url) return false;
-              return !action.url.startsWith("chrome-extension://") && !action.url.startsWith("chrome://") && !action.url.startsWith("edge://") && !action.url.includes("/editor/editor.html");
+              const u = action.url == null ? "" : String(action.url).trim();
+              if (!u) return false;
+              return !u.startsWith("chrome-extension://") && !u.startsWith("chrome://") && !u.startsWith("edge://") && !u.includes("/editor/editor.html");
             })) == null ? void 0 : _r.url;
-            if (firstValidUrl) {
-              console.log(`\u{1F4C2} \u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u043D\u043E\u0432\u0443\u044E \u0432\u043A\u043B\u0430\u0434\u043A\u0443 \u0441 \u043F\u0435\u0440\u0432\u044B\u043C \u043D\u0430\u0439\u0434\u0435\u043D\u043D\u044B\u043C URL: ${firstValidUrl}`);
+            const tabUrlFromFirst = normalizeUrl(firstValidUrl != null ? String(firstValidUrl) : "");
+            if (tabUrlFromFirst) {
+              console.log(`\u{1F4C2} \u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u043D\u043E\u0432\u0443\u044E \u0432\u043A\u043B\u0430\u0434\u043A\u0443 \u0441 \u043F\u0435\u0440\u0432\u044B\u043C \u043D\u0430\u0439\u0434\u0435\u043D\u043D\u044B\u043C URL: ${tabUrlFromFirst}`);
               try {
-                const newTab = yield chrome.tabs.create({ url: firstValidUrl });
+                const newTab = yield chrome.tabs.create({ url: tabUrlFromFirst });
                 yield new Promise((resolve) => setTimeout(resolve, 1500));
                 this.startVideoRecordingIfEnabled(message.testId, testToPlay.name, newTab.id).catch(() => {
                 });
@@ -3676,6 +3770,7 @@
   );
   chrome.tabs.onRemoved.addListener((tabId) => {
     networkRequests.delete(tabId);
+    testManager.onPlaybackTabRemoved(tabId);
   });
   console.log("[Background] Network monitoring initialized");
 })();

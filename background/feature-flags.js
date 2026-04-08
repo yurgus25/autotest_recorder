@@ -43,6 +43,30 @@ const FeatureFlags = {
       localOverrideKey: 'enableExcelExport',
       remoteCheckUrl: null,
       fallbackEnabled: false
+    },
+
+    /** Data-driven CSV: higher row limits planned for Premium; core feature stays usable in Free with cap. */
+    DATA_DRIVEN_BULK: {
+      id: 'dataDrivenBulk',
+      name: 'Data-driven bulk rows',
+      description: 'Run scenarios on large CSV datasets',
+      enabled: false,
+      requiresLicense: true,
+      localOverrideKey: 'enableDataDrivenBulk',
+      remoteCheckUrl: null,
+      fallbackEnabled: true
+    },
+
+    /** Visual regression (lite): Premium positioning; baseline compare enabled for all during preview. */
+    VISUAL_REGRESSION_LITE: {
+      id: 'visualRegressionLite',
+      name: 'Visual regression lite',
+      description: 'Screenshot baseline comparison on playback',
+      enabled: false,
+      requiresLicense: true,
+      localOverrideKey: 'enableVisualRegressionLite',
+      remoteCheckUrl: null,
+      fallbackEnabled: true
     }
   },
 
@@ -164,8 +188,9 @@ const FeatureFlags = {
   },
   setLicense: function(licenseData) {
     var self = this;
-    return chrome.storage.local.set({ license: licenseData }).then(function() {
-      self._license = licenseData;
+    var normalized = normalizeLicenseData(licenseData);
+    return chrome.storage.local.set({ license: normalized }).then(function() {
+      self._license = normalized;
       self._cache = {};
       return chrome.storage.local.remove('featureFlags');
     }).then(function() {
@@ -204,12 +229,114 @@ const FeatureFlags = {
   }
 };
 
+const ActionCatalog = {
+  RUN_ANALYSIS: 'analysis.run',
+  START_RECORDING: 'recording.start',
+  UPDATE_TEST: 'test.update',
+  VIEW_ANALYTICS: 'analytics.view',
+  EXPORT_EXCEL: 'export.excel'
+};
+
+function normalizeLicenseData(license) {
+  var raw = license && typeof license === 'object' ? license : {};
+  var tier = raw.tier;
+  if (tier !== 'premium' && tier !== 'b2b') tier = 'free';
+  return {
+    tier: tier,
+    valid: raw.valid === true,
+    expiresAt: raw.expiresAt || null,
+    orgId: raw.orgId || null,
+    seats: typeof raw.seats === 'number' ? raw.seats : null,
+    planId: raw.planId || null,
+    signature: raw.signature || null,
+    updatedAt: raw.updatedAt || new Date().toISOString(),
+    source: raw.source || 'local'
+  };
+}
+
+const AccessPolicy = {
+  ROLLOUT_KEY: 'tierAccessRolloutEnabled',
+
+  ACTIONS: ActionCatalog,
+
+  ACTION_REQUIREMENTS: {
+    'analysis.run': { minimumTier: 'premium' },
+    'recording.start': { minimumTier: 'free' },
+    'test.update': { minimumTier: 'free' },
+    'analytics.view': { minimumTier: 'premium' },
+    'export.excel': { minimumTier: 'premium' }
+  },
+
+  getLicense: function() {
+    return chrome.storage.local.get('license').then(function(result) {
+      return normalizeLicenseData(result.license);
+    }).catch(function() {
+      return normalizeLicenseData(null);
+    });
+  },
+
+  isRolloutEnabled: function() {
+    return chrome.storage.local.get(this.ROLLOUT_KEY).then((result) => result[this.ROLLOUT_KEY] === true).catch(function() {
+      return false;
+    });
+  },
+
+  getTierRank: function(tier) {
+    if (tier === 'b2b') return 3;
+    if (tier === 'premium') return 2;
+    return 1;
+  },
+
+  getCapabilities: function(license) {
+    var normalized = normalizeLicenseData(license);
+    var tier = normalized.valid ? normalized.tier : 'free';
+    var rank = this.getTierRank(tier);
+    return {
+      tier: tier,
+      canRunAnalysis: rank >= this.getTierRank('premium'),
+      canUseAnalyticsDashboard: rank >= this.getTierRank('premium'),
+      canExportExcel: rank >= this.getTierRank('premium'),
+      isB2B: tier === 'b2b'
+    };
+  },
+
+  can: function(action, context) {
+    var self = this;
+    var requirement = this.ACTION_REQUIREMENTS[action] || { minimumTier: 'free' };
+    return Promise.all([this.getLicense(), this.isRolloutEnabled()]).then(function(values) {
+      var license = values[0];
+      var rolloutEnabled = values[1];
+      var caps = self.getCapabilities(license);
+      var minimumTier = requirement.minimumTier || 'free';
+      var allowed = self.getTierRank(caps.tier) >= self.getTierRank(minimumTier);
+      if (!rolloutEnabled) {
+        allowed = true;
+      }
+      return {
+        allowed: allowed,
+        action: action,
+        reason: allowed ? null : 'TIER_REQUIRED',
+        requiredTier: minimumTier,
+        tier: caps.tier,
+        rolloutEnabled: rolloutEnabled,
+        context: context || null
+      };
+    });
+  }
+};
+
 // Экспорт для использования в других модулях
 if (typeof window !== 'undefined') {
   window.FeatureFlags = FeatureFlags;
+  window.ActionCatalog = ActionCatalog;
+  window.AccessPolicy = AccessPolicy;
+  window.normalizeLicenseData = normalizeLicenseData;
 }
 
 // Для background script
 if (typeof self !== 'undefined') {
   self.FeatureFlags = FeatureFlags;
+  self.ActionCatalog = ActionCatalog;
+  self.AccessPolicy = AccessPolicy;
+  self.normalizeLicenseData = normalizeLicenseData;
 }

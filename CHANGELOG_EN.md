@@ -4,6 +4,32 @@ See [CHANGELOG.md](CHANGELOG.md) for the full Russian changelog.
 
 ---
 
+## [0.9.7.2] — 2026-04-01
+
+**First roadmap slice** (growth): shipped for everyone in preview; some limits may move to Premium later.
+
+### Data-driven (CSV / tables)
+
+- Run a single test over CSV rows with values merged into the variable context; row cap for the basic tier; background queue and per-row summary.
+- **CSV report export** (pass/fail per row, UTF‑8 BOM) from the editor — foundation for a future premium export.
+
+### Visual regression (lite)
+
+- Baselines live under **`extensionAssets.visualRegressionBaselines`** in the test JSON (portable across machines); future import may optionally strip this block.
+- Player reads baselines from the test first, then legacy `chrome.storage.local`; updates go through **`MERGE_TEST_EXTENSION_ASSETS`**.
+- Editor **`UPDATE_TEST`** **merges** `extensionAssets` with the stored test so player-written baselines are not wiped on save.
+
+### Onboarding & templates
+
+- First-run wizard in the popup plus starter templates.
+- **Settings → “Show again”** clears `onboardingWizardV1CompletedAt` so the wizard can reappear.
+
+### Misc
+
+- Feature-flag stubs: **`DATA_DRIVEN_BULK`**, **`VISUAL_REGRESSION_LITE`** (`fallbackEnabled: true` for now).
+
+---
+
 ## [0.9.7.1] — 2026-03-30
 
 GitHub-oriented follow-up: source audit for public release.

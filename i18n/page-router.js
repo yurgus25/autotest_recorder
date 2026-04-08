@@ -23,9 +23,17 @@
   }
 
   function detectBrowserLang() {
-    const langs = navigator.languages || [navigator.language || 'en'];
-    for (const lang of langs) {
-      if (lang.toLowerCase().startsWith('ru')) return 'ru';
+    try {
+      if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function') {
+        var ui = chrome.i18n.getUILanguage() || '';
+        var base = (ui.split(/[-_]/)[0] || '').toLowerCase();
+        if (base === 'ru' || base === 'en') return base;
+      }
+    } catch (e) {}
+    var langs = navigator.languages || [navigator.language || 'en'];
+    for (var i = 0; i < langs.length; i++) {
+      if (langs[i].toLowerCase().indexOf('ru') === 0) return 'ru';
+      if (langs[i].toLowerCase().indexOf('en') === 0) return 'en';
     }
     return 'en';
   }

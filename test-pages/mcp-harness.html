@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCP harness — тексты и JSON для Cursor Browser</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; line-height: 1.45; }
+    body { max-width: 52rem; margin: 1.5rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    label { display: block; font-weight: 600; margin-top: 1rem; }
+    textarea, input[type="text"] { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; }
+    textarea { min-height: 7rem; }
+    #scenarioOut { min-height: 10rem; background: #0d1117; color: #e6edf3; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    button { padding: 0.45rem 0.85rem; cursor: pointer; }
+    .hint { color: #555; font-size: 0.9rem; margin-top: 0.25rem; }
+    ul.check { list-style: none; padding: 0; }
+    ul.check li { padding: 0.35rem 0; border-bottom: 1px solid #eee; }
+    .done { color: #1a7f37; }
+    footer { margin-top: 2rem; font-size: 0.85rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>MCP harness — прогон текстов и JSON из чата</h1>
+  <p>Страница для <strong>Cursor Browser</strong> (MCP): стабильные подписи элементов для snapshot → click/fill по <code>ref</code>.</p>
+
+  <section aria-labelledby="sec-source">
+    <h2 id="sec-source">Исходный текст из чата</h2>
+    <label for="chatSourceText">Многострочный текст (вставьте сюда фрагмент из чата)</label>
+    <textarea id="chatSourceText" data-mcp-role="chat-source" placeholder="Вставьте сюда текст из Cursor…"></textarea>
+    <p class="hint">В автоматизации: <code>browser_fill</code> в поле «Многострочный текст…».</p>
+  </section>
+
+  <section aria-labelledby="sec-title">
+    <h2 id="sec-title">Однострочное поле</h2>
+    <label for="singleLineTitle">Заголовок сценария</label>
+    <input type="text" id="singleLineTitle" data-mcp-role="scenario-title" placeholder="Например: проверка popup" />
+  </section>
+
+  <section aria-labelledby="sec-actions">
+    <h2 id="sec-actions">Действия</h2>
+    <div class="row">
+      <button type="button" id="btnBuildJson" data-mcp-role="build-json">Собрать JSON сценария</button>
+      <button type="button" id="btnClear" data-mcp-role="clear-form">Очистить поля</button>
+      <button type="button" id="btnMarkCheck1" data-mcp-role="toggle-check-1">Отметить пункт 1</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="sec-out">
+    <h2 id="sec-out">Результат (JSON)</h2>
+    <label for="scenarioOut">Сгенерированный JSON (как в тест-кейсе расширения)</label>
+    <textarea id="scenarioOut" readonly data-mcp-role="json-output" aria-label="Сгенерированный JSON сценария"></textarea>
+    <p class="hint">Можно копировать в редактор тестов AutoTest Recorder.</p>
+  </section>
+
+  <section aria-labelledby="sec-checklist">
+    <h2 id="sec-checklist">Чеклист для пошагового прохода в Browser</h2>
+    <ul class="check" id="checklist">
+      <li id="checkItem1" data-mcp-role="check-item-1">Пункт 1: открыта страница harness</li>
+      <li id="checkItem2" data-mcp-role="check-item-2">Пункт 2: текст из чата вставлен в многострочное поле</li>
+      <li id="checkItem3" data-mcp-role="check-item-3">Пункт 3: нажата «Собрать JSON сценария»</li>
+    </ul>
+  </section>
+
+  <footer>
+    Запуск: из корня репозитория выполните <code>.\scripts\serve-test-pages.ps1</code>, затем в MCP Browser откройте
+    <code>http://127.0.0.1:9876/mcp-harness.html</code>. Само расширение Chrome в этом браузере не подключается — только эта страница.
+  </footer>
+
+  <script>
+    (function () {
+      var src = document.getElementById('chatSourceText');
+      var title = document.getElementById('singleLineTitle');
+      var out = document.getElementById('scenarioOut');
+      var c1 = document.getElementById('checkItem1');
+
+      document.getElementById('btnBuildJson').addEventListener('click', function () {
+        var scenario = {
+          name: title.value.trim() || 'MCP harness scenario',
+          source: 'cursor-chat',
+          actions: [
+            { type: 'comment', value: 'Собрано из mcp-harness.html' },
+            { type: 'assert', subtype: 'assert-visible', selector: 'body', note: 'страница открыта' }
+          ],
+          pastedTextLength: (src.value || '').length,
+          pastedPreview: (src.value || '').slice(0, 200)
+        };
+        out.value = JSON.stringify(scenario, null, 2);
+      });
+
+      document.getElementById('btnClear').addEventListener('click', function () {
+        src.value = '';
+        title.value = '';
+        out.value = '';
+      });
+
+      document.getElementById('btnMarkCheck1').addEventListener('click', function () {
+        c1.classList.add('done');
+        c1.textContent = 'Пункт 1: выполнено (кнопка в Browser)';
+      });
+
+      if (location.hash.indexOf('text=') === 0) {
+        try {
+          src.value = decodeURIComponent(location.hash.slice(5));
+        } catch (e) {}
+      }
+    })();
+  </script>
+</body>
+</html>

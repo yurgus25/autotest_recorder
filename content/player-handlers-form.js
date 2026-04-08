@@ -454,6 +454,10 @@ TestPlayer.prototype.handleAssert = async function(action) {
   const subtype = action.subtype || '';
   console.log(`✓ Проверка утверждения: ${subtype || action.assertion || action.value || 'N/A'}`);
 
+  if (subtype === 'assert-visual-regression') {
+    return this.handleVisualRegressionAssert(action);
+  }
+
   // Для assert-not-exists селектор НЕ обязателен должен существовать
   if (subtype === 'assert-not-exists') {
     if (!action.selector) {
@@ -586,6 +590,100 @@ TestPlayer.prototype.handleAssert = async function(action) {
   } else {
     console.log('✅ Элемент найден');
   }
+}
+
+/**
+ * Визуальная регрессия (lite): эталон в test.extensionAssets.visualRegressionBaselines (перенос с JSON теста);
+ * legacy fallback — chrome.storage visualRegressionBaselines.
+ */
+TestPlayer.prototype.handleVisualRegressionAssert = async function(action) {
+  const scope = String(action.visualRegressionScope || 'element').toLowerCase();
+  const maxDiffPercent = typeof action.maxDiffPercent === 'number' && !Number.isNaN(action.maxDiffPercent)
+    ? action.maxDiffPercent
+    : parseFloat(action.maxDiffPercent) || 0.5;
+  const pixelThreshold = typeof action.visualRegressionPixelThreshold === 'number' && !Number.isNaN(action.visualRegressionPixelThreshold)
+    ? action.visualRegressionPixelThreshold
+    : parseFloat(action.visualRegressionPixelThreshold) || 0.12;
+  const updateBaseline = action.visualRegressionUpdateBaseline === true;
+
+  if (scope === 'element' && !action.selector) {
+    throw new Error('Visual regression: укажите селектор элемента или выберите область «viewport»');
+  }
+
+  const pseudoAction = scope === 'viewport'
+    ? { subtype: 'page-screenshot', screenshotCaptureType: 'full' }
+    : { subtype: 'visual-screenshot', screenshotCaptureType: 'element', selector: action.selector };
+
+  const current = await this.handleScreenshot(pseudoAction);
+  if (!current) {
+    throw new Error('Visual regression: не удалось получить снимок');
+  }
+
+  const testId = String(this.currentTest?.id || 'unknown');
+  const regKey = action.visualRegressionKey || `${testId}_${this.currentActionIndex}`;
+  const storageKey = 'visualRegressionBaselines';
+
+  const baselinesFromTest = this.currentTest?.extensionAssets?.visualRegressionBaselines;
+  let legacyMap = {};
+  try {
+    const data = await chrome.storage.local.get(storageKey);
+    if (data[storageKey] && typeof data[storageKey] === 'object') {
+      legacyMap = { ...data[storageKey] };
+    }
+  } catch (e) {
+    console.warn('Visual regression: storage read failed', e);
+  }
+
+  const baselineFromJson = baselinesFromTest && typeof baselinesFromTest === 'object' ? baselinesFromTest[regKey] : null;
+  const baseline = baselineFromJson || legacyMap[regKey] || null;
+
+  const persistBaselineToTest = async (dataUrl) => {
+    if (!this.currentTest || !this.currentTest.id) return;
+    this.currentTest.extensionAssets = this.currentTest.extensionAssets || {};
+    this.currentTest.extensionAssets.visualRegressionBaselines = {
+      ...(this.currentTest.extensionAssets.visualRegressionBaselines || {}),
+      [regKey]: dataUrl
+    };
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: 'MERGE_TEST_EXTENSION_ASSETS',
+        testId: String(this.currentTest.id),
+        assets: { visualRegressionBaselines: { [regKey]: dataUrl } }
+      });
+      if (!res || !res.success) {
+        console.warn('Visual regression: MERGE_TEST_EXTENSION_ASSETS', res?.error || 'failed');
+      }
+    } catch (err) {
+      console.warn('Visual regression: merge assets message failed', err);
+    }
+    if (legacyMap[regKey]) {
+      delete legacyMap[regKey];
+      try {
+        await chrome.storage.local.set({ [storageKey]: legacyMap });
+      } catch (e3) { /* ignore */ }
+    }
+  };
+
+  if (!baseline || updateBaseline) {
+    await persistBaselineToTest(current);
+    console.log(updateBaseline ? '✅ Visual regression: эталон обновлён (в JSON теста)' : '✅ Visual regression: сохранён эталон в JSON теста');
+    return;
+  }
+
+  const Comparer = window.ScreenshotComparer;
+  if (!Comparer) {
+    throw new Error('Visual regression: модуль ScreenshotComparer не загружен');
+  }
+  const comparer = new Comparer();
+  const result = await comparer.compareScreenshots(baseline, current, { threshold: pixelThreshold, highlightDifferences: true });
+  if (result.error) {
+    throw new Error('Visual regression: ошибка сравнения: ' + result.error);
+  }
+  const diffPct = typeof result.diffPercentage === 'number' ? result.diffPercentage : 0;
+  if (diffPct > maxDiffPercent) {
+    throw new Error(`Visual regression: отличие ${diffPct.toFixed(2)}% превышает порог ${maxDiffPercent}%`);
+  }
+  console.log(`✅ Visual regression: отличие ${diffPct.toFixed(2)}% в пределах порога`);
 }
 
 /**
