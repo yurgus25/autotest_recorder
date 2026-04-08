@@ -1,4 +1,4 @@
-AutoTest Recorder & Player is a Google Chrome extension (Manifest V3) for no-code web test automation. Record actions on your site, edit scenarios in a visual editor, and replay them with smart waits, self-healing selectors, rich logs, and screenshots.
+AutoTest Recorder & Player is an extension for Google Chrome™ (Manifest V3) for no-code web test automation. Record actions on your site, edit scenarios in a visual editor, and replay them with smart waits, self-healing selectors, rich logs, and screenshots.
 
 WHO IT’S FOR
 • QA engineers who need fast regression flows without maintaining Selenium scripts.
@@ -26,3 +26,5 @@ LICENSE & SOURCE
 MIT license. Source code and releases on GitHub (see the store listing “Homepage” URL).
 
 Why this extension: one tool to record, edit, and run tests; clear visibility for the team; no separate server required for core workflows; built for Manifest V3.
+
+Google Chrome is a trademark of Google LLC. Use of this trademark is subject to Google Permissions.

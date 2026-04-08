@@ -33,7 +33,8 @@ RU: AutoTest Recorder & Player — запись и воспроизведени�
 
 ## URL политики конфиденциальности (одно поле в Dashboard — EN приоритетен для модерации)
 
-EN: https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md
-RU: https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md
+EN: https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY_EN.md
+RU: https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY.md
 
 В поле Dashboard вставляйте EN-ссылку: CWS-модерация проводится на английском.
+Резервный вариант (если нужен GitHub UI): `.../blob/main/PRIVACY_EN.md`.

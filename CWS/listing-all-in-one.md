@@ -46,7 +46,7 @@ No-code web test automation: record, visual editor, playback with smart waits & 
 |------|----------|
 | Главная страница | `https://github.com/yurgus25/autotest_recorder` |
 | Поддержка | `https://github.com/yurgus25/autotest_recorder/issues` |
-| Политика конфиденциальности (EN) | `https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md` |
+| Политика конфиденциальности (EN, рекомендовано) | `https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY_EN.md` |
 
 Подробнее: [**04-urls.txt**](04-urls.txt) и [**03-metadata.json**](03-metadata.json).
 

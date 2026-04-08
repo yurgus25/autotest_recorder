@@ -13,8 +13,8 @@
     "homepage": "https://github.com/yurgus25/autotest_recorder",
     "support": "https://github.com/yurgus25/autotest_recorder/issues",
     "releases": "https://github.com/yurgus25/autotest_recorder/releases",
-    "privacyPolicyEn": "https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md",
-    "privacyPolicyRu": "https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md"
+    "privacyPolicyEn": "https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY_EN.md",
+    "privacyPolicyRu": "https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY.md"
   },
   "characterLimits": {
     "shortDescription": 132,

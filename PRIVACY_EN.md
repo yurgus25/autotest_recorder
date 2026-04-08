@@ -21,6 +21,48 @@
 
 ---
 
+## Mandatory Data Disclosure (Chrome Web Store)
+
+This section explicitly describes how user data is **collected**, **processed**, **stored**, and **transferred**.
+
+### A) Collection
+
+We collect/process data only when you use the extension for test automation features:
+
+- Page URLs, selectors, clicks, typed values, and related test-step context on pages you choose to test.
+- Optional network metadata (URL, method, status, timing) when network monitoring is enabled by you.
+- Optional screenshots and optional tab video when you trigger those actions.
+- Test configuration data you create (steps, variables, CSV rows, settings, logs).
+
+### B) Processing (Use)
+
+We process collected data only to provide test automation functionality:
+
+- Record, edit, store, and replay test scenarios.
+- Show test logs, assertions, reports, screenshots, and network diagnostics in the extension UI.
+- Execute user-configured scenario steps on user-selected websites or APIs.
+
+### C) Storage
+
+- Primary storage is local browser storage (`chrome.storage.local`) on your device.
+- Exported artifacts (JSON, reports, screenshots, videos) are saved to your Downloads folder only on your request.
+- Data remains stored until you delete it in the extension UI, clear extension storage, or uninstall the extension.
+
+### D) Transfer / Sharing and Recipients
+
+By default, we do not transfer your test data to publisher servers. Data transfer may occur only in these cases:
+
+1. **Websites/APIs you explicitly target in your scenarios**  
+   Browser requests are sent to those destinations as required by your test flow.
+2. **Google Chrome infrastructure**  
+   Extension APIs run inside Chrome under Google's platform and privacy terms.
+3. **Legal compliance (if required by law)**  
+   We may disclose only the minimum data required by valid legal process.
+
+We do not sell personal data and do not share data for advertising or unrelated profiling.
+
+---
+
 ## 1. Who We Are
 
 **AutoTest Recorder & Player** is a browser extension for recording and replaying automated test scenarios on websites. The publisher is identified on the [Chrome Web Store listing](https://chrome.google.com/webstore/detail/lafiegkhipdflafdgogmmephankkceol) and reachable at [guscshin@gmail.com](mailto:guscshin@gmail.com).

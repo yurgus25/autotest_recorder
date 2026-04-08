@@ -31,12 +31,17 @@ https://github.com/yurgus25/autotest_recorder/blob/main/USER_AGREEMENT.md
 
 ## Политика конфиденциальности (отдельное поле в разделе «Конфиденциальность»)
 
-Английский (часто предпочтителен для международной проверки):
+Английский (рекомендуется для модерации; стабильнее валидация):
 
-https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md
+https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY_EN.md
 
 Русский:
 
+https://raw.githubusercontent.com/yurgus25/autotest_recorder/main/PRIVACY.md
+
+Резервные ссылки (если нужен GitHub UI-вид):
+
+https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY_EN.md
 https://github.com/yurgus25/autotest_recorder/blob/main/PRIVACY.md
 
 ---
