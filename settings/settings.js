@@ -110,7 +110,8 @@ class SettingsManager {
       },
       playback: {
         stepTimeoutSeconds: 5,    // Таймаут выполнения шага (5, 10 или 15 сек); при превышении — диалог «Продолжить» / «Остановить»
-        showRunNotifications: true  // Показывать всплывающие сообщения о результатах прогона (завершение теста и т.п.)
+        showRunNotifications: true,  // Показывать всплывающие сообщения о результатах прогона (завершение теста и т.п.)
+        selectorNotFoundStreakWarningThreshold: 3 // Порог подряд идущих "селектор не найден" для предупреждения
       }
     };
 
@@ -276,6 +277,13 @@ class SettingsManager {
     const playbackEl = document.getElementById('playbackStepTimeout');
     if (playbackEl) playbackEl.value = String(stepTimeout);
     this.setCheckboxSafe('playbackShowRunNotifications', playback.showRunNotifications !== false);
+    const selectorWarnThreshold = Number(playback.selectorNotFoundStreakWarningThreshold);
+    this.setInputSafe(
+      'playbackSelectorNotFoundStreakThreshold',
+      Number.isFinite(selectorWarnThreshold) && selectorWarnThreshold >= 2
+        ? String(Math.min(20, Math.floor(selectorWarnThreshold)))
+        : String(this.defaultSettings.playback.selectorNotFoundStreakWarningThreshold || 3)
+    );
     
     // Показываем/скрываем настройки пикера
     this.togglePickerSettings(recordingMode === 'picker');
@@ -874,6 +882,8 @@ class SettingsManager {
     const stepTimeoutVal = parseInt(document.getElementById('playbackStepTimeout')?.value, 10);
     s.playback.stepTimeoutSeconds = [5, 10, 15].includes(stepTimeoutVal) ? stepTimeoutVal : 5;
     s.playback.showRunNotifications = this.getCheckboxSafe('playbackShowRunNotifications', true);
+    const streakThresholdRaw = this.getNumberSafe('playbackSelectorNotFoundStreakThreshold', 3);
+    s.playback.selectorNotFoundStreakWarningThreshold = Math.min(20, Math.max(2, Number.isFinite(streakThresholdRaw) ? streakThresholdRaw : 3));
 
     // Autotests
     s.autotests = s.autotests || {};

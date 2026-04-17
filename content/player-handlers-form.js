@@ -48,6 +48,53 @@ TestPlayer.prototype.handleInput = async function(action) {
     }
   }
 
+  // Защита: некоторые "input" шаги в старых тестах фактически являются нажатием кнопки
+  // (например, "сохранить"), и не должны уходить в dropdown-анализ.
+  const isButtonLikeElement = (el) => {
+    if (!el) return false;
+    const tag = String(el.tagName || '').toLowerCase();
+    if (tag === 'button' || tag === 'a' || tag === 'app-header-button') return true;
+    const role = String(el.getAttribute?.('role') || '').toLowerCase();
+    if (role === 'button' || role === 'link' || role === 'menuitem') return true;
+    const elementIdAttr = String(el.getAttribute?.('elementid') || '').toLowerCase();
+    if (/save-button|submit|create|apply/.test(elementIdAttr)) return true;
+    const cls = String(el.className || '').toLowerCase();
+    if (/(^|[\s_-])(big-button|btn|button|menu__subitem)([\s_-]|$)/i.test(cls)) return true;
+    if (el.closest?.('button, a, [role="button"], [role="menuitem"]')) return true;
+    return false;
+  };
+  const isInputLikeElement = (el) => {
+    if (!el) return false;
+    const tag = String(el.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (el.isContentEditable) return true;
+    const role = String(el.getAttribute?.('role') || '').toLowerCase();
+    return role === 'textbox' || role === 'searchbox' || role === 'combobox';
+  };
+  const isButtonIntentValue = (v) => {
+    const txt = String(v || '').trim().toLowerCase();
+    if (!txt) return false;
+    return /(сохран|save|submit|отправ|create|созда|добав|apply|примен|ok|да)/i.test(txt);
+  };
+  const selectorText = String(this.formatSelector(action.selector) || '').toLowerCase();
+  const fieldLabelText = String(action?.fieldLabel || '').toLowerCase();
+  const buttonIntentFromContext = /app-header-button|save-button|сохран|save|submit|apply/.test(selectorText) ||
+    /сохран|save|submit|apply/.test(fieldLabelText);
+
+  if (
+    !isInputLikeElement(element) &&
+    isButtonIntentValue(processedValue) &&
+    (isButtonLikeElement(element) || buttonIntentFromContext)
+  ) {
+    console.log(`🖱️ [Input->ClickGuard] Шаг input распознан как кнопка "${processedValue}", выполняю click вместо dropdown/input`);
+    await this.handleClick({
+      ...action,
+      type: 'click',
+      value: null
+    });
+    return;
+  }
+
   if (this.isDropdownElement(element)) {
     const refinedElement = this.resolveDropdownElementByFieldLabel(action, element);
     if (refinedElement && refinedElement !== element) {
@@ -58,6 +105,11 @@ TestPlayer.prototype.handleInput = async function(action) {
     if (preferredTrigger && preferredTrigger !== element) {
       element = preferredTrigger;
     }
+  }
+
+  if (this.shouldSkipPlaybackForDomHiddenTarget?.(element)) {
+    console.log('⏭️ [Player] Ввод пропущен: целевой элемент не виден (скрыт в DOM); в optimized-режиме такие поля не заполняются');
+    return;
   }
 
   // Проверяем, нужно ли пропустить (уже заполнено)
@@ -84,50 +136,104 @@ TestPlayer.prototype.handleInput = async function(action) {
   if (action.subtype === 'dropdown-datalist' || action.subtype === 'dropdown-combobox') {
     const searchText = await this.processVariables(action.searchText || action.optionText || action.value || '');
     if (!searchText) throw new Error('Для dropdown-datalist/combobox не указан текст поиска (searchText/optionText)');
-    await this.handleDropdownDatalistCombobox(element, searchText, action.subtype);
+    if (element.tagName === 'INPUT') {
+      await this.handleDropdownDatalistCombobox(element, searchText, action.subtype, action);
+    } else {
+      // Для записей, где selector указывает на root dropdown (app-select/div), а не на input,
+      // используем dropdown-select pipeline вместо input-only combobox handler.
+      await this.handleDropdownAction({
+        ...action,
+        type: 'click',
+        subtype: 'dropdown-select',
+        value: searchText,
+        optionText: action.optionText || searchText
+      }, element);
+    }
     return;
   }
 
   // Выбор из выпадающего списка при записи: isDropdownSelection / dropdownAutoFilled.
   // isDropdownElement() для <input> всегда false — иначе шаг «ввод» только пишет текст в поле, не кликает опцию (GWT, кастомные combobox без role).
   if (element.tagName === 'INPUT' && (action.isDropdownSelection || action.dropdownAutoFilled)) {
-    const searchText = String(processedValue || '').trim();
+    const searchText = this.resolveRecordedOptionSearchText
+      ? this.resolveRecordedOptionSearchText(action, processedValue)
+      : String(processedValue || '').trim();
     if (searchText) {
       try {
-        await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox');
+        await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox', action);
         console.log(`✅ Ввод из dropdown (флаги записи): "${searchText}"`);
         const optimizedDelay = await this.getOptimizedDelay('input', 200);
         await this.delay(optimizedDelay);
         return;
       } catch (e) {
-        console.warn('⚠️ Выбор из списка по флагам записи не удался, пробуем эвристику combobox:', e.message);
+        console.warn('⚠️ Выбор из списка по флагам записи не удался, пробую robust dropdown-pipeline:', e.message);
+        try {
+          await this.handleDropdownAction({
+            ...action,
+            subtype: 'dropdown-select',
+            value: searchText,
+            optionText: searchText
+          }, element);
+          const optimizedDelay = await this.getOptimizedDelay('input', 200);
+          await this.delay(optimizedDelay);
+          return;
+        } catch (dropdownErr) {
+          // Для явно записанного dropdown-шага не делаем fallback на обычный текстовый ввод.
+          throw new Error(`Не удалось выбрать dropdown-значение "${searchText}": ${dropdownErr?.message || dropdownErr}`);
+        }
       }
     }
   }
 
   // input с role="combobox" или id="account" (поле ФИО/сотрудник): ввод + выбор из выпадающего списка
-  const isComboboxInput = element.tagName === 'INPUT' && (
-    element.getAttribute('role') === 'combobox' ||
-    element.getAttribute('aria-haspopup') === 'listbox' ||
-    element.id === 'account' ||
-    (element.type === 'search' && /сотрудник|account|фio|fio|user|пользователь/i.test(element.name || element.placeholder || element.id || ''))
-  );
+  const isComboboxInput = element.tagName === 'INPUT' &&
+    this.shouldTreatInputAsDropdown?.(action, element, processedValue) &&
+    (
+      element.getAttribute('role') === 'combobox' ||
+      element.getAttribute('aria-haspopup') === 'listbox' ||
+      element.id === 'account' ||
+      element.id === 'SELECTED_ACCOUNT' ||
+      !!element.closest?.('.ant-select-show-search, .ant-select.ant-select-show-search') ||
+      (element.type === 'search' && /сотрудник|account|фio|fio|user|пользователь/i.test(element.name || element.placeholder || element.id || ''))
+    );
   if (isComboboxInput) {
-    const searchText = String(processedValue || '').trim();
+    const searchText = this.resolveRecordedOptionSearchText
+      ? this.resolveRecordedOptionSearchText(action, processedValue)
+      : String(processedValue || '').trim();
     if (searchText) {
       try {
-        await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox');
+        await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox', action);
         console.log(`✅ Combobox (ФИО/сотрудник): введено "${searchText}"`);
         return;
       } catch (e) {
-        console.warn('⚠️ Combobox не сработал, fallback к обычному вводу:', e.message);
+        console.warn('⚠️ Combobox не сработал, пробую dropdown-select pipeline:', e.message);
+        try {
+          await this.handleDropdownAction({
+            ...action,
+            subtype: action.subtype || 'dropdown-select',
+            value: searchText,
+            optionText: action.optionText || searchText
+          }, element);
+          return;
+        } catch (dropdownErr) {
+          const dropdownIntent = !!(action.isDropdownSelection || action.dropdownAutoFilled || String(action.subtype || '').startsWith('dropdown-'));
+          if (dropdownIntent) {
+            throw new Error(`Combobox dropdown выбор не выполнен: ${dropdownErr?.message || dropdownErr}`);
+          }
+          console.warn('⚠️ Combobox dropdown pipeline не сработал, fallback к обычному вводу:', dropdownErr?.message || dropdownErr);
+        }
       }
     }
   }
 
   // Проверяем, является ли это dropdown
-  if (this.isDropdownElement(element)) {
+  const shouldUseDropdownPipeline = this.shouldTreatInputAsDropdown?.(action, element, processedValue) && this.isDropdownElement(element);
+  if (shouldUseDropdownPipeline) {
     console.log(`🔽 Обнаружен dropdown при вводе, пробую выбрать значение: "${processedValue}"`);
+    if (this._isLikelyCompositeRecordedDropdownValue?.(element, processedValue)) {
+      console.warn(`⚠️ [Input] Пропускаю составное значение dropdown из записи: "${processedValue}"`);
+      return;
+    }
     // Если ввод идёт сразу после клика — сначала пробуем выбрать опцию в уже открытой панели (не открывая другой dropdown)
     if (action.inputAfterClick && this.trySelectOptionInRevealedPanels) {
       console.log('🔍 [Input] inputAfterClick=true: ищу опцию в уже открытой панели (без повторного открытия dropdown)');
@@ -137,25 +243,24 @@ TestPlayer.prototype.handleInput = async function(action) {
     } else if (this.trySelectOptionInRevealedPanels) {
       console.log('⚠️ [Input] inputAfterClick не установлен — пропускаем поиск в открытой панели, открываю dropdown');
     }
-    this._dispatchClick(element);
-    await this.delay(200);
     try {
-      let result = await this.autoSelectDropdownValue(element, processedValue);
-      if (!this.isPlaying) return;
-      if (!result?.success) {
-        const container = element.closest('[class*="select"], [class*="dropdown"], [class*="combo"]') || 
-                         element.closest('[role="combobox"], [role="listbox"]') ||
-                         element.parentElement;
-        if (container) {
-          result = await this.selectDropdownValueViaFillFieldsStyle(container, processedValue);
-          if (!this.isPlaying) return;
-          if (!result?.success) result = await this.fillDropdownViaAnalysis(container, processedValue);
-          if (!this.isPlaying) return;
-          if (!result?.success) result = await this.selectDropdownUniversal(element, processedValue);
-        }
-      }
+      const result = await this.selectDropdownAdaptiveValue(element, processedValue, action);
       if (!this.isPlaying) return;
       if (result && result.success) {
+        const hasStrongBinding = !!this._getDropdownElementId?.(action, element);
+        const isComboboxSubtype = String(action?.subtype || '').toLowerCase() === 'dropdown-combobox';
+        const isAutocompleteElement = !!(
+          element?.closest?.('app-autocomplete, [class*="autocomplete"], [class*="suggest"]') ||
+          String(element?.tagName || '').toLowerCase() === 'app-autocomplete'
+        );
+        // Для autocomplete-комбобоксов строгая перепроверка после успешного adaptive выбора
+        // часто даёт ложный негатив из-за расширенного текста ("ФИО — Организация").
+        if (hasStrongBinding && !isComboboxSubtype && !isAutocompleteElement && typeof this._isDropdownSelectionCommitted === 'function') {
+          const strictConfirmed = await this._isDropdownSelectionCommitted(element, processedValue, { strict: true });
+          if (!strictConfirmed) {
+            throw new Error(`Строгая проверка выбора не пройдена для "${processedValue}"`);
+          }
+        }
         console.log(`✅ Значение "${processedValue}" выбрано в dropdown`);
         return;
       }
@@ -192,6 +297,10 @@ TestPlayer.prototype._handleInputDirect = async function(action) {
   const element = findResult?.element;
   if (!element) {
     throw new Error(`Элемент не найден: ${this.formatSelector(action.selector)}`);
+  }
+  if (this.shouldSkipPlaybackForDomHiddenTarget?.(element)) {
+    console.log('⏭️ [Player] Прямой ввод пропущен: элемент не виден (скрыт в DOM)');
+    return;
   }
   await this._performInput(element, processedValue);
 }
@@ -1217,7 +1326,8 @@ TestPlayer.prototype.init = function() {
             actionIndex: Number.isNaN(nextActionIndex) ? this.currentActionIndex : nextActionIndex,
             nextUrl: '__AUTO_NAV__',
             runMode: this.playMode,
-            runHistory: runHistoryForStorage
+            runHistory: runHistoryForStorage,
+            ...(this.playbackSessionId ? { playbackSessionId: this.playbackSessionId } : {})
           }).catch(() => {});
         } catch (e) { /* ignore */ }
       }
@@ -1229,6 +1339,13 @@ TestPlayer.prototype.init = function() {
     if (message.type === 'PLAY_TEST') {
       // Проверяем, не запущен ли уже тест на этой вкладке
       if (this.isPlaying) {
+        const incomingId = message.test?.id != null ? String(message.test.id) : '';
+        const currentId = this.currentTest?.id != null ? String(this.currentTest.id) : '';
+        if (incomingId && currentId && incomingId === currentId) {
+          console.warn('⚠️ Повторный PLAY_TEST для того же теста (воспроизведение уже идёт) — отвечаю success (идемпотентно)');
+          sendResponse({ success: true, ignoredDuplicatePlay: true });
+          return true;
+        }
         console.warn('⚠️ Тест уже запущен на этой вкладке, игнорирую повторный запуск');
         sendResponse({ success: false, error: 'Test already playing on this tab' });
         return true;
@@ -1293,7 +1410,7 @@ TestPlayer.prototype.init = function() {
       this.groupRunCurrentIndex = message.groupRunCurrentIndex;
       this.groupRunTotal = message.groupRunTotal;
       console.log(`▶️ Запускаю тест "${message.test?.name || 'без имени'}" в режиме ${message.mode || 'optimized'}`);
-      this.playTest(message.test, message.mode || 'optimized');
+      this.playTest(message.test, message.mode || 'optimized', message.playbackSessionId || null);
       sendResponse({ success: true });
     } else if (message.type === 'STOP_PLAYING' || message.type === 'FORCE_STOP') {
       this.stopPlaying();
@@ -1311,7 +1428,13 @@ TestPlayer.prototype.init = function() {
       this.isGroupRun = message.isGroupRun || false;
       this.groupRunCurrentIndex = message.groupRunCurrentIndex;
       this.groupRunTotal = message.groupRunTotal;
-      this.resumePlayback(message.test, message.actionIndex, message.mode || 'optimized', message.runHistory || null);
+      this.resumePlayback(
+        message.test,
+        message.actionIndex,
+        message.mode || 'optimized',
+        message.runHistory || null,
+        message.playbackSessionId != null ? message.playbackSessionId : this.playbackSessionId
+      );
       sendResponse({ success: true });
     } else if (message.type === 'RESUME_TEST') {
       // Восстановление теста в новой вкладке (new-tab)
@@ -1322,8 +1445,11 @@ TestPlayer.prototype.init = function() {
         this.groupRunTotal = ts.groupRunTotal;
         const test = { id: ts.testId, name: ts.testName, actions: ts.actions, variables: ts.userVariables || {} };
         const actionIndex = (ts.currentActionIndex != null && ts.currentActionIndex >= 0) ? ts.currentActionIndex : 1;
+        const resumeMode = ts.runMode || 'optimized';
+        const resumeHistory = ts.runHistory || null;
+        const resumeSessionId = ts.playbackSessionId != null ? ts.playbackSessionId : null;
         console.log(`▶️ RESUME_TEST: продолжаю тест в новой вкладке с шага ${actionIndex + 1}`);
-        this.resumePlayback(test, actionIndex, 'optimized');
+        this.resumePlayback(test, actionIndex, resumeMode, resumeHistory, resumeSessionId);
       }
       sendResponse({ success: true });
     } else if (message.type === 'RECORDING_STOPPED') {
@@ -1605,7 +1731,8 @@ TestPlayer.prototype.takeScreenshot = async function() {
     const isMessagingError = (e) => {
       const m = (e?.message || '').toLowerCase();
       return m.includes('channel closed') || m.includes('port closed') || m.includes('message channel') ||
-        m.includes('receiving end does not exist') || m.includes('response was received');
+        m.includes('receiving end does not exist') || m.includes('response was received') ||
+        m.includes('extension context invalidated') || m.includes('context invalidated');
     };
     let response = null;
     const delays = [0, 600, 1200, 1800];
@@ -1638,7 +1765,7 @@ TestPlayer.prototype.takeScreenshot = async function() {
     }
     // Игнорируем ошибки messaging после retry — скриншот не критичен для прогона
     const errMsg = (error?.message || '').toLowerCase();
-    if (errMsg.includes('channel closed') || errMsg.includes('port closed') || errMsg.includes('receiving end does not exist') || errMsg.includes('response was received')) {
+    if (errMsg.includes('channel closed') || errMsg.includes('port closed') || errMsg.includes('receiving end does not exist') || errMsg.includes('response was received') || errMsg.includes('extension context invalidated') || errMsg.includes('context invalidated')) {
       console.warn('⚠️ Скриншот недоступен (канал сообщений закрыт), пропускаю');
       return null;
     }

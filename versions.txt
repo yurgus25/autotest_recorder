@@ -2,6 +2,86 @@
   AutoTest Recorder & Player - История изменений
 ═══════════════════════════════════════════════════════════════════════════════
 
+Версия 0.9.7.6 (2026-04-17) 🔁 Воспроизведение: сессия прогона и устойчивый resume
+───────────────────────────────────────────────────────────────────────────────
+• playbackSessionId на всём цикле прогона:
+  - PLAY_TEST, SAVE_PLAYBACK_STATE (включая pagehide), resume (player-core, form-handlers)
+• background (background.js, background-sw.js, message-handlers.js, message-handlers-sw.js):
+  - слияние SAVE_PLAYBACK_STATE без отката actionIndex (Math.max и учёт сессии)
+  - PLAY_TEST / групповые и data-driven сценарии — передача playbackSessionId
+• content/player-core.js:
+  - playTest(test, mode, playbackSessionId), сохранение сессии при старте и при resume
+• content/player-handlers-form.js:
+  - RESUME_TEST: runMode, runHistory, playbackSessionId из testState
+• content/player-handlers-extended.js:
+  - savePlaybackState / resumePlayback с session id в payload
+• manifest 0.9.7.6
+
+Версия 0.9.7.5 (2026-04-15) 🔧 Стабилизация recording/replay (cross-system)
+───────────────────────────────────────────────────────────────────────────────
+• Recording (content/recorder.js):
+  - Очередь отложенных шагов для ADD_ACTION при временной недоступности background/service worker
+  - Retry с backoff и автодосылка шагов после восстановления канала
+  - Flush очереди перед stop recording
+  - _clientActionId для безопасной переотправки без потери шагов
+
+• Background dedupe (message-handlers.js, message-handlers-sw.js):
+  - Дедупликация входящих шагов по _clientActionId
+  - Повторно доставленные шаги подтверждаются без дублирования в тесте
+
+• Replay stability (content/player-core.js):
+  - При fallback-поиске элемента теперь всегда сохраняется replay evidence
+  - Мягкий режим missing evidence: шаг не падает, если действие выполнено
+  - Сохранены строгие проверки target mismatch при наличии evidence
+
+• Fallback для хрупких селекторов (content/player-handlers-extended.js):
+  - class-only селекторы (например .big-button) ищутся по видимому кандидату и по тексту кнопки
+
+Версия 0.9.7.5 (2026-04-14) ✅ Strict automation: запись + replay validation
+───────────────────────────────────────────────────────────────────────────────
+• content/recorder.js:
+  - Добавлен строгий pre-save gate: sanitize/validate/prepare для шага записи
+  - Автопропуск невалидных и шумных шагов без ручного участия
+  - Live-уведомления во время записи при пропуске шага и сбое сохранения
+  - Принудительный auto-режим записи (picker отключается для минимизации ручных действий)
+  - Runtime-статистика записи: saved/skipped/failed
+
+• background/message-handlers.js и background/message-handlers-sw.js:
+  - Defensive ingress-валидация ADD_ACTION (тип/подтип/селекторный контракт)
+  - Отклонение некорректных шагов с явными error/details
+• background/background.js и background/background-sw.js:
+  - Усилена cleanDuplicateActions для login/dropdown кейса:
+    удаляется первичный dropdown-click перед immediate dropdown-selection input/change
+  - Сопоставление по targetKey + fallback по совпадающему selector (фикс `#SELECTED_ACCOUNT`)
+
+• content/player-core.js:
+  - Strict replay target validation (обязательное подтверждение цели шага)
+  - Проверка совпадения найденного элемента с ожидаемым (tag/id/class/text)
+  - Запись evidence в runHistory.steps[].validation.replayTarget
+
+• content/player-handlers-extended.js:
+  - findElementWithRetry возвращает расширенный proof (source, attempt, selectorType, usedSelector)
+  - Поддержка evidence для fallback-поиска
+
+• Документация и процесс:
+  - Обновлены tasks/todo.md и tasks/lessons.md
+  - Обновлён changes.md с детальным описанием реализации
+
+• Технические проверки:
+  - node --check: recorder.js, message-handlers.js, message-handlers-sw.js, player-core.js, player-handlers-extended.js — pass
+  - ReadLints по изменённым файлам — без ошибок
+
+• Сценарии из Controller/json:
+  - Контрактная проверка шагов (type + selector для selector-dependent действий) — без ошибок
+  - Полный E2E replay зависит от авторизации (CAS/login) и шагов chrome-extension://
+
+Версия 0.9.7.5 (2026-04-13) 🛑 Запись: без автозаполнения полей
+───────────────────────────────────────────────────────────────────────────────
+• manifest 0.9.7.5
+• content/recorder.js: в режиме записи удалено программное заполнение dropdown/combobox
+• Теперь запись фиксирует только реальные действия пользователя (без визуального автоввода)
+
+───────────────────────────────────────────────────────────────────────────────
 Версия 0.9.7.4 (2026-04-02) 🎬 Воспроизведение: вкладка и NAVIGATE
 ───────────────────────────────────────────────────────────────────────────────
 • manifest 0.9.7.4

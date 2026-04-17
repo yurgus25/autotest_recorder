@@ -468,6 +468,71 @@ TestEditor.prototype.updateActionField = function(index, field, value) {
   // НЕ сохраняем автоматически - пользователь сам сохранит
 }
 
+TestEditor.prototype.quickSetActionType = function(indexStr, targetType) {
+  const allowed = new Set(['click', 'input', 'change']);
+  if (!allowed.has(targetType)) return;
+
+  const resolveAction = () => {
+    const asNumber = parseInt(indexStr, 10);
+    if (!Number.isNaN(asNumber)) {
+      return this.test?.actions?.[asNumber] || null;
+    }
+    const match = String(indexStr || '').match(/(loop|then|else|try|catch|finally)-(\d+)-(\d+)/);
+    if (!match) return null;
+    const branch = match[1];
+    const parentIndex = parseInt(match[2], 10);
+    const branchIndex = parseInt(match[3], 10);
+    const nested = this.getNestedAction(parentIndex, branch, branchIndex);
+    return nested?.action || null;
+  };
+
+  const action = resolveAction();
+  if (!action) return;
+  if (action.type === targetType) return;
+
+  // Ключевое требование: не трогаем selector при смене типа.
+  action.type = targetType;
+
+  // Лёгкая нормализация subtype, чтобы не оставлять очевидно несовместимые варианты.
+  const subtype = String(action.subtype || '');
+  if (targetType === 'click' && (subtype === 'dropdown-combobox' || subtype === 'dropdown-datalist')) {
+    delete action.subtype;
+  }
+  if (targetType === 'change' && subtype.startsWith('dropdown-')) {
+    delete action.subtype;
+  }
+
+  this.markActionEdited(action);
+  this.renderActions();
+}
+
+TestEditor.prototype.quickCycleActionType = function(indexStr) {
+  const resolveAction = () => {
+    const asNumber = parseInt(indexStr, 10);
+    if (!Number.isNaN(asNumber)) {
+      return this.test?.actions?.[asNumber] || null;
+    }
+    const match = String(indexStr || '').match(/(loop|then|else|try|catch|finally)-(\d+)-(\d+)/);
+    if (!match) return null;
+    const branch = match[1];
+    const parentIndex = parseInt(match[2], 10);
+    const branchIndex = parseInt(match[3], 10);
+    const nested = this.getNestedAction(parentIndex, branch, branchIndex);
+    return nested?.action || null;
+  };
+
+  const action = resolveAction();
+  if (!action) return;
+
+  const cycle = ['click', 'input', 'change'];
+  const current = String(action.type || '').toLowerCase();
+  const currentIndex = cycle.indexOf(current);
+  if (currentIndex < 0) return;
+
+  const nextType = cycle[(currentIndex + 1) % cycle.length];
+  this.quickSetActionType(indexStr, nextType);
+}
+
 TestEditor.prototype.addReserveSelector = function(index, rawValue) {
   const action = this.test.actions[index];
   if (!action) return;

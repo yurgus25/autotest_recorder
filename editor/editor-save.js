@@ -33,7 +33,18 @@ TestEditor.prototype.saveAction = function() {
   
   // Обычное действие
   const actionType = document.getElementById('actionType')?.value;
-  const subtype = this.currentSubtype;
+  let subtype = this.currentSubtype;
+
+  // При смене типа действия сохраняем возможность "быстрого" конверта:
+  // если старый subtype не поддерживается новым type, автоматически сбрасываем subtype.
+  // Это особенно важно для input(dropdown-combobox) -> click.
+  if (subtype) {
+    const supportedForType = this.runtimeSupportedSubtypes?.[actionType];
+    if (!supportedForType || !supportedForType.has(subtype)) {
+      subtype = null;
+      this.currentSubtype = null;
+    }
+  }
 
   if (!this.runtimeSupportedActionTypes.has(actionType)) {
     alert(`Тип действия "${actionType}" пока не поддерживается при воспроизведении`);

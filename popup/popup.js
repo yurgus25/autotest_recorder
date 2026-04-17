@@ -53,6 +53,7 @@ class PopupController {
     this.currentEditingGroupId = null;
     this._creatingGroupContext = null; // { testIds: string[] } when creating a new group via modal
     this._lastRandomGroupColor = null;
+    this.stateHydrated = false; // Первичная синхронизация GET_STATE после открытия popup
     this.init();
     this.setupSettingsListener();
   }
@@ -728,57 +729,76 @@ class PopupController {
     });
   }
 
-  async loadState() {
-    try {
-      // Проверяем, что extension готов
-      if (!chrome.runtime?.id) {
-        console.warn('⚠️ Extension context недействителен, пропускаю загрузку состояния');
-        return;
-      }
-      
-      const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
-      if (response && response.success) {
-        // Сохраняем currentTestId и isPaused перед обновлением
-        const savedTestId = this.state.currentTestId;
-        const savedIsPaused = this.state.isPaused;
-        
-        const merged = { ...this.state, ...response.state };
-        // Не даём периодическому GET_STATE откатывать шаг назад, если popup уже видел завершённые шаги.
-        const completedMaxStep = (this.state.completedSteps || []).reduce((max, s) => {
-          const stepNum = Number(s?.step) || 0;
-          return stepNum > max ? stepNum : max;
-        }, 0);
-        const minAllowedStep = completedMaxStep > 0 ? completedMaxStep + 1 : 0;
-        merged.currentStep = Math.max(Number(merged.currentStep) || 0, minAllowedStep);
-        this.state = merged;
-        
-        // Восстанавливаем currentTestId и isPaused, если тест все еще воспроизводится
-        if (this.state.isPlaying) {
-          if (savedTestId) {
-            this.state.currentTestId = savedTestId;
+  async loadState(maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Проверяем, что extension готов
+        if (!chrome.runtime?.id) {
+          if (attempt < maxRetries - 1) {
+            await this.delay(120);
+            continue;
           }
-          if (savedIsPaused !== undefined) {
-            this.state.isPaused = savedIsPaused;
-          }
+          console.warn('⚠️ Extension context недействителен, пропускаю загрузку состояния');
+          return;
         }
 
-        // Если background сообщает о текущей группе — окрашиваем прогресс цветом группы;
-        // иначе сбрасываем, чтобы не показывать цвет предыдущей группы при одиночном запуске.
-        if (response.state?.currentGroupId) {
-          this.state.playingGroupId = String(response.state.currentGroupId);
-        } else {
-          this.state.playingGroupId = null;
+        const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
+        if (response && response.success) {
+          // Сохраняем currentTestId и isPaused перед обновлением
+          const savedTestId = this.state.currentTestId;
+          const savedIsPaused = this.state.isPaused;
+
+          const merged = { ...this.state, ...response.state };
+          // Не даём периодическому GET_STATE откатывать шаг назад, если popup уже видел завершённые шаги.
+          const completedMaxStep = (this.state.completedSteps || []).reduce((max, s) => {
+            const stepNum = Number(s?.step) || 0;
+            return stepNum > max ? stepNum : max;
+          }, 0);
+          const minAllowedStep = completedMaxStep > 0 ? completedMaxStep + 1 : 0;
+          merged.currentStep = Math.max(Number(merged.currentStep) || 0, minAllowedStep);
+          this.state = merged;
+
+          // Восстанавливаем currentTestId и isPaused, если тест все еще воспроизводится
+          if (this.state.isPlaying) {
+            if (savedTestId) {
+              this.state.currentTestId = savedTestId;
+            }
+            if (savedIsPaused !== undefined) {
+              this.state.isPaused = savedIsPaused;
+            }
+          }
+
+          // Если background сообщает о текущей группе — окрашиваем прогресс цветом группы;
+          // иначе сбрасываем, чтобы не показывать цвет предыдущей группы при одиночном запуске.
+          if (response.state?.currentGroupId) {
+            this.state.playingGroupId = String(response.state.currentGroupId);
+          } else {
+            this.state.playingGroupId = null;
+          }
+
+          this.stateHydrated = true;
+          this.updateUI();
+          return;
         }
-        
-        this.updateUI();
+        if (attempt < maxRetries - 1) {
+          await this.delay(120 + attempt * 60);
+          continue;
+        }
+      } catch (error) {
+        // Игнорируем ошибки соединения - это нормально, если background script перезапускается
+        if (error.message && error.message.includes('Receiving end does not exist')) {
+          if (attempt < maxRetries - 1) {
+            await this.delay(120 + attempt * 60);
+            continue;
+          }
+          return;
+        }
+        if (attempt < maxRetries - 1) {
+          await this.delay(120 + attempt * 60);
+          continue;
+        }
+        console.error('Error loading state:', error);
       }
-    } catch (error) {
-      // Игнорируем ошибки соединения - это нормально, если background script перезапускается
-      if (error.message && error.message.includes('Receiving end does not exist')) {
-        // Это нормально, background script может быть не готов
-        return;
-      }
-      console.error('Error loading state:', error);
     }
   }
 
@@ -1057,8 +1077,8 @@ class PopupController {
 
     try {
       console.log('📤 Отправка сообщения START_RECORDING...');
-      
-      const response = await new Promise((resolve, reject) => {
+
+      const sendStartRecordingRequest = () => new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'START_RECORDING',
           testName: testName
@@ -1066,15 +1086,51 @@ class PopupController {
           if (chrome.runtime.lastError) {
             console.error('❌ Ошибка chrome.runtime:', chrome.runtime.lastError);
             reject(new Error(chrome.runtime.lastError.message));
+          } else if (!response || typeof response !== 'object') {
+            resolve({
+              success: false,
+              error: this.t('popup.backgroundNotResponding')
+            });
           } else {
             resolve(response);
           }
         });
       });
 
+      const isRetryableStartError = (msg) => {
+        const text = String(msg || '').toLowerCase();
+        return text.includes('receiving end does not exist') ||
+               text.includes('could not establish connection') ||
+               text.includes('extension context invalidated') ||
+               text.includes('background');
+      };
+
+      let response;
+      let didRetry = false;
+      try {
+        response = await sendStartRecordingRequest();
+      } catch (firstError) {
+        if (!didRetry && isRetryableStartError(firstError?.message)) {
+          didRetry = true;
+          console.warn('⚠️ START_RECORDING: фон не готов, повтор через 250ms...');
+          await this.delay(250);
+          response = await sendStartRecordingRequest();
+        } else {
+          throw firstError;
+        }
+      }
+
+      if ((!response || response.success !== true) && !didRetry && isRetryableStartError(response?.error)) {
+        didRetry = true;
+        console.warn('⚠️ START_RECORDING: получен временный сбой, повтор через 250ms...');
+        await this.delay(250);
+        response = await sendStartRecordingRequest();
+      }
+
       console.log('📥 Ответ от background:', response);
 
       if (response && response.success) {
+        this.stateHydrated = true;
         this.state.isRecording = true;
         this.state.currentTestId = response.testId;
         this.updateUI();
@@ -1099,14 +1155,37 @@ class PopupController {
   async stopRecording() {
     try {
       const response = await chrome.runtime.sendMessage({ type: 'STOP_RECORDING' });
+      if (chrome.runtime.lastError) {
+        const le = chrome.runtime.lastError.message || '';
+        await this.loadState();
+        if (!this.state.isRecording) {
+          this.stateHydrated = true;
+          this.updateUI();
+          await this.loadTests();
+          return;
+        }
+        alert(this.t('popup.alertStopRecordingError', {
+          msg: le || this.t('popup.backgroundNotResponding')
+        }));
+        return;
+      }
 
-      if (response.success) {
+      if (response?.success) {
+        this.stateHydrated = true;
         this.state.isRecording = false;
         this.state.currentTestId = null;
         this.updateUI();
         await this.loadTests(); // Обновляем список тестов
       } else {
-        alert(this.t('popup.alertStopRecordingError', { msg: response.error || this.t('common.unknownError') }));
+        // Иногда background не успевает вернуть payload, но запись уже остановлена.
+        await this.loadState();
+        if (!this.state.isRecording) {
+          return;
+        }
+        const stopErrorMessage = response?.error === 'BACKGROUND_NO_RESPONSE'
+          ? this.t('popup.backgroundNotResponding')
+          : (response?.error || this.t('common.unknownError'));
+        alert(this.t('popup.alertStopRecordingError', { msg: stopErrorMessage }));
       }
     } catch (error) {
       console.error('Error stopping recording:', error);
@@ -1138,12 +1217,36 @@ class PopupController {
     this.showToast(this.t('popup.refreshPageWarning'), 'warning');
 
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'PLAY_TEST',
-        testId: testId
+      const sendPlayRequest = () => new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+          type: 'PLAY_TEST',
+          testId: testId
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response);
+        });
       });
 
-      if (response.success) {
+      const isRetryablePlayError = (msg) => {
+        const text = String(msg || '').toLowerCase();
+        return text.includes('receiving end does not exist') ||
+               text.includes('could not establish connection') ||
+               text.includes('background') ||
+               text.includes('context');
+      };
+
+      let response = await sendPlayRequest();
+      if ((!response || typeof response !== 'object' || response.success !== true) &&
+          isRetryablePlayError(response?.error || 'background')) {
+        await this.delay(250);
+        response = await sendPlayRequest();
+      }
+
+      if (response && response.success) {
+        this.stateHydrated = true;
         this.state.isPlaying = true;
         this.state.isPaused = false;
         this.state.currentTestId = testId;
@@ -1156,11 +1259,16 @@ class PopupController {
           this.loadState();
         }, 5000);
       } else {
-        if (response.error === 'NO_STEPS_TO_PLAY') {
+        // Иногда PLAY_TEST уже запущен, но ответ в popup не пришёл/пустой.
+        await this.loadState();
+        if (this.state.isPlaying && String(this.state.currentTestId) === String(testId)) {
+          return;
+        }
+        if (response?.error === 'NO_STEPS_TO_PLAY') {
           this.showToast(this.t('popup.noStepsToPlay'), 'warning');
         } else {
           const hint = window.i18n && typeof window.i18n.playbackUserMessage === 'function'
-            ? window.i18n.playbackUserMessage(response.error)
+            ? window.i18n.playbackUserMessage(response?.error || this.t('popup.backgroundNotResponding'))
             : this.t('popup.playbackHintGeneric');
           alert(hint);
         }
@@ -1180,14 +1288,14 @@ class PopupController {
         type: 'PAUSE_PLAYBACK'
       });
 
-      if (response.success) {
+      if (response?.success) {
         this.state.isPaused = true;
         this.stopIdleWarningTimer();
         this.updateUI();
         this.renderTests(); // Обновляем список тестов для показа кнопки возобновления
         console.log('⏸️ Воспроизведение поставлено на паузу');
       } else {
-        alert(this.t('popup.alertPauseError', {msg: response.error || this.t('common.unknownError')}));
+        alert(this.t('popup.alertPauseError', {msg: response?.error || this.t('common.unknownError')}));
       }
     } catch (error) {
       console.error('Error pausing playback:', error);
@@ -1201,14 +1309,14 @@ class PopupController {
         type: 'RESUME_PLAYBACK_FROM_PAUSE'
       });
 
-      if (response.success) {
+      if (response?.success) {
         this.state.isPaused = false;
         this.markPlaybackActivity();
         this.updateUI();
         this.renderTests(); // Обновляем список тестов для показа кнопки паузы
         console.log('▶️ Воспроизведение возобновлено');
       } else {
-        alert(this.t('popup.alertResumeError', {msg: response.error || this.t('common.unknownError')}));
+        alert(this.t('popup.alertResumeError', {msg: response?.error || this.t('common.unknownError')}));
       }
     } catch (error) {
       console.error('Error resuming playback:', error);
@@ -2006,7 +2114,7 @@ class PopupController {
       
       if (this.state.isPlaying) {
         const response = await chrome.runtime.sendMessage({ type: 'STOP_PLAYING' });
-        if (response.success) {
+        if (response?.success) {
           this.state.isPlaying = false;
           this.state.isPaused = false;
           this.state.currentTestId = null;
@@ -2032,6 +2140,20 @@ class PopupController {
     const stepText = document.getElementById('stepText');
     const stepType = document.getElementById('stepType');
     const stepBarFill = document.getElementById('stepBarFill');
+
+    // Пока состояние background не синхронизировано, не показываем "Готов" с активной кнопкой старта.
+    if (!this.stateHydrated && !this.state.isRecording && !this.state.isPlaying) {
+      statusIndicator.className = 'status-indicator';
+      statusText.textContent = this.t('common.loading') || '...';
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      stopBtn.style.display = 'inline-block';
+      forceStopBtn.disabled = true;
+      if (pauseBtn) pauseBtn.style.display = 'none';
+      if (resumeBtn) resumeBtn.style.display = 'none';
+      stepProgress.style.display = 'none';
+      return;
+    }
 
     if (this.state.isRecording) {
       statusIndicator.className = 'status-indicator recording';
@@ -3127,7 +3249,7 @@ class PopupController {
         test: testData
       });
 
-      if (response.success) {
+      if (response?.success) {
         alert(this.t('popup.alertImportSuccess', {name: testData.name}));
         await this.loadTests(); // Обновляем список
       } else {

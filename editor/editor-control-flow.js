@@ -469,7 +469,7 @@ TestEditor.prototype.renderConditionBlock = function(action, index, visibleStepN
   return `
     <div class="${actionClassName}" data-index="${index}" data-protected="condition">
       <div class="action-header">
-        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${visibleStepNumber}</span>
+        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${isHidden ? '—' : visibleStepNumber}</span>
         <span class="drag-handle" title="${this.t('editorUI.dragToMove') || 'Drag to move'}">☰</span>
         <span class="action-type-badge condition">${this.t('editorUI.conditionBadge')}</span>
         <div class="condition-expression">
@@ -566,7 +566,7 @@ TestEditor.prototype.renderLoopBlock = function(action, index, visibleStepNumber
   return `
     <div class="${actionClassName}" data-index="${index}" data-protected="loop">
       <div class="action-header">
-        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${visibleStepNumber}</span>
+        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${isHidden ? '—' : visibleStepNumber}</span>
         <span class="drag-handle" title="${this.t('editorUI.dragToMove') || 'Drag to move'}">☰</span>
         <span class="action-type-badge loop">${this.t('editorUI.loopBadge')}</span>
         <div class="loop-description">
@@ -627,7 +627,7 @@ TestEditor.prototype.renderTryCatchBlock = function(action, index, visibleStepNu
   return `
     <div class="${actionClassName}" data-index="${index}" data-protected="try-catch">
       <div class="action-header">
-        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${visibleStepNumber}</span>
+        <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${index}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepShort', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action')}">${isHidden ? '—' : visibleStepNumber}</span>
         <span class="drag-handle" title="${this.t('editorUI.dragToMove') || 'Drag to move'}">☰</span>
         <span class="action-type-badge try-catch">${this.t('editorUI.tryCatchBadge') || 'TRY-CATCH'}</span>
         <div class="try-catch-description">

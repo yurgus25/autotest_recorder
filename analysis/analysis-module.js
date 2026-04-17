@@ -2828,7 +2828,9 @@ const AnalysisModule = {
     return async function(containerSelector, targetValue) {
       const delay = (ms) => new Promise(r => setTimeout(r, ms));
       const normalize = (s) => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const normalizeCompact = (s) => normalize(String(s || '').replace(/[^\p{L}\p{N}\s()]+/gu, ' '));
       const targetLower = normalize(String(targetValue));
+      const targetCompact = normalizeCompact(String(targetValue));
       const container = document.querySelector(containerSelector);
       if (!container) return { success: false, error: 'Container not found: ' + containerSelector };
       const getDisplayValue = (c) => {
@@ -2849,6 +2851,7 @@ const AnalysisModule = {
       const clickTargets = [
         () => container.querySelector('.options, [class*="options"]'),
         () => container.querySelector('.arrow.isShowOptions, .arrow[class*="isShowOptions"]'),
+        () => container.querySelector('[role="combobox"], input[role="combobox"]'),
         () => container.querySelector('.select-box, .result, .arrow, [class*="arrow"], [class*="select-box"]'),
         () => container
       ];
@@ -2858,19 +2861,27 @@ const AnalysisModule = {
         if (trigger) break;
       }
       if (!trigger) return { success: false, error: 'No trigger found' };
-      try { trigger.focus?.(); trigger.click(); } catch (e) {}
-      trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, view: window }));
-      trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, view: window }));
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, view: window }));
-      await delay(3200);
-      const optionSelectors = '[role="option"], .mat-option, .ng-option, .cdk-option, .option, .option.cutted-text, .result__content, .result__item, li[role="option"], div[class*="option-item"], div[class*="ant-select-item"]';
-      const panelSelectors = '.cdk-overlay-pane, .cdk-overlay-container, .ant-select-dropdown, .el-select-dropdown, [role="listbox"], [id*="__result"]';
+      const pulseOpen = (el) => {
+        if (!el) return;
+        try { el.focus?.(); el.click?.(); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+        try {
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+        } catch (_) {}
+      };
+      pulseOpen(trigger);
+      await delay(900);
+      const optionSelectors = '[role="option"], .mat-option, .ng-option, .cdk-option, .option, .option.cutted-text, .group-item, li[role="option"], .ant-select-item-option, [class*="group-item"]';
+      const panelSelectors = '.cdk-overlay-pane, .cdk-overlay-container, .ant-select-dropdown, .el-select-dropdown, [role="listbox"], [id*="__result"], [class*="dropdown-panel"], [class*="content-list"]';
       const collectOptions = () => {
         const options = [];
         const overlayRoot = document.querySelector('.cdk-overlay-container');
         let panels = overlayRoot ? overlayRoot.querySelectorAll(panelSelectors) : [];
         if (!panels.length) panels = document.querySelectorAll(panelSelectors);
-        panels = Array.from(panels).filter(p => p && isVisible(p) && !container.contains(p));
+        panels = Array.from(panels).filter(p => p && isVisible(p));
         for (const p of panels) {
           p.querySelectorAll(optionSelectors).forEach(o => {
             const txt = (o.textContent || '').trim();
@@ -2878,10 +2889,10 @@ const AnalysisModule = {
           });
         }
         const elementId = container.getAttribute?.('elementid') || container.getAttribute?.('ng-reflect-element-id');
-        if (options.length === 0 && elementId) {
+        if (elementId) {
           const resultId = elementId + '__result';
           const relatedPanel = document.getElementById(resultId) || document.querySelector('[id*="' + resultId + '"]');
-          if (relatedPanel && !container.contains(relatedPanel)) {
+          if (relatedPanel) {
             relatedPanel.querySelectorAll(optionSelectors).forEach(o => {
               const txt = (o.textContent || '').trim();
               if (txt && isVisible(o) && isSafeOption(o)) options.push(o);
@@ -2894,52 +2905,60 @@ const AnalysisModule = {
             if (txt && txt.length > 2 && isVisible(o) && isSafeOption(o)) options.push(o);
           });
         }
-        return options;
+        if (options.length === 0) {
+          container.querySelectorAll(optionSelectors).forEach(o => {
+            const txt = (o.textContent || '').trim();
+            if (txt && isVisible(o) && isSafeOption(o)) options.push(o);
+          });
+        }
+        return [...new Set(options)];
       };
       let options = [];
       for (let attempt = 0; attempt < 16; attempt++) {
         await delay(attempt === 0 ? 800 : 400);
         options = collectOptions();
         if (options.length > 0) break;
-      }
-      const getOptText = (o) => {
-        const c = o.querySelector('.result__content, .result__value, [ng-reflect-value], [ng-reflect-app-tooltip]');
-        const raw = (c?.textContent || c?.getAttribute?.('ng-reflect-app-tooltip') || o.getAttribute?.('ng-reflect-app-tooltip') || o.textContent || o.innerText || '').trim().replace(/^[—–-]\s*/, '');
-        return normalize(raw) || normalize(o.textContent || '');
-      };
-      const abbrevMatch = targetLower.match(/\(([^)]+)\)/);
-      const matchOption = (o) => {
-        const txt = getOptText(o);
-        if (!txt) return false;
-        if (txt === targetLower || txt.includes(targetLower) || targetLower.includes(txt)) return true;
-        if (abbrevMatch) {
-          const abbrev = normalize(abbrevMatch[1]);
-          if (abbrev && (txt.includes(abbrev) || txt.includes('(' + abbrevMatch[1].toLowerCase() + ')') || txt === abbrev)) return true;
-          if (abbrevMatch[1].length <= 4 && (txt.endsWith('(' + abbrev + ')') || txt.endsWith(' (' + abbrev + ')'))) return true;
-        }
-        const targetNoParen = targetLower.replace(/\s*\([^)]+\)\s*/, '').trim();
-        if (targetNoParen && txt.includes(targetNoParen)) return true;
-        const firstWord = targetLower.split(/\s+/)[0];
-        if (firstWord && firstWord.length >= 4 && txt.includes(firstWord)) return true;
-        return false;
-      };
-      let matched = options.find(matchOption);
-      if (!matched && options.length > 0) {
-        const targetWords = targetLower.replace(/\s*\([^)]+\)\s*/, '').split(/\s+/).filter(w => w.length >= 2);
-        matched = options.find(o => {
-          const txt = getOptText(o);
-          return txt && targetWords.filter(w => txt.includes(w)).length >= Math.min(2, targetWords.length);
-        });
-      }
-      if (!matched && options.length > 0 && abbrevMatch) {
-        const abbrev = normalize(abbrevMatch[1]);
-        if (abbrev && abbrev.length >= 2) {
-          matched = options.find(o => {
-            const txt = getOptText(o);
-            return txt && txt.includes(abbrev);
+        if (attempt >= 2 && (attempt % 2 === 1 || attempt === 14)) {
+          const deepTrigger = container.querySelector('div div div div:nth-of-type(2), .select-box, .result, [role="combobox"]');
+          const appSelect = container.closest?.('app-select') || container.querySelector?.('app-select');
+          const openTargets = [trigger, deepTrigger, appSelect, container];
+          openTargets.forEach((el) => {
+            if (el) pulseOpen(el);
           });
         }
       }
+      const getOptText = (o) => {
+        const c = o.querySelector('.result__content, .result__value, [ng-reflect-value], [ng-reflect-app-tooltip]');
+        const raw = (
+          c?.textContent ||
+          c?.getAttribute?.('ng-reflect-app-tooltip') ||
+          o.getAttribute?.('ng-reflect-app-tooltip') ||
+          o.getAttribute?.('aria-label') ||
+          o.getAttribute?.('title') ||
+          o.textContent ||
+          o.innerText ||
+          ''
+        ).trim().replace(/^[—–-]\s*/, '');
+        return normalize(raw) || normalize(o.textContent || '');
+      };
+      const abbrevMatch = targetLower.match(/\(([^)]+)\)/);
+      const isStrictMatch = (txt) => {
+        if (!txt) return false;
+        const txtCompact = normalizeCompact(txt);
+        if (txt === targetLower || txtCompact === targetCompact) return true;
+        if (abbrevMatch) {
+          const abRaw = String(abbrevMatch[1] || '');
+          const ab = normalize(abRaw);
+          if (ab && (txt === ab || txt.endsWith('(' + ab + ')') || txt.endsWith(' (' + ab + ')'))) return true;
+        }
+        return false;
+      };
+      const matchOption = (o) => {
+        const txt = getOptText(o);
+        if (!txt) return false;
+        return isStrictMatch(txt);
+      };
+      let matched = options.find(matchOption);
       if (!matched) return { success: false, error: 'Option not found: ' + targetValue };
       matched.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
       await delay(400);
@@ -2955,13 +2974,10 @@ const AnalysisModule = {
       const clickTarget = matched.closest?.('.option, [role="option"], [class*="option-item"]') || matched;
       tryClick(clickTarget);
       await delay(700);
-      const abbrevForVerify = abbrevMatch ? normalize(abbrevMatch[1]) : '';
       const isVerified = (disp) => {
         if (!disp) return false;
-        const d = (disp + '').toLowerCase();
-        if (d.includes(targetLower) || targetLower.includes(d)) return true;
-        if (abbrevForVerify && d.includes(abbrevForVerify)) return true;
-        return false;
+        const d = normalize(String(disp || ''));
+        return isStrictMatch(d);
       };
       let displayAfter = getDisplayValue(container);
       let verified = isVerified(displayAfter);

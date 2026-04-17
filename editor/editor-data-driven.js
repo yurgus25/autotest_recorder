@@ -267,20 +267,30 @@
     var actualMode = debugMode ? 'optimized' : mode;
 
     var response;
+    var sendPlayRequest = () => chrome.runtime.sendMessage({
+      type: 'PLAY_TEST',
+      testId: this.test.id,
+      test: this.test,
+      mode: actualMode,
+      debugMode: debugMode,
+      dataDrivenStart: true,
+      dataDrivenRows: rows
+    });
     try {
-      response = await chrome.runtime.sendMessage({
-        type: 'PLAY_TEST',
-        testId: this.test.id,
-        test: this.test,
-        mode: actualMode,
-        debugMode: debugMode,
-        dataDrivenStart: true,
-        dataDrivenRows: rows
-      });
+      response = await sendPlayRequest();
     } catch (sendError) {
       console.error('[Editor] PLAY_TEST data-driven:', sendError);
       alert(this.t('editorUI.requestError', { error: sendError.message || String(sendError) }));
       return;
+    }
+
+    if (!response) {
+      await new Promise(r => setTimeout(r, 250));
+      response = await sendPlayRequest().catch(() => null);
+      if (!response) {
+        this.showToast(this.t('popup.backgroundNotResponding'), 'warning');
+        return;
+      }
     }
 
     if (response && response.success) {

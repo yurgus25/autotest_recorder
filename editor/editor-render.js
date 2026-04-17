@@ -177,6 +177,7 @@ TestEditor.prototype.renderActionItem = function(action, index, visibleStepNumbe
   const reserveStats = this.getSelectorReserveStats(action);
   const selectorDisplayValue = this.escapeHtml(selectorInfo);
   const actionValue = this.getActionValue(action);
+  const subtypeVisualBadge = this.getSubtypeVisualBadge(action);
   
   // Рассчитываем метрики качества селектора
   // Передаем сохраненное качество, чтобы не проверять селектор на текущей странице, если он был найден во время воспроизведения
@@ -203,6 +204,7 @@ TestEditor.prototype.renderActionItem = function(action, index, visibleStepNumbe
   // Добавляем класс для действий внутри циклов/условий
   if (isInsideLoopOrCondition) classes.push('inside-nested');
   const actionClassName = classes.join(' ');
+  const quickTypeSwitchable = ['click', 'input', 'change'].includes(action.type);
   const optimizationBadge = isAutoOptimized ? `
     <span class="action-status-badge optimized" title="${this.escapeHtml(optimizationMeta.reason || this.t('editorUI.autoOptimization'))}">
       ⚡ Оптимизация
@@ -223,10 +225,17 @@ TestEditor.prototype.renderActionItem = function(action, index, visibleStepNumbe
           <span class="selector-quality-indicator" style="background-color: ${qualityColor}" title="${this.escapeHtml(qualityTooltip)}"></span>
           ${hasProblematicPatterns ? '<span class="selector-warning-icon" title="' + this.escapeHtml((this.t('editorUI.problematicSelectorWithIssues', { issues: selectorQuality.issues.join(', ') }) || ('⚠️ Problematic selector: ' + selectorQuality.issues.join(', ')))) + '">⚠️</span>' : ''}
           <span class="action-number clickable-number ${isHidden ? 'inactive' : ''}" data-action-index="${actionIndex}" data-action="toggle-visibility" title="${this.t('editorUI.clickToShowHideStepTooltip', { action: isHidden ? this.t('editorUI.showBtn') : this.t('editorUI.hideBtn') }) || ('Click to ' + (isHidden ? 'show' : 'hide') + ' action. Double click to change step number.')}">
-            ${isCollapsed ? '#' : '# '}${visibleStepNumber}
+            ${isHidden ? '—' : (isCollapsed ? '#' : '# ') + visibleStepNumber}
           </span>
           <span class="drag-handle">☰</span>
-          <span class="action-type-badge ${action.type} ${action.subtype ? action.subtype : ''}" title="${this.escapeHtml(typeIconChar + ' ' + typeBadge)}"><span class="action-type-icon" aria-hidden="true">${typeIconChar}</span><span class="action-type-label">${typeBadge}</span></span>
+          <span
+            class="action-type-badge ${action.type} ${action.subtype ? action.subtype : ''} ${quickTypeSwitchable ? 'type-badge-clickable' : ''}"
+            data-action="${quickTypeSwitchable ? 'quick-cycle-type' : ''}"
+            data-action-index="${quickTypeSwitchable ? actionIndex : ''}"
+            title="${this.escapeHtml(typeIconChar + ' ' + typeBadge + (quickTypeSwitchable ? ' • Click to switch type' : ''))}"
+            style="${quickTypeSwitchable ? 'cursor:pointer;' : ''}"
+          ><span class="action-type-icon" aria-hidden="true">${typeIconChar}</span><span class="action-type-label">${typeBadge}</span></span>
+          ${subtypeVisualBadge}
           ${(action.fieldLabel && this.showFieldLabels) ? `<span class="action-field-label" title="${this.t('editorUI.fieldLabelTooltip') || 'Field label'}">${this.escapeHtml(action.fieldLabel)}</span>` : ''}
           ${optimizationBadge}
           ${gigaChatBadge}
@@ -844,6 +853,28 @@ TestEditor.prototype.getActionTypeBadge = function(type, action) {
     'try-catch': this.t('editorUI.actionTypeTryCatch') || 'Error handling'
   };
   return badges[type] || type;
+}
+
+TestEditor.prototype.getSubtypeVisualBadge = function(action) {
+  const subtype = String(action?.subtype || '').trim();
+  if (!subtype) return '';
+
+  const badges = {
+    'dropdown-combobox': { icon: '🔽', label: 'dropdown-combobox', color: '#1e40af' },
+    'dropdown-datalist': { icon: '📋', label: 'dropdown-datalist', color: '#1e40af' },
+    'keyboard-typeahead': { icon: '⌨️', label: 'keyboard-typeahead', color: '#334155' }
+  };
+  const cfg = badges[subtype];
+  if (!cfg) return '';
+
+  return `
+    <span class="action-subtype-visual-badge"
+          title="${this.escapeHtml('Quick step: ' + cfg.label)}"
+          style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:${cfg.color};color:#fff;font-size:11px;line-height:1.4;">
+      <span aria-hidden="true">${cfg.icon}</span>
+      <span>${this.escapeHtml(cfg.label)}</span>
+    </span>
+  `;
 }
 
 TestEditor.prototype.getAnalysisDescription = function(subtype) {

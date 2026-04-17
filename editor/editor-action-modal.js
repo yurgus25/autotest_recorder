@@ -1681,7 +1681,12 @@ TestEditor.prototype.getCurrentTestUrl = function() {
 TestEditor.prototype.updateFormForActionType = function(subtype = null) {
   const actionType = document.getElementById('actionType').value;
   this.currentEditingActionType = actionType === 'try-catch' ? 'try-catch' : 'action';
-  const effectiveSubtype = subtype || this.currentSubtype;
+  let effectiveSubtype = subtype || this.currentSubtype;
+  const supportedForType = this.runtimeSupportedSubtypes?.[actionType];
+  if (effectiveSubtype && (!supportedForType || !supportedForType.has(effectiveSubtype))) {
+    effectiveSubtype = null;
+    this.currentSubtype = null;
+  }
   
   const actionValueGroup = document.getElementById('actionValueGroup');
   const actionValueLabel = document.getElementById('actionValueLabel');

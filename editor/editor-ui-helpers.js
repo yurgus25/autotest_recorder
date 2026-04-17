@@ -208,14 +208,28 @@ TestEditor.prototype.saveTest = async function() {
     // Сбрасываем счетчик при успешной проверке
     this.saveTestAttempts = 0;
 
-    const response = await chrome.runtime.sendMessage({
+    let response = await chrome.runtime.sendMessage({
       type: 'UPDATE_TEST',
       test: this.test
     });
 
-    // Проверяем, что response не undefined
     if (!response) {
-      throw new Error(this.t('editorUI.backgroundNoResponse'));
+      // Временный null-ответ из MV3 канала: короткий ретрай вместо ошибки пользователю.
+      await new Promise(r => setTimeout(r, 250));
+      response = await chrome.runtime.sendMessage({
+        type: 'UPDATE_TEST',
+        test: this.test
+      });
+      if (!response) {
+        if (!this.saveTestAttempts) this.saveTestAttempts = 0;
+        this.saveTestAttempts++;
+        if (this.saveTestAttempts < 5) {
+          setTimeout(() => this.saveTest(), 400 * this.saveTestAttempts);
+          return;
+        }
+        this.showToast(this.t('editorUI.saveError') + ': ' + this.t('popup.backgroundNotResponding'), 'warning');
+        return;
+      }
     }
 
     if (response.success) {
@@ -398,14 +412,15 @@ TestEditor.prototype.playTest = async function(mode = null, options = {}) {
     // Передаём текущее состояние теста из редактора (включая снятие скрытия шагов),
     // чтобы воспроизведение использовало то, что видит пользователь, а не только сохранённую копию.
     let response;
+    const sendPlayRequest = () => chrome.runtime.sendMessage({
+      type: 'PLAY_TEST',
+      testId: this.test.id,
+      test: this.test,
+      mode: actualMode,
+      debugMode: debugMode,
+    });
     try {
-      response = await chrome.runtime.sendMessage({
-        type: 'PLAY_TEST',
-        testId: this.test.id,
-        test: this.test,
-        mode: actualMode,
-        debugMode: debugMode,
-      });
+      response = await sendPlayRequest();
     } catch (sendError) {
       console.error('❌ [Editor] Ошибка при отправке сообщения в background script:', sendError);
       const errorMessage = sendError?.message || String(sendError);
@@ -420,13 +435,16 @@ TestEditor.prototype.playTest = async function(mode = null, options = {}) {
 
     // Проверяем, что response не undefined
     if (!response) {
-      console.error('❌ [Editor] Background script не вернул ответ на запрос PLAY_TEST');
-      console.error('   Возможно, background script еще не готов или extension перезагружен');
-      alert(this.t('editorUI.extensionNotResponded'));
-      return;
+      await new Promise(r => setTimeout(r, 250));
+      response = await sendPlayRequest().catch(() => null);
+      if (!response) {
+        // Не показываем фатальную ошибку: просим пользователя повторить, но без блокирующего alert.
+        this.showToast(this.t('popup.backgroundNotResponding'), 'warning');
+        return;
+      }
     }
 
-    if (response.success) {
+    if (response?.success) {
       const modeLabel = mode === 'full' ? this.t('editorUI.fullRun') : this.t('editorUI.optimizedRun');
       
       // Если тест без визуальных действий and запускается из редактора, показываем другое сообщение

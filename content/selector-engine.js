@@ -402,9 +402,8 @@ class SelectorEngine {
     if (element.name) {
       const nameSelector = `[name="${this.escapeSelector(element.name)}"]`;
       const nameElements = document.querySelectorAll(nameSelector);
-      // Для name проверяем, что это единственный элемент такого типа с таким name
-      const isUnique = nameElements.length === 1 || 
-        (nameElements.length > 0 && Array.from(nameElements).every(el => el.tagName === element.tagName && el.name === element.name));
+      // Для name считаем уникальным только реально одиночный матч на странице.
+      const isUnique = nameElements.length === 1;
       
       selectors.push({
         type: 'name',
@@ -1277,7 +1276,6 @@ class SelectorEngine {
               try {
                 const list = document.querySelectorAll(`[aria-label*="${esc}"]`);
                 if (list.length === 1) element = list[0];
-                else if (list.length > 1) element = list[0];
               } catch (e) {
                 // ignore
               }

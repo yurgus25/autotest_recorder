@@ -81,6 +81,163 @@ function formatAppliedWhen(appliedWhen) {
   return map[appliedWhen] || appliedWhen;
 }
 
+function getActionSelectorKey(action) {
+  const selector = action?.selector;
+  if (!selector) return '';
+  if (typeof selector === 'string') return selector;
+  return selector.selector || selector.value || '';
+}
+
+function getActionTargetKey(action) {
+  if (!action) return '';
+  if (action.elementKey) return `element:${action.elementKey}`;
+  const selectorKey = getActionSelectorKey(action);
+  return selectorKey ? `selector:${selectorKey}` : '';
+}
+
+function isSingleTargetSelector(action) {
+  const selector = action?.selector;
+  if (!selector || typeof selector !== 'object') return false;
+  return selector.isUnique === true || selector.unique === true || selector.matchCount === 1 || selector.matchesCount === 1;
+}
+
+function isActionSingleTarget(action) {
+  return !!(action?.elementKey || isSingleTargetSelector(action));
+}
+
+function isValueAction(action) {
+  return !!(action && (action.type === 'input' || action.type === 'change') && action.value !== undefined && action.value !== null);
+}
+
+function shouldReplacePreviousValueAction(prevAction, nextAction) {
+  if (!isValueAction(prevAction) || !isValueAction(nextAction)) return false;
+  if (!isActionSingleTarget(nextAction)) return false;
+  const prevTarget = getActionTargetKey(prevAction);
+  const nextTarget = getActionTargetKey(nextAction);
+  if (!prevTarget || prevTarget !== nextTarget) return false;
+  if (prevAction.type !== nextAction.type) return false;
+
+  const prevTs = Number(prevAction.timestamp) || 0;
+  const nextTs = Number(nextAction.timestamp) || 0;
+  // Защита от замены старых исторических шагов при дозаписи.
+  if (!prevTs || !nextTs || (nextTs - prevTs) > 5000) return false;
+
+  return true;
+}
+
+function findPreviousValueActionIndex(actions, nextAction, fromIndex, toIndex) {
+  if (!Array.isArray(actions) || actions.length === 0) return -1;
+  if (!isValueAction(nextAction) || !isActionSingleTarget(nextAction)) return -1;
+  const nextTarget = getActionTargetKey(nextAction);
+  if (!nextTarget) return -1;
+  const nextTs = Number(nextAction.timestamp) || 0;
+
+  const start = Math.max(0, Number(fromIndex) || 0);
+  const end = Math.min(actions.length - 1, Number.isFinite(toIndex) ? Number(toIndex) : (actions.length - 1));
+  for (let i = end; i >= start; i--) {
+    const candidate = actions[i];
+    if (!isValueAction(candidate)) continue;
+    if (candidate.type !== nextAction.type) continue;
+    if (getActionTargetKey(candidate) !== nextTarget) continue;
+    if (!isActionSingleTarget(candidate) && !isActionSingleTarget(nextAction)) continue;
+    const candidateTs = Number(candidate.timestamp) || 0;
+    if (nextTs && candidateTs && Math.abs(nextTs - candidateTs) > 5000) continue;
+    return i;
+  }
+  return -1;
+}
+
+function removeInternalRecordMeta(action) {
+  if (!action || typeof action !== 'object') return action;
+  if (Object.prototype.hasOwnProperty.call(action, '__recordArrivalOrder')) {
+    delete action.__recordArrivalOrder;
+  }
+  return action;
+}
+
+function normalizeActionTypeForIngress(type) {
+  if (self.ActionTypes && typeof self.ActionTypes.normalizeActionType === 'function') {
+    return self.ActionTypes.normalizeActionType(type);
+  }
+  if (type === 'assertion') return 'assert';
+  if (type === 'navigate') return 'navigation';
+  return type;
+}
+
+function getSelectorValueFromAction(action) {
+  const selector = action?.selector;
+  if (!selector) return '';
+  if (typeof selector === 'string') return selector.trim();
+  return String(selector.selector || selector.value || '').trim();
+}
+
+function isSelectorRequiredTypeForIngress(type) {
+  const required = new Set([
+    'click', 'dblclick', 'input', 'change', 'hover', 'focus', 'blur', 'clear', 'upload', 'drag',
+    'table', 'datepicker', 'assert', 'wait'
+  ]);
+  return required.has(type);
+}
+
+function validateIncomingRecordedAction(action) {
+  if (!action || typeof action !== 'object') {
+    return { ok: false, error: 'INVALID_ACTION_PAYLOAD', details: 'action must be an object' };
+  }
+
+  const normalizedType = normalizeActionTypeForIngress(action.type);
+  if (!normalizedType) {
+    return { ok: false, error: 'INVALID_ACTION_PAYLOAD', details: 'missing action.type' };
+  }
+
+  if (self.ActionTypes && typeof self.ActionTypes.isActionTypeSupported === 'function') {
+    if (!self.ActionTypes.isActionTypeSupported(normalizedType)) {
+      return { ok: false, error: 'UNSUPPORTED_ACTION_TYPE', details: normalizedType };
+    }
+  }
+
+  const subtype = typeof action.subtype === 'string' ? action.subtype.trim() : action.subtype;
+  if (subtype && self.ActionTypes && typeof self.ActionTypes.isSubtypeSupported === 'function') {
+    if (!self.ActionTypes.isSubtypeSupported(normalizedType, subtype)) {
+      return { ok: false, error: 'UNSUPPORTED_ACTION_SUBTYPE', details: `${normalizedType}:${subtype}` };
+    }
+  }
+
+  if (isSelectorRequiredTypeForIngress(normalizedType)) {
+    const selectorValue = getSelectorValueFromAction(action);
+    if (!selectorValue) {
+      return { ok: false, error: 'INVALID_ACTION_SELECTOR', details: `selector is required for ${normalizedType}` };
+    }
+  }
+
+  return { ok: true, normalizedType };
+}
+
+function isDuplicateClientRecordedAction(manager, action) {
+  const clientActionId = String(action?._clientActionId || '').trim();
+  if (!clientActionId) return false;
+
+  if (!manager._recordedClientActionIds) {
+    manager._recordedClientActionIds = new Set();
+    manager._recordedClientActionOrder = [];
+  }
+
+  if (manager._recordedClientActionIds.has(clientActionId)) {
+    return true;
+  }
+
+  manager._recordedClientActionIds.add(clientActionId);
+  manager._recordedClientActionOrder.push(clientActionId);
+
+  if (manager._recordedClientActionOrder.length > 1200) {
+    const staleId = manager._recordedClientActionOrder.shift();
+    if (staleId) {
+      manager._recordedClientActionIds.delete(staleId);
+    }
+  }
+
+  return false;
+}
+
 
 
 
@@ -1030,15 +1187,48 @@ function registerBackgroundMessageHandlers(manager, registry) {
       effectiveRunHistory = manager.playbackState.runHistory || null;
     }
 
+    const prevState = manager.playbackState;
+    const incomingIdx = Number(message.actionIndex);
+    const incomingIdxSafe = Number.isFinite(incomingIdx) ? incomingIdx : 0;
+    const prevIdx = Number(prevState?.actionIndex);
+    const prevIdxSafe = Number.isFinite(prevIdx) ? prevIdx : 0;
+    const sameTest = !!(testToSave && prevState?.test &&
+      String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || ''));
+    let mergedActionIndex = incomingIdxSafe;
+    let mergedPlaybackSessionId = message.playbackSessionId || prevState?.playbackSessionId || null;
+    if (sameTest) {
+      mergedActionIndex = Math.max(incomingIdxSafe, prevIdxSafe);
+      if (mergedActionIndex > incomingIdxSafe) {
+        mergedPlaybackSessionId = prevState.playbackSessionId || mergedPlaybackSessionId;
+        console.log('🛡️ [SAVE_PLAYBACK_STATE] Не уменьшаю actionIndex (устаревшее сохранение отклонено):', {
+          incoming: incomingIdxSafe,
+          previous: prevIdxSafe,
+          merged: mergedActionIndex
+        });
+      }
+    }
+
     manager.playbackState = {
       test: testToSave,
-      actionIndex: message.actionIndex,
+      actionIndex: mergedActionIndex,
       nextUrl: message.nextUrl,
       runMode,
       runHistory: effectiveRunHistory,
       isGroupRun: message.isGroupRun || false,
       groupRunCurrentIndex: message.groupRunCurrentIndex,
-      groupRunTotal: message.groupRunTotal
+      groupRunTotal: message.groupRunTotal,
+      playbackSessionId: mergedPlaybackSessionId
+    };
+    const playbackStateForStorage = {
+      ...manager.playbackState,
+      testRefId: testToSave?.id || null,
+      // Храним в storage только метаданные теста, чтобы не выбивать квоту.
+      test: testToSave ? {
+        id: testToSave.id,
+        name: testToSave.name,
+        createdAt: testToSave.createdAt,
+        updatedAt: testToSave.updatedAt
+      } : null
     };
 
     if (!manager.isPlaying) {
@@ -1052,7 +1242,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
     };
 
     try {
-      await chrome.storage.local.set({ playbackState: manager.playbackState });
+      await chrome.storage.local.set({ playbackState: playbackStateForStorage });
       console.log('✅ Состояние воспроизведения сохранено в storage');
 
       const verify = await chrome.storage.local.get('playbackState');
@@ -1071,7 +1261,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
       console.error('   Детали ошибки:', error.message, error.stack);
       if (isQuotaError(error)) {
         try {
-          const trimmed = { ...manager.playbackState };
+          const trimmed = { ...playbackStateForStorage };
           if (trimmed.runHistory?.steps?.length) {
             trimmed.runHistory = {
               ...trimmed.runHistory,
@@ -1120,6 +1310,22 @@ function registerBackgroundMessageHandlers(manager, registry) {
       nextUrl: state?.nextUrl
     });
 
+    const stateHasActions = !!(state?.test && Array.isArray(state.test.actions));
+    if (state && !stateHasActions) {
+      const refId = state?.testRefId || state?.test?.id;
+      const fullTest = refId ? getTestById(manager, refId) : null;
+      if (fullTest) {
+        state = {
+          ...state,
+          test: {
+            ...fullTest,
+            actions: Array.isArray(fullTest.actions) ? [...fullTest.actions] : []
+          }
+        };
+        manager.playbackState = state;
+      }
+    }
+
     if (state && (manager.isPlaying || state.test)) {
       console.log('✅ Возвращаю активное состояние воспроизведения');
       const inGroupRun = !!manager.currentGroupId;
@@ -1133,11 +1339,25 @@ function registerBackgroundMessageHandlers(manager, registry) {
         runHistory: state.runHistory || null,
         isGroupRun: state.isGroupRun || inGroupRun,
         groupRunCurrentIndex: state.groupRunCurrentIndex,
-        groupRunTotal: state.groupRunTotal
+        groupRunTotal: state.groupRunTotal,
+        playbackSessionId: state.playbackSessionId || null
       });
     } else {
       console.log('ℹ️ Воспроизведение не активно');
       sendResponse({ success: true, isPlaying: false });
+    }
+  });
+
+  registry.register('CLEAR_PLAYBACK_STATE', async ({ sendResponse }) => {
+    try {
+      manager.playbackState = null;
+      manager.isPlaying = false;
+      await chrome.storage.local.remove('playbackState');
+      console.log('✅ [CLEAR_PLAYBACK_STATE] Состояние воспроизведения очищено');
+      sendResponse({ success: true });
+    } catch (e) {
+      console.warn('⚠️ [CLEAR_PLAYBACK_STATE]', e?.message);
+      sendResponse({ success: false, error: e?.message });
     }
   });
 
@@ -1263,6 +1483,9 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
 
     manager.isRecording = true;
+    manager.resumePlaybackAfterRecordingStop = false;
+    manager._recordedClientActionIds = new Set();
+    manager._recordedClientActionOrder = [];
     manager.currentTest = {
       id: Date.now().toString(),
       name: message.testName || `Test ${new Date().toLocaleString()}`,
@@ -1285,7 +1508,11 @@ function registerBackgroundMessageHandlers(manager, registry) {
       console.error('❌ Ошибка при запуске записи:', error);
       manager.isRecording = false;
       manager.currentTest = null;
-      sendResponse({ success: false, error: error.message });
+      manager.resumePlaybackAfterRecordingStop = false;
+      sendResponse({
+        success: false,
+        error: (error && error.message) ? error.message : String(error || 'START_RECORDING_FAILED')
+      });
     }
   });
 
@@ -1316,10 +1543,13 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
 
     manager.isRecording = true;
+    manager._recordedClientActionIds = new Set();
+    manager._recordedClientActionOrder = [];
     manager.currentTest = existingTest;
     manager.recordInsertIndex = message.insertAfterIndex !== undefined ? message.insertAfterIndex + 1 : existingTest.actions.length;
     manager.recordedActionsCount = 0;
     manager.recordMarkerActionIndex = message.insertAfterIndex;
+    manager.resumePlaybackAfterRecordingStop = false;
 
     console.log(`🎬 Начало записи в существующий тест: ${existingTest.name} (ID: ${existingTest.id}), вставка после индекса ${message.insertAfterIndex}`);
 
@@ -1383,6 +1613,12 @@ function registerBackgroundMessageHandlers(manager, registry) {
           fromMarker: true
         });
       }
+      manager.resumePlaybackAfterRecordingStop = !!(
+        message.tabId != null &&
+        String(message.tabId).trim() !== '' &&
+        Number.isFinite(Number(message.tabId)) &&
+        Number(message.tabId) > 0
+      );
       console.log('✅ Broadcast отправлен, отправляю ответ...');
       sendResponse({ success: true, testId: manager.currentTest.id });
       console.log('✅ Ответ отправлен успешно');
@@ -1392,87 +1628,137 @@ function registerBackgroundMessageHandlers(manager, registry) {
       manager.currentTest = null;
       manager.recordInsertIndex = null;
       manager.recordMarkerActionIndex = null;
+      manager.resumePlaybackAfterRecordingStop = false;
       sendResponse({ success: false, error: error.message });
     }
   });
 
   registry.register('STOP_RECORDING', async ({ message, sendResponse }) => {
-    if (!manager.isRecording) {
-      sendResponse({ success: false, error: 'Запись не активна' });
-      return;
-    }
-
-    const cancelMarkerRecording = !!message?.cancelMarkerRecording;
-
-    manager.isRecording = false;
-    if (manager.currentTest) {
-      const actionsCountBefore = manager.currentTest.actions.length;
-      const wasRecordingIntoExisting = manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null;
-      const recordedCount = manager.recordedActionsCount || 0;
-
-      const removedCount = manager.cleanDuplicateActions(manager.currentTest);
-      if (removedCount > 0) {
-        console.log(`🧹 Автоматически удалено ${removedCount} дублирующихся действий из записанного теста`);
+    try {
+      if (!manager.isRecording) {
+        sendResponse({ success: false, error: 'Запись не активна' });
+        return;
       }
 
-      // Если запись велась в существующий тест и пользователь нажал стоп при записи по маркеру —
-      // откатываем вставленные действия и не сохраняем их.
-      if (wasRecordingIntoExisting && cancelMarkerRecording && recordedCount > 0 && manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null) {
-        manager.currentTest.actions.splice(manager.recordInsertIndex, recordedCount);
-        console.log(`⏹️ Запись по маркеру отменена пользователем, удалено ${recordedCount} записанных действий, тест не изменён относительно исходного состояния.`);
-      }
+      const cancelMarkerRecording = !!message?.cancelMarkerRecording;
 
-      const actionsCountAfter = manager.currentTest.actions.length;
-      manager.tests.set(manager.currentTest.id, manager.currentTest);
-      await manager.saveTests();
+      manager.isRecording = false;
+      if (manager.currentTest) {
+        const actionsCountBefore = manager.currentTest.actions.length;
+        const wasRecordingIntoExisting = manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null;
+        const recordedCount = manager.recordedActionsCount || 0;
 
-      if (wasRecordingIntoExisting && manager.recordMarkerActionIndex !== null && manager.recordMarkerActionIndex !== undefined && !cancelMarkerRecording) {
-        const markerActionIndex = manager.recordMarkerActionIndex;
-        if (markerActionIndex >= 0 && markerActionIndex < manager.currentTest.actions.length) {
-          const markerAction = manager.currentTest.actions[markerActionIndex];
-          if (markerAction && markerAction.recordMarker === true) {
-            markerAction.recordMarker = false;
-            console.log(`🔴 Маркер записи снят с действия ${markerActionIndex + 1}`);
+        const sortStart = wasRecordingIntoExisting ? manager.recordInsertIndex : 0;
+        const sortEndExclusive = wasRecordingIntoExisting
+          ? Math.min(manager.currentTest.actions.length, sortStart + recordedCount)
+          : manager.currentTest.actions.length;
+        if (sortStart >= 0 && sortEndExclusive > sortStart) {
+          const before = manager.currentTest.actions.slice(0, sortStart);
+          const middle = manager.currentTest.actions.slice(sortStart, sortEndExclusive);
+          const after = manager.currentTest.actions.slice(sortEndExclusive);
+          middle.sort((a, b) => {
+            const ta = Number(a?.timestamp) || 0;
+            const tb = Number(b?.timestamp) || 0;
+            if (ta !== tb) return ta - tb;
+            const oa = Number(a?.__recordArrivalOrder) || 0;
+            const ob = Number(b?.__recordArrivalOrder) || 0;
+            return oa - ob;
+          });
+          manager.currentTest.actions = before.concat(middle, after).map(removeInternalRecordMeta);
+        }
+
+        const removedCount = manager.cleanDuplicateActions(manager.currentTest);
+        if (removedCount > 0) {
+          console.log(`🧹 Автоматически удалено ${removedCount} дублирующихся действий из записанного теста`);
+        }
+
+        if (wasRecordingIntoExisting && cancelMarkerRecording && recordedCount > 0 && manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null) {
+          manager.currentTest.actions.splice(manager.recordInsertIndex, recordedCount);
+          console.log(`⏹️ Запись по маркеру отменена пользователем, удалено ${recordedCount} записанных действий, тест не изменён относительно исходного состояния.`);
+        }
+
+        const actionsCountAfter = manager.currentTest.actions.length;
+        manager.tests.set(manager.currentTest.id, manager.currentTest);
+        await manager.saveTests();
+
+        if (wasRecordingIntoExisting && manager.recordMarkerActionIndex !== null && manager.recordMarkerActionIndex !== undefined && !cancelMarkerRecording) {
+          const markerActionIndexClear = manager.recordMarkerActionIndex;
+          if (markerActionIndexClear >= 0 && markerActionIndexClear < manager.currentTest.actions.length) {
+            const markerAction = manager.currentTest.actions[markerActionIndexClear];
+            if (markerAction && markerAction.recordMarker === true) {
+              markerAction.recordMarker = false;
+              console.log(`🔴 Маркер записи снят с действия ${markerActionIndexClear + 1}`);
+            }
           }
         }
-      }
 
-      if (wasRecordingIntoExisting) {
-        if (cancelMarkerRecording) {
-          console.log(`⏹️ Запись по маркеру отменена пользователем. В тест "${manager.currentTest.name}" не добавлено ни одного нового действия (всего действий: ${actionsCountAfter})`);
+        if (wasRecordingIntoExisting) {
+          if (cancelMarkerRecording) {
+            console.log(`⏹️ Запись по маркеру отменена пользователем. В тест "${manager.currentTest.name}" не добавлено ни одного нового действия (всего действий: ${actionsCountAfter})`);
+          } else {
+            console.log(`⏹️ Запись остановлена. В тест "${manager.currentTest.name}" добавлено ${recordedCount} действий (всего действий: ${actionsCountAfter})`);
+          }
         } else {
-          console.log(`⏹️ Запись остановлена. В тест "${manager.currentTest.name}" добавлено ${recordedCount} действий (всего действий: ${actionsCountAfter})`);
+          console.log(`⏹️ Запись остановлена. Сохранен тест "${manager.currentTest.name}" с ${actionsCountAfter} действиями (было ${actionsCountBefore})`);
         }
-      } else {
-        console.log(`⏹️ Запись остановлена. Сохранен тест "${manager.currentTest.name}" с ${actionsCountAfter} действиями (было ${actionsCountBefore})`);
-      }
 
-      const testId = manager.currentTest.id;
-      const markerActionIndex = manager.recordMarkerActionIndex;
-      manager.currentTest = null;
-      manager.recordInsertIndex = null;
-      manager.recordedActionsCount = 0;
-      manager.recordMarkerActionIndex = null;
-      await manager.broadcast({
-        type: 'RECORDING_STOPPED',
-        testId,
-        recordedCount: cancelMarkerRecording ? 0 : recordedCount,
-        markerActionIndex,
-        shouldResumePlayback: wasRecordingIntoExisting && !cancelMarkerRecording
-      });
-      sendResponse({ success: true, testId, recordedCount: cancelMarkerRecording ? 0 : recordedCount, canceledMarkerRecording: cancelMarkerRecording });
-    } else {
-      console.warn('⚠️ Попытка остановить запись, но активного теста нет');
-      sendResponse({ success: false, error: 'No active test' });
+        const testId = manager.currentTest.id;
+        const markerActionIndex = manager.recordMarkerActionIndex;
+        const shouldResumePlayback =
+          wasRecordingIntoExisting && !cancelMarkerRecording && !!manager.resumePlaybackAfterRecordingStop;
+        manager.resumePlaybackAfterRecordingStop = false;
+        manager.currentTest = null;
+        manager.recordInsertIndex = null;
+        manager.recordedActionsCount = 0;
+        manager.recordMarkerActionIndex = null;
+        await manager.broadcast({
+          type: 'RECORDING_STOPPED',
+          testId,
+          recordedCount: cancelMarkerRecording ? 0 : recordedCount,
+          markerActionIndex,
+          shouldResumePlayback
+        });
+        sendResponse({ success: true, testId, recordedCount: cancelMarkerRecording ? 0 : recordedCount, canceledMarkerRecording: cancelMarkerRecording });
+      } else {
+        console.warn('⚠️ Попытка остановить запись, но активного теста нет');
+        manager.resumePlaybackAfterRecordingStop = false;
+        sendResponse({ success: false, error: 'No active test' });
+      }
+    } catch (error) {
+      console.error('❌ STOP_RECORDING:', error);
+      try {
+        manager.isRecording = false;
+        manager.resumePlaybackAfterRecordingStop = false;
+      } catch (_) {}
+      const msg = (error && error.message) ? error.message : String(error || 'STOP_RECORDING_FAILED');
+      sendResponse({ success: false, error: msg });
     }
   });
 
   registry.register('ADD_ACTION', async ({ message, sendResponse }) => {
     if (manager.isRecording && manager.currentTest) {
+      const incomingTs = Number(message?.action?.timestamp);
       const newAction = {
         ...message.action,
-        timestamp: Date.now()
+        // ВАЖНО: сохраняем исходный timestamp события из content script, если он передан.
+        // Иначе порядок шагов может "плавать" из-за задержек доставки сообщений.
+        timestamp: Number.isFinite(incomingTs) && incomingTs > 0 ? incomingTs : Date.now()
       };
+      manager._recordArrivalCounter = (manager._recordArrivalCounter || 0) + 1;
+      newAction.__recordArrivalOrder = manager._recordArrivalCounter;
+
+      if (isDuplicateClientRecordedAction(manager, newAction)) {
+        sendResponse({ success: true, duplicateClientAction: true });
+        return;
+      }
+
+      const validation = validateIncomingRecordedAction(newAction);
+      if (!validation.ok) {
+        console.warn(`⚠️ [Background] ADD_ACTION rejected: ${validation.error}`, validation.details || '');
+        sendResponse({ success: false, error: validation.error, details: validation.details || null });
+        return;
+      }
+      newAction.type = validation.normalizedType || newAction.type;
 
       // Если ввод идёт сразу за кликом — пауза 200 мс и поиск в раскрывшемся поле при воспроизведении
       if (newAction.type === 'input') {
@@ -1484,7 +1770,35 @@ function registerBackgroundMessageHandlers(manager, registry) {
         }
       }
 
-      if (manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null) {
+      const actions = manager.currentTest.actions || [];
+      const hasInsertMode = manager.recordInsertIndex !== undefined && manager.recordInsertIndex !== null;
+      const lastRecordedIndex = hasInsertMode
+        ? (manager.recordedActionsCount > 0 ? (manager.recordInsertIndex + manager.recordedActionsCount - 1) : -1)
+        : (actions.length - 1);
+      if (lastRecordedIndex >= 0 && shouldReplacePreviousValueAction(actions[lastRecordedIndex], newAction)) {
+        // Сохраняем хронологический порядок: новое действие должно оставаться "последним",
+        // а не перезаписывать более ранний шаг по индексу.
+        actions.splice(lastRecordedIndex, 1);
+        if (hasInsertMode) {
+          manager.recordedActionsCount = Math.max(0, manager.recordedActionsCount - 1);
+          actions.splice(manager.recordInsertIndex + manager.recordedActionsCount, 0, newAction);
+          manager.recordedActionsCount++;
+        } else {
+          actions.push(newAction);
+        }
+        manager.currentTest.updatedAt = new Date().toISOString();
+        if (hasInsertMode) {
+          manager.tests.set(manager.currentTest.id, manager.currentTest);
+          await manager.saveTests();
+        }
+        sendResponse({ success: true, replacedPreviousValue: true });
+        return;
+      }
+
+      // Не заменяем "старые" value-шаги через дальний поиск по диапазону.
+      // Это сохраняет фактическую последовательность пользовательских действий.
+
+      if (hasInsertMode) {
         manager.currentTest.actions.splice(manager.recordInsertIndex + manager.recordedActionsCount, 0, newAction);
         manager.recordedActionsCount++;
         console.log(`📝 Добавлено действие в позицию ${manager.recordInsertIndex + manager.recordedActionsCount - 1} (всего записано: ${manager.recordedActionsCount})`);
@@ -2150,6 +2464,47 @@ function registerBackgroundMessageHandlers(manager, registry) {
     const actionDetails = message.actionDetails || [];
     const detailMap = new Map(actionDetails.map(detail => [detail.index, detail]));
     const now = new Date().toISOString();
+    const actions = testToUpdate.actions;
+    const getActionText = (action) => String(
+      action?.fieldLabel ||
+      action?.description ||
+      action?.name ||
+      action?.label ||
+      action?.value ||
+      ''
+    ).toLowerCase();
+    const hasExplicitSelector = (action) => {
+      const selectorText = String(action?.selector?.selector || action?.selector?.value || action?.selector || '').trim();
+      if (!selectorText) return false;
+      return (
+        selectorText.startsWith('#') ||
+        /\[[^\]]+\]/.test(selectorText) ||
+        /elementid|ng-reflect-element-id|aria-label|name=|id=/.test(selectorText)
+      );
+    };
+    const hasNearbyAnalog = (index, action) => {
+      for (let j = Math.max(0, index - 2); j <= Math.min(actions.length - 1, index + 2); j++) {
+        if (j === index) continue;
+        const neighbor = actions[j];
+        if (!neighbor || neighbor.hidden) continue;
+        if (neighbor.type !== action.type) continue;
+        if (!neighbor.selector || !action.selector) continue;
+        if (manager.areSelectorsEqual(neighbor.selector, action.selector)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    const shouldProtectFromAutoHide = (index, action) => {
+      if (!action) return false;
+      const type = String(action.type || '').toLowerCase();
+      if (!['click', 'dblclick', 'input', 'change', 'navigate', 'navigation'].includes(type)) return false;
+      if (!hasExplicitSelector(action)) return false;
+      const text = getActionText(action);
+      const isSignificant = /(save|submit|send|create|delete|publish|apply|сохран|отправ|созда|удал|примен|опубли)/i.test(text);
+      if (!isSignificant) return false;
+      return !hasNearbyAnalog(index, action);
+    };
 
     const sortedIndices = [...actionIndices].sort((a, b) => b - a);
     let removedCount = 0;
@@ -2166,6 +2521,11 @@ function registerBackgroundMessageHandlers(manager, registry) {
         }
 
         if (!action.hidden) {
+          if (shouldProtectFromAutoHide(index, action)) {
+            console.log(`🛡️ Пропускаю auto-hidden для значимого шага ${index + 1} (явный селектор, нет соседних аналогов)`);
+            skippedCount++;
+            continue;
+          }
           action.hidden = true;
           removedCount++;
           action.hiddenAt = now;

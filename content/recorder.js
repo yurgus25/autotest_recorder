@@ -33,6 +33,7 @@ class ImprovedActionRecorder {
     this.dropdownFillTimeout = null;
     this.dropdownPollingInterval = null; // Интервал для периодической проверки значения
     this.dropdownFillDelay = 2000; // мс ожидания подтверждения
+    this.dropdownTriggerResolveWindowMs = 12000; // окно связывания «открытие dropdown -> выбор опции»
     
     // Отслеживание промежуточных input событий (сохраняем только последнее значение)
     this.pendingInput = null; // { element, selector, elementInfo, value, timeout }
@@ -47,7 +48,22 @@ class ImprovedActionRecorder {
     // Механизм: при клике запускаем таймер, если dblclick приходит - отменяем клик
     this.pendingClickTimeout = null;
     this.pendingClickAction = null;
+    this.pageHideFlushHandler = null;
     this.dblclickDetectionDelay = 350; // мс ожидания dblclick
+    this.recentSavedAction = null; // Антидубль для быстрых повторов одного шага
+    this.actionDedupWindowMs = 450;
+    this.recentDropdownSelection = null; // { selector, value, timestamp }
+    this.dropdownChangeDedupWindowMs = 1500;
+    this.recordingAlertThrottleMs = 2500;
+    this.recordingAlertTimestamps = new Map();
+    this.recordingRuntimeStats = { saved: 0, skipped: 0, failed: 0 };
+    this.forceAutoRecordingMode = true;
+    this.pendingActionQueue = [];
+    this.pendingActionFlushTimer = null;
+    this.pendingActionFlushInProgress = false;
+    this.maxPendingActionQueue = 150;
+    this.recordActionSequence = 0;
+    this._clickRouteDebugIntroShown = false;
     
     // Контекстное меню для переменных
     this.variableContextMenu = null;
@@ -89,6 +105,60 @@ class ImprovedActionRecorder {
   }
 
   /**
+   * Детальные логи маршрутизации клика (dropdown vs обычный click).
+   * Включение: localStorage или sessionStorage, ключ autotestRecorderDebugClickRoute = "1", затем F5.
+   */
+  isRecorderClickRouteDebugEnabled() {
+    try {
+      return (
+        localStorage.getItem('autotestRecorderDebugClickRoute') === '1' ||
+        sessionStorage.getItem('autotestRecorderDebugClickRoute') === '1'
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  logRecorderClickRoute(message, details) {
+    if (!this.isRecorderClickRouteDebugEnabled()) return;
+    if (!this._clickRouteDebugIntroShown) {
+      this._clickRouteDebugIntroShown = true;
+      console.log(
+        '[Recorder][click-route] Debug: localStorage/sessionStorage autotestRecorderDebugClickRoute="1", затем перезагрузка страницы'
+      );
+    }
+    if (details !== undefined) console.log(`[Recorder][click-route] ${message}`, details);
+    else console.log(`[Recorder][click-route] ${message}`);
+  }
+
+  _strongSelectPanelSelector() {
+    return (
+      '[role="listbox"], .cdk-overlay-pane, .mat-select-panel, .mat-mdc-select-panel, .ng-dropdown-panel, .ng-select-dropdown, ' +
+      '.ant-select-dropdown, .rc-virtual-list, .select2-dropdown, .select2-results, .choices__list--dropdown, ' +
+      '.v-menu__content, .v-list, .ui.dropdown .menu, [class*="select-panel"], [class*="dropdown-panel"]'
+    );
+  }
+
+  /** Панель/контейнер настоящего select/listbox (не произвольное app-menu). */
+  isStrongSelectLikePanelHost(el) {
+    if (!el || typeof el.matches !== 'function') return false;
+    try {
+      return el.matches(this._strongSelectPanelSelector());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  closestStrongSelectLikePanelHost(element) {
+    if (!element || typeof element.closest !== 'function') return null;
+    try {
+      return element.closest(this._strongSelectPanelSelector());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
    * Загрузка настроек режима записи
    */
   async _loadRecordingModeSettings() {
@@ -98,9 +168,17 @@ class ImprovedActionRecorder {
       
       // Режим записи: 'auto' | 'picker' | 'inspector'
       const recordingMode = settings.recordingMode || 'auto';
-      this.selectorPickerMode = recordingMode === 'picker';
+      this.selectorPickerMode = this.forceAutoRecordingMode ? false : (recordingMode === 'picker');
       
       console.log('✅ [Recorder] Режим записи:', recordingMode, 'picker mode:', this.selectorPickerMode);
+      if (this.forceAutoRecordingMode && recordingMode === 'picker') {
+        this.showRecordingRuntimeNotification({
+          level: 'info',
+          title: 'Автоматическая запись',
+          message: 'Режим выбора селектора отключен для записи без ручного участия',
+          throttleKey: 'info:auto-mode-forced'
+        });
+      }
     } catch (error) {
       console.warn('⚠️ [Recorder] Ошибка загрузки настроек режима записи:', error);
     }
@@ -223,20 +301,17 @@ class ImprovedActionRecorder {
           });
         return true;
       } else if (message.type === 'RECORDING_STOPPED' || message.type === 'FORCE_STOP') {
-        // ВАЖНО: Убеждаемся, что stopRecording() всегда возвращает Promise
-        const stopPromise = this.stopRecording();
-        if (stopPromise && typeof stopPromise.then === 'function') {
-          stopPromise.then(() => {
-          sendResponse({ success: true });
-          }).catch((error) => {
+        this.removeRecordingIndicator();
+        Promise.resolve(this.stopRecording())
+          .then(() => {
+            this.removeRecordingIndicator();
+            sendResponse({ success: true });
+          })
+          .catch((error) => {
             console.error('❌ Ошибка при остановке записи:', error);
-          sendResponse({ success: true }); // Отправляем ответ даже при ошибке
-        });
-        } else {
-          // Если stopRecording() не вернул Promise, отправляем ответ сразу
-          console.warn('⚠️ stopRecording() не вернул Promise, отправляю ответ немедленно');
-          sendResponse({ success: true });
-        }
+            this.removeRecordingIndicator();
+            sendResponse({ success: true });
+          });
         return true; // Асинхронный ответ
       } else if (message.type === 'EXPORT_TEST_TO_EXCEL') {
         // Экспорт теста в Excel по запросу из background
@@ -248,7 +323,8 @@ class ImprovedActionRecorder {
         });
         return true; // Асинхронный ответ
       }
-      return true;
+      // Не заявляем асинхронный ответ для чужих типов (PLAY_TEST и т.д.) — иначе Chrome ждёт sendResponse.
+      return false;
     });
 
     
@@ -379,6 +455,17 @@ class ImprovedActionRecorder {
       console.log('✅ [Dropdown] Обнаружен dropdown по классу:', className);
       return true;
     }
+
+    // 4.1 Специальный случай: placeholder внутри combobox-триггера
+    const placeholderLike = classNameLower.includes('placeholder');
+    if (placeholderLike && el?.closest) {
+      const triggerRoot = this.resolveToDropdownRoot(el) ||
+        el.closest('[role="combobox"], [aria-haspopup="listbox"], [elementid], .select-container');
+      if (this.isDropdownRootCandidate(triggerRoot, { allowElementId: true })) {
+        console.log('✅ [Dropdown] Обнаружен dropdown по placeholder-триггеру');
+        return true;
+      }
+    }
     
     // 5. Проверка по селектору
     if (selector) {
@@ -461,17 +548,46 @@ class ImprovedActionRecorder {
       console.warn('⚠️ [Recorder] saveAction: запись не активна, действие не будет сохранено');
       return;
     }
+
+    const preparedAction = this.prepareActionForRecording(action);
+    if (!preparedAction.ok) {
+      this.recordingRuntimeStats.skipped++;
+      console.warn(`⏭️ [Recorder] Шаг пропущен: ${preparedAction.reasonCode} — ${preparedAction.message}`);
+      this.showRecordingRuntimeNotification({
+        level: 'warning',
+        title: 'Шаг пропущен',
+        message: preparedAction.message,
+        throttleKey: `skip:${preparedAction.reasonCode}`
+      });
+      return;
+    }
+    const actionToSave = preparedAction.action;
+    if (!actionToSave._clientActionId) {
+      this.recordActionSequence = (this.recordActionSequence || 0) + 1;
+      actionToSave._clientActionId = `${this.currentTestId || 'record'}:${Date.now()}:${this.recordActionSequence}`;
+    }
+
+    if (this.shouldSkipDuplicateAction(actionToSave)) {
+      this.recordingRuntimeStats.skipped++;
+      this.showRecordingRuntimeNotification({
+        level: 'warning',
+        title: 'Шаг пропущен',
+        message: `Повторяющееся действие "${actionToSave.type}" автоматически исключено`,
+        throttleKey: `skip:dedupe:${actionToSave.type || 'unknown'}`
+      });
+      return;
+    }
     
     // ВАЖНО: Проверяем валидность extension context перед сохранением
     if (!chrome.runtime?.id) {
       console.warn('⚠️ [Recorder] saveAction: Extension context недействителен, действие не будет сохранено');
-      // Пытаемся восстановить через небольшую задержку
+      // При временном перезапуске service worker не останавливаем запись:
+      // просто даем фону восстановиться и продолжаем слушать события.
       setTimeout(() => {
         if (chrome.runtime?.id && this.isRecording) {
           console.log('✅ Extension context восстановлен, можно продолжать запись');
         } else if (this.isRecording) {
-          console.error('❌ Extension context не восстановлен, останавливаю запись');
-          this.stopRecording();
+          console.warn('⚠️ Extension context пока не восстановлен, шаг пропущен');
         }
       }, 1000);
       return;
@@ -481,8 +597,8 @@ class ImprovedActionRecorder {
       console.log('💾 Сохранение действия:', action.type);
 
       // === ВАЛИДАЦИЯ СЕЛЕКТОРА (через SelectorOptimizer) ===
-      if (this.optimizer?.settings?.validateBeforeSave && action.selector) {
-        const selectorStr = action.selector.selector || action.selector.value;
+      if (this.optimizer?.settings?.validateBeforeSave && actionToSave.selector) {
+        const selectorStr = actionToSave.selector.selector || actionToSave.selector.value;
         if (selectorStr) {
           const validation = this.optimizer.validateSelector(selectorStr);
           if (validation.issues.length > 0) {
@@ -490,33 +606,225 @@ class ImprovedActionRecorder {
             validation.issues.forEach(issue => {
               console.log(`   ${issue.type === 'error' ? '❌' : '⚠️'} ${issue.message}`);
             });
-            
+
+            const hasHardErrors = validation.issues.some(issue => String(issue?.type || '').toLowerCase() === 'error');
+            if (hasHardErrors) {
+              this.recordingRuntimeStats.skipped++;
+              const reasonText = validation.issues
+                .filter(issue => String(issue?.type || '').toLowerCase() === 'error')
+                .map(issue => issue?.message)
+                .filter(Boolean)
+                .join('; ') || 'селектор не прошел строгую валидацию';
+              this.showRecordingRuntimeNotification({
+                level: 'warning',
+                title: 'Шаг пропущен',
+                message: `Некорректный селектор: ${reasonText}`,
+                throttleKey: 'skip:selector-validation-error'
+              });
+              return;
+            }
+
             // Добавляем информацию о валидации к действию
-            action.validationIssues = validation.issues;
-            action.selectorValidated = true;
+            actionToSave.validationIssues = validation.issues;
+            actionToSave.selectorValidated = true;
           }
         }
       }
 
-      // Отправляем действие в background для сохранения
-      const response = await chrome.runtime.sendMessage({
-        type: 'ADD_ACTION',
-        action: action
-      });
+      if (this.pendingActionQueue.length > 0) {
+        await this.flushPendingActionQueue({ maxBatch: 40, silent: true });
+      }
+
+      let response = null;
+      if (this.pendingActionQueue.length === 0) {
+        response = await this.sendAddActionWithRetries(actionToSave, { maxAttempts: 5, baseDelayMs: 120 });
+      } else {
+        response = { success: false, error: 'QUEUE_BACKPRESSURE' };
+      }
       
       if (response && response.success) {
-        console.log('✅ Действие сохранено:', action.type);
+        this.recordingRuntimeStats.saved++;
+        console.log('✅ Действие сохранено:', actionToSave.type);
       } else {
-        console.warn('⚠️ Действие не было сохранено:', response?.error || 'Unknown error');
+        const queued = this.enqueuePendingAction(actionToSave);
+        if (queued) {
+          const errorMessage = response?.error === 'BACKGROUND_NO_RESPONSE'
+            ? 'Фоновая страница временно не ответила, шаг поставлен в очередь'
+            : (response?.error || 'Background unavailable, queued for retry');
+          console.warn('⚠️ [Recorder] ADD_ACTION отложен:', errorMessage);
+          this.showRecordingRuntimeNotification({
+            level: 'warning',
+            title: 'Фон перезапускается',
+            message: `Шаг "${actionToSave.type || 'unknown'}" временно отложен и будет дослан автоматически`,
+            throttleKey: 'queue:add-action-deferred'
+          });
+          this.schedulePendingActionFlush(220);
+        } else {
+          this.recordingRuntimeStats.failed++;
+          const errorMessage = response?.error === 'BACKGROUND_NO_RESPONSE'
+            ? 'Фоновая страница не вернула ответ (возможен перезапуск service worker)'
+            : (response?.error || 'Unknown error');
+          console.warn('⚠️ Действие не было сохранено:', errorMessage);
+          this.showRecordingRuntimeNotification({
+            level: 'error',
+            title: 'Сбой записи шага',
+            message: `Шаг "${actionToSave.type || 'unknown'}" не сохранен: ${errorMessage}`,
+            throttleKey: `fail:add-action:${actionToSave.type || 'unknown'}`
+          });
+        }
       }
     } catch (error) {
+      this.recordingRuntimeStats.failed++;
       console.error('❌ Ошибка при сохранении действия:', error);
+      this.showRecordingRuntimeNotification({
+        level: 'error',
+        title: 'Сбой записи шага',
+        message: `Ошибка сохранения "${actionToSave?.type || action?.type || 'unknown'}": ${error?.message || String(error)}`,
+        throttleKey: `fail:save:${actionToSave?.type || action?.type || 'unknown'}`
+      });
       
       // Обрабатываем ошибку "Extension context invalidated"
       if (error.message && error.message.includes('Extension context invalidated')) {
         console.warn('⚠️ Extension context инвалидирован, пробуем переподключиться...');
-        await this.handleContextInvalidated(action);
+        await this.handleContextInvalidated(actionToSave);
       }
+    }
+  }
+
+  isRetryableMessageError(message) {
+    const text = String(message || '').toLowerCase();
+    return text.includes('background_no_response') ||
+      text.includes('receiving end does not exist') ||
+      text.includes('could not establish connection') ||
+      text.includes('extension context invalidated') ||
+      text.includes('message port closed') ||
+      text.includes('queue_backpressure') ||
+      text.includes('not recording') ||
+      text.includes('background');
+  }
+
+  sendAddActionRequest(action) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'ADD_ACTION',
+          action
+        }, (response) => {
+          if (chrome.runtime?.lastError) {
+            reject(new Error(chrome.runtime.lastError.message || 'Runtime messaging error'));
+            return;
+          }
+          if (!response || typeof response !== 'object') {
+            resolve({
+              success: false,
+              error: 'BACKGROUND_NO_RESPONSE'
+            });
+            return;
+          }
+          resolve(response);
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  async sendAddActionWithRetries(action, options = {}) {
+    const maxAttempts = Number(options.maxAttempts) > 0 ? Number(options.maxAttempts) : 5;
+    const baseDelayMs = Number(options.baseDelayMs) > 0 ? Number(options.baseDelayMs) : 120;
+
+    let lastResponse = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let response = null;
+      try {
+        response = await this.sendAddActionRequest(action);
+      } catch (error) {
+        if (!this.isRetryableMessageError(error?.message)) {
+          throw error;
+        }
+        response = {
+          success: false,
+          error: error?.message || 'BACKGROUND_NO_RESPONSE'
+        };
+      }
+
+      if (response?.success) {
+        return response;
+      }
+
+      lastResponse = response;
+      const shouldRetry = attempt < maxAttempts && this.isRetryableMessageError(response?.error);
+      if (!shouldRetry) {
+        return response;
+      }
+
+      const retryDelay = Math.min(1000, Math.round(baseDelayMs * Math.pow(1.6, attempt - 1)));
+      console.warn(`⚠️ [Recorder] ADD_ACTION retry ${attempt}/${maxAttempts} через ${retryDelay}ms...`);
+      await this.delay(retryDelay);
+    }
+
+    return lastResponse || { success: false, error: 'BACKGROUND_NO_RESPONSE' };
+  }
+
+  enqueuePendingAction(action) {
+    if (!action || typeof action !== 'object') {
+      return false;
+    }
+    if (this.pendingActionQueue.length >= this.maxPendingActionQueue) {
+      const dropped = this.pendingActionQueue.shift();
+      console.warn('⚠️ [Recorder] Переполнение очереди отложенных шагов, удален самый старый:', dropped?.type);
+    }
+    this.pendingActionQueue.push({ ...action });
+    return true;
+  }
+
+  schedulePendingActionFlush(delayMs = 250) {
+    if (this.pendingActionFlushTimer || !this.isRecording) {
+      return;
+    }
+    this.pendingActionFlushTimer = setTimeout(async () => {
+      this.pendingActionFlushTimer = null;
+      await this.flushPendingActionQueue({ maxBatch: 50, silent: false });
+      if (this.pendingActionQueue.length > 0 && this.isRecording) {
+        this.schedulePendingActionFlush(900);
+      }
+    }, Math.max(0, Number(delayMs) || 0));
+  }
+
+  async flushPendingActionQueue(options = {}) {
+    if (this.pendingActionFlushInProgress || !this.isRecording || this.pendingActionQueue.length === 0) {
+      return this.pendingActionQueue.length === 0;
+    }
+    if (!chrome.runtime?.id) {
+      return false;
+    }
+
+    const maxBatch = Number(options.maxBatch) > 0 ? Number(options.maxBatch) : 50;
+    const silent = !!options.silent;
+    this.pendingActionFlushInProgress = true;
+    try {
+      let processed = 0;
+      while (this.pendingActionQueue.length > 0 && processed < maxBatch && this.isRecording) {
+        const nextAction = this.pendingActionQueue[0];
+        const response = await this.sendAddActionWithRetries(nextAction, { maxAttempts: 4, baseDelayMs: 140 });
+        if (response?.success) {
+          this.pendingActionQueue.shift();
+          this.recordingRuntimeStats.saved++;
+          processed++;
+        } else {
+          if (!silent) {
+            console.warn('⚠️ [Recorder] Отложенный шаг пока не удалось дослать:', response?.error || 'UNKNOWN');
+          }
+          break;
+        }
+      }
+
+      if (!silent && processed > 0) {
+        console.log(`✅ [Recorder] Досланы отложенные шаги: ${processed}, осталось: ${this.pendingActionQueue.length}`);
+      }
+      return this.pendingActionQueue.length === 0;
+    } finally {
+      this.pendingActionFlushInProgress = false;
     }
   }
 
@@ -527,7 +835,10 @@ class ImprovedActionRecorder {
       const dropdownRoot = this.resolveToDropdownRoot(element) || element;
       
       const snapshot = this.captureDropdownSnapshot(dropdownRoot, action);
-      const initialValue = this.getDropdownSnapshotValue(snapshot);
+      const initialValue = this.sanitizeDropdownDetectedValue(
+        this.getDropdownSnapshotValue(snapshot),
+        dropdownRoot
+      );
       
       this.cancelDropdownFillVerification();
       
@@ -555,6 +866,19 @@ class ImprovedActionRecorder {
     } catch (error) {
       console.warn('⚠️ [Dropdown] Ошибка подготовки проверки заполнения:', error);
     }
+  }
+
+  resolveActionTimestamp(sourceTimestamp = null, anchorTimestamp = null) {
+    const sourceTs = Number(sourceTimestamp);
+    if (Number.isFinite(sourceTs) && sourceTs > 0) {
+      return sourceTs;
+    }
+    const anchorTs = Number(anchorTimestamp);
+    if (Number.isFinite(anchorTs) && anchorTs > 0) {
+      // Асинхронно обнаруженный dropdown-value должен оставаться сразу после шага открытия.
+      return anchorTs + 1;
+    }
+    return Date.now();
   }
   
   /**
@@ -640,6 +964,7 @@ class ImprovedActionRecorder {
       }
       
       const initialValue = this.pendingDropdownFill.initialValue || '';
+      currentValue = this.sanitizeDropdownDetectedValue(currentValue, parentDropdown);
       
       // Логируем каждые 5 проверок или если значение изменилось
       if (checkCount % 5 === 0 || (currentValue && currentValue !== initialValue)) {
@@ -672,6 +997,10 @@ class ImprovedActionRecorder {
       
       if (valueChanged) {
         const rootForCheck = this.pendingDropdownFill?.dropdownRoot || this.resolveToDropdownRoot(element) || element;
+        if (this.shouldDeferImplicitDropdownSelection(rootForCheck, null)) {
+          console.log(`⏳ [Dropdown] Polling: значение "${currentValue}" выглядит предварительным (панель открыта), продолжаю ожидание`);
+          return;
+        }
         if (this.shouldRejectDropdownValueForFieldMismatch(rootForCheck, currentValue)) {
           console.warn(`⚠️ [Dropdown] Polling: отклонено — «${currentValue}» не совпадает с полем combobox (часто клик по меню)`);
           clearInterval(this.dropdownPollingInterval);
@@ -694,94 +1023,17 @@ class ImprovedActionRecorder {
         const dropdownElement = this.resolveToDropdownRoot(targetDropdownRoot) || targetDropdownRoot;
         
         if (dropdownElement) {
-          // ВАЖНО: Обертываем асинхронный код в отдельную функцию, так как setInterval callback не может быть async
+          // В режиме записи не меняем UI программно: фиксируем только фактический выбор пользователя.
           (async () => {
             try {
-              // ВАЖНО: Сначала заполняем dropdown, затем записываем действие
-              // Это гарантирует, что значение визуально отображается перед записью
-              let filled = false;
-              
-              // Используем SeleniumUtils для правильного заполнения dropdown (логика из автотеста)
-              if (this.seleniumUtils && this.seleniumUtils.selectDropdownOption) {
-                console.log(`📝 [Dropdown] Использую SeleniumUtils для заполнения dropdown значением: "${currentValue}"`);
-                try {
-                  // Проверяем, открыт ли dropdown - если нет, открываем
-                  const isOpen = this.seleniumUtils.isDropdownOpen ? 
-                                this.seleniumUtils.isDropdownOpen(dropdownElement) : false;
-                  
-                  if (!isOpen) {
-                    // Если dropdown закрыт, открываем его
-                    const selectBox = dropdownElement.querySelector('.select-box, .result, input, [role="combobox"]');
-                    if (selectBox) {
-                      selectBox.click();
-                      await new Promise(resolve => setTimeout(resolve, 200));
-                    }
-                  }
-                  
-                  filled = await this.seleniumUtils.selectDropdownOption(dropdownElement, currentValue);
-                  if (filled) {
-                    console.log(`✅ [Dropdown] Поле успешно заполнено через SeleniumUtils`);
-                  } else {
-                    console.log(`⚠️ [Dropdown] SeleniumUtils не смог заполнить поле, пробую альтернативный способ`);
-                    // Пробуем альтернативный способ
-                    filled = await this.fillDropdownFieldManually(dropdownElement, currentValue);
-                  }
-                } catch (error) {
-                  console.warn(`⚠️ [Dropdown] Ошибка при заполнении через SeleniumUtils:`, error);
-                  // Пробуем альтернативный способ
-                  filled = await this.fillDropdownFieldManually(dropdownElement, currentValue);
-                }
-              } else {
-                // Альтернативный способ заполнения
-                filled = await this.fillDropdownFieldManually(dropdownElement, currentValue);
-              }
-              
-              // После успешного заполнения записываем действие
-              // Это важно сделать после заполнения, чтобы значение было визуально отображено
-              if (filled) {
-                console.log(`📝 [Dropdown] Записываю действие после успешного заполнения`);
-                await this.recordDropdownOptionSelection(dropdownElement, currentValue, null);
-              } else {
-                console.warn(`⚠️ [Dropdown] Не удалось заполнить dropdown, но все равно записываю действие`);
-                // Записываем действие даже если заполнение не удалось, чтобы не потерять выбор пользователя
-                await this.recordDropdownOptionSelection(dropdownElement, currentValue, null);
-              }
-              
-              // Дополнительная проверка: убеждаемся, что значение записалось
-              await new Promise(resolve => setTimeout(resolve, 200));
-              
-              // Проверяем значение в поле несколькими способами
-              const snapshot = this.captureDropdownSnapshot(dropdownElement, null);
-              const finalValue = this.getDropdownSnapshotValue(snapshot);
-              
-              // Также проверяем напрямую через поле ввода
-              const inputField = dropdownElement.querySelector('input, .select-box, .result, [role="combobox"]') ||
-                                dropdownElement.querySelector('[class*="value"], [class*="text"], [class*="selected"]');
-              const directValue = inputField ? (inputField.value || inputField.textContent || inputField.innerText || '').trim() : '';
-              
-              const valueMatches = (finalValue && finalValue.trim() === currentValue.trim()) || 
-                                  (directValue && directValue === currentValue.trim());
-              
-              if (valueMatches) {
-                console.log(`✅ [Dropdown] Значение подтверждено в поле: "${finalValue || directValue}"`);
-              } else {
-                console.warn(`⚠️ [Dropdown] Значение не подтверждено. Ожидалось: "${currentValue}", получено: "${finalValue || directValue}"`);
-                // Пробуем еще раз заполнить вручную с более агрессивным подходом
-                console.log(`🔄 [Dropdown] Повторная попытка заполнения поля...`);
-                await this.fillDropdownFieldManually(dropdownElement, currentValue);
-                
-                // Еще одна проверка после повторного заполнения
-                await new Promise(resolve => setTimeout(resolve, 200));
-                const retrySnapshot = this.captureDropdownSnapshot(dropdownElement, null);
-                const retryValue = this.getDropdownSnapshotValue(retrySnapshot);
-                if (retryValue && retryValue.trim() === currentValue.trim()) {
-                  console.log(`✅ [Dropdown] Значение подтверждено после повторного заполнения: "${retryValue}"`);
-                } else {
-                  console.warn(`⚠️ [Dropdown] Значение все еще не подтверждено после повторного заполнения`);
-                }
-              }
-              
-              // Закрываем dropdown после обнаружения значения (с задержкой, чтобы значение успело записаться)
+              await this.recordDropdownOptionSelection(
+                dropdownElement,
+                currentValue,
+                null,
+                this.resolveActionTimestamp(null, action?.timestamp)
+              );
+              console.log(`📝 [Dropdown] Выбор пользователя зафиксирован без автозаполнения: "${currentValue}"`);
+
               // ВАЖНО: В режиме выбора селектора не закрываем dropdown автоматически, чтобы пользователь мог выбрать селектор
               if (!this.selectorPickerMode) {
                 setTimeout(() => {
@@ -798,12 +1050,15 @@ class ImprovedActionRecorder {
           // Fallback: записываем действие напрямую, если не нашли dropdown элемент
           const fillAction = {
             type: 'input',
+            subtype: 'dropdown-combobox',
             selector: action.selector,
             element: action.element,
             value: currentValue,
             displayValue: currentValue,
+            optionText: currentValue,
             dropdownAutoFilled: true,
-            timestamp: Date.now(),
+            isDropdownSelection: true,
+            timestamp: this.resolveActionTimestamp(null, action?.timestamp),
             url: window.location.href
           };
           
@@ -1082,12 +1337,15 @@ class ImprovedActionRecorder {
         // Записываем действие
         const fillAction = {
           type: 'input',
+          subtype: 'dropdown-combobox',
           selector: actionMeta.selector,
           element: actionMeta.element,
           value: value,
           displayValue: value,
+          optionText: value,
           dropdownAutoFilled: true,
-          timestamp: Date.now(),
+          isDropdownSelection: true,
+          timestamp: this.resolveActionTimestamp(null, actionMeta?.timestamp),
           url: window.location.href
         };
         
@@ -1110,12 +1368,15 @@ class ImprovedActionRecorder {
       // Записываем действие
       const fillAction = {
         type: 'input',
+        subtype: 'dropdown-combobox',
         selector: actionMeta.selector,
         element: actionMeta.element,
         value: value,
         displayValue: value,
+        optionText: value,
         dropdownAutoFilled: true,
-        timestamp: Date.now(),
+        isDropdownSelection: true,
+        timestamp: this.resolveActionTimestamp(null, actionMeta?.timestamp),
         url: window.location.href
       };
       
@@ -1138,12 +1399,15 @@ class ImprovedActionRecorder {
         // Записываем действие
         const fillAction = {
           type: 'input',
+          subtype: 'dropdown-combobox',
           selector: actionMeta.selector,
           element: actionMeta.element,
           value: value,
           displayValue: value,
+          optionText: value,
           dropdownAutoFilled: true,
-          timestamp: Date.now(),
+          isDropdownSelection: true,
+          timestamp: this.resolveActionTimestamp(null, actionMeta?.timestamp),
           url: window.location.href
         };
         
@@ -1183,7 +1447,7 @@ class ImprovedActionRecorder {
     const pending = this.pendingClickAction;
     this.pendingClickAction = null;
     try {
-      await this.recordClickAction(pending.element, 'click', pending.isDropdown);
+      await this.recordClickAction(pending.element, 'click', pending.isDropdown, pending.timestamp);
     } catch (e) {
       console.warn('⚠️ [Recorder] flushPendingClickIfAny:', e?.message || e);
     }
@@ -1272,12 +1536,15 @@ class ImprovedActionRecorder {
     
     const fillAction = {
       type: 'input',
+      subtype: 'dropdown-combobox',
       selector: actionMeta.selector,
       element: actionMeta.element,
       value: currentValue,
       displayValue: currentValue,
+      optionText: currentValue,
       dropdownAutoFilled: true,
-      timestamp: Date.now(),
+      isDropdownSelection: true,
+      timestamp: this.resolveActionTimestamp(null, actionMeta?.timestamp),
       url: window.location.href
     };
     
@@ -1437,6 +1704,52 @@ class ImprovedActionRecorder {
     }
     
     return '';
+  }
+
+  _normalizeDropdownTextValue(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  isCompositeDropdownValueText(value, dropdownElement) {
+    const raw = String(value || '').trim();
+    if (!raw || raw.length < 20) return false;
+    const normalized = this._normalizeDropdownTextValue(raw);
+    if (!normalized) return false;
+
+    let optionTexts = [];
+    try {
+      if (this.seleniumUtils && dropdownElement) {
+        const panels = this.seleniumUtils.findDropdownPanels(dropdownElement) || [];
+        for (const panel of panels) {
+          const options = this.seleniumUtils.findOptionsInPanel(panel) || [];
+          for (const opt of options) {
+            const txt = (this.seleniumUtils.getElementText(opt) || opt.textContent || '').trim();
+            if (!txt || txt.length > 40) continue;
+            optionTexts.push(txt);
+          }
+        }
+      }
+    } catch (_) {}
+
+    optionTexts = Array.from(new Set(optionTexts.map(t => t.trim()).filter(Boolean)));
+    const matches = optionTexts.filter(text => {
+      const n = this._normalizeDropdownTextValue(text);
+      return n && normalized.includes(n);
+    });
+
+    if (matches.length >= 2) return true;
+    if (/плановый\s+по поручению\s+инициативный/i.test(raw)) return true;
+    return false;
+  }
+
+  sanitizeDropdownDetectedValue(value, dropdownElement) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (this.isCompositeDropdownValueText(text, dropdownElement)) {
+      // Составной текст списка не является выбранным значением поля.
+      return '';
+    }
+    return text;
   }
 
   isRelatedDropdownElement(element, snapshot) {
@@ -1677,6 +1990,8 @@ class ImprovedActionRecorder {
           await this.saveAction(navigationAction);
           
           console.log('✅ Запись продолжается на новой странице');
+        } else if (response && response.success && !response.state.isRecording) {
+          this.removeRecordingIndicator();
         }
       } catch (error) {
         if (error.message && error.message.includes('Receiving end does not exist')) {
@@ -1720,6 +2035,10 @@ class ImprovedActionRecorder {
     
     this.isRecording = true;
     this.currentTestId = testId;
+    this.pendingActionQueue = [];
+    this.pendingActionFlushInProgress = false;
+    this.recordActionSequence = 0;
+    this.recordingRuntimeStats = { saved: 0, skipped: 0, failed: 0 };
     console.log('✅ [Recorder] isRecording установлен в:', this.isRecording);
     console.log('✅ [Recorder] currentTestId установлен в:', this.currentTestId);
     
@@ -1778,13 +2097,10 @@ class ImprovedActionRecorder {
   }
 
   async stopRecording() {
-    // ВАЖНО: Всегда возвращаем Promise
+    this.removeRecordingIndicator();
     if (!this.isRecording) {
       return Promise.resolve();
     }
-
-    // Сразу убираем индикатор «ЗАПИСЬ», чтобы он не оставался на экране
-    this.removeRecordingIndicator();
 
     try {
       // Закрываем пикер если он открыт
@@ -1896,10 +2212,17 @@ class ImprovedActionRecorder {
                 !currentValue.toLowerCase().includes('выберите') &&
                 !currentValue.toLowerCase().includes('select') &&
                 !currentValue.toLowerCase().includes('placeholder')) {
-              console.log(`✅ [Dropdown] Найдено выбранное значение "${currentValue}" перед остановкой, сохраняю...`);
-              
-              // Записываем выбор опции
-              await this.recordDropdownOptionSelection(dropdownElement, currentValue.trim(), null);
+              if (this.shouldDeferImplicitDropdownSelection(dropdownElement, null)) {
+                console.log(`ℹ️ [Dropdown] Пропуск фиксации "${currentValue}" при остановке: панель ещё открыта, выбор не подтверждён (остановка записи продолжается)`);
+              } else {
+                console.log(`✅ [Dropdown] Найдено выбранное значение "${currentValue}" перед остановкой, сохраняю...`);
+                await this.recordDropdownOptionSelection(
+                  dropdownElement,
+                  currentValue.trim(),
+                  null,
+                  this.resolveActionTimestamp(null, actionMeta?.timestamp)
+                );
+              }
             } else {
               console.log(`ℹ️ [Dropdown] Значение не найдено или не изменилось (текущее: "${currentValue}", начальное: "${initialValue}")`);
             }
@@ -1911,6 +2234,9 @@ class ImprovedActionRecorder {
 
     // Сохраняем pending input перед остановкой записи
     await this.savePendingInput();
+    // Отложенный клик (ожидание dblclick) иначе теряется при detach/stop — типично «Сохранить» / последний шаг
+    await this.flushPendingClickIfAny();
+    await this.flushPendingActionQueue({ maxBatch: 200, silent: false });
     
     // Сохраняем testId перед сброса
     const testId = this.currentTestId;
@@ -1931,6 +2257,10 @@ class ImprovedActionRecorder {
     if (this.pendingInputTimeout) {
       clearTimeout(this.pendingInputTimeout);
       this.pendingInputTimeout = null;
+    }
+    if (this.pendingActionFlushTimer) {
+      clearTimeout(this.pendingActionFlushTimer);
+      this.pendingActionFlushTimer = null;
     }
     
     this.isRecording = false;
@@ -2005,19 +2335,6 @@ class ImprovedActionRecorder {
         }
       }, 100); // Небольшая задержка для гарантии завершения всех операций остановки
     }
-    
-    // Принудительно отменяем все таймауты и интервалы
-    if (this.dropdownFillTimeout) {
-      clearTimeout(this.dropdownFillTimeout);
-      this.dropdownFillTimeout = null;
-    }
-    if (this.dropdownPollingInterval) {
-      clearInterval(this.dropdownPollingInterval);
-      this.dropdownPollingInterval = null;
-      }
-      
-      // Явно возвращаем Promise.resolve() для гарантии
-      return Promise.resolve();
     } catch (error) {
       console.error('❌ Ошибка при остановке записи:', error);
       // Всегда возвращаем Promise, даже при ошибке
@@ -2107,6 +2424,15 @@ class ImprovedActionRecorder {
     document.addEventListener('drop', this.dropHandler, true);
     document.addEventListener('dragend', this.dragEndHandler, true);
     // ======================================================
+
+    if (!this.pageHideFlushHandler) {
+      this.pageHideFlushHandler = () => {
+        if (this.isRecording) {
+          void this.flushPendingClickIfAny();
+        }
+      };
+    }
+    window.addEventListener('pagehide', this.pageHideFlushHandler);
     
     console.log('✅ [Recorder] Обработчики событий прикреплены:', {
       click: !!this.clickHandler,
@@ -2160,6 +2486,10 @@ class ImprovedActionRecorder {
       document.removeEventListener('dragend', this.dragEndHandler, true);
     }
     // ==============================================
+
+    if (this.pageHideFlushHandler) {
+      window.removeEventListener('pagehide', this.pageHideFlushHandler);
+    }
     
     // Удаляем контекстное меню переменных
     this.hideVariableContextMenu();
@@ -2225,13 +2555,12 @@ class ImprovedActionRecorder {
     // ВАЖНО: Проверяем валидность extension context перед обработкой
     if (!chrome.runtime?.id) {
       console.warn('⚠️ Extension context недействителен при обработке клика');
-      // Пытаемся восстановить запись через небольшую задержку
+      // Не останавливаем запись автоматически: это часто временный рестарт SW.
       setTimeout(() => {
         if (chrome.runtime?.id && this.isRecording) {
           console.log('✅ Extension context восстановлен, запись продолжается');
         } else if (this.isRecording) {
-          console.error('❌ Extension context не восстановлен, останавливаю запись');
-          this.stopRecording();
+          console.warn('⚠️ Extension context пока не восстановлен, клик пропущен');
         }
       }, 1000);
       return;
@@ -2436,9 +2765,22 @@ class ImprovedActionRecorder {
 
     // === THROTTLE КЛИКОВ (через SelectorOptimizer) ===
     const now = Date.now();
+    const isFieldDoubleClickCandidate = (() => {
+      if (!this.isFieldLikeElementForDoubleClick(clickedElement)) return false;
+      if (event.detail >= 2) return true;
+      if (!this.pendingClickAction?.element) return false;
+      return this.getElementKey(this.pendingClickAction.element) === this.getElementKey(clickedElement);
+    })();
     if (this.optimizer?.settings?.eventDebounce && !inOverlayPickContext) {
-      if (now - this.lastClickTime < this.clickThrottleMs) {
+      if (now - this.lastClickTime < this.clickThrottleMs && !isFieldDoubleClickCandidate) {
         console.log('⏭️ [Recorder] Пропуск быстрого клика (throttle)');
+        this.recordingRuntimeStats.skipped++;
+        this.showRecordingRuntimeNotification({
+          level: 'warning',
+          title: 'Шаг пропущен',
+          message: 'Быстрый повторный клик автоматически пропущен (антидубль)',
+          throttleKey: 'skip:throttle-click'
+        });
         return;
       }
     }
@@ -2447,10 +2789,18 @@ class ImprovedActionRecorder {
     // Проверяем, что extension context валиден
     if (!chrome.runtime?.id) {
       console.warn('⚠️ Extension context недействителен при обработке клика');
+      this.recordingRuntimeStats.failed++;
+      this.showRecordingRuntimeNotification({
+        level: 'error',
+        title: 'Сбой записи шага',
+        message: 'Контекст расширения недоступен, клик не записан',
+        throttleKey: 'fail:context-invalid-click'
+      });
       return;
     }
 
     const element = clickedElement;
+    const clickTimestamp = Date.now();
 
     // Пункт меню приложения: отменяем ожидание выбора из combobox — иначе polling подставит текст пункта как «значение поля»
     if (this.isApplicationMenuItem(element)) {
@@ -2487,8 +2837,20 @@ class ImprovedActionRecorder {
       return; // Не записываем клик по элементам плагина
     }
     
-    // Сохраняем pending input перед кликом (если клик не на том же элементе)
-    if (this.pendingInput) {
+    const isDropdownOptionLikeClick = !!(
+      (element.closest && (
+        element.closest('.cdk-overlay-pane, .cdk-overlay-container') ||
+        element.closest('[role="listbox"]') ||
+        element.closest('[class*="select-group"]') ||
+        element.closest('[class*="content-list"]')
+      )) &&
+      (this.pendingDropdownFill || (this.pendingClickAction && this.pendingClickAction.isDropdown))
+    );
+
+    // Сохраняем pending input перед кликом (если клик не на том же элементе).
+    // Для второго клика по dropdown-опции откладываем savePendingInput:
+    // иначе между "открыть dropdown" и "выбрать значение" может вклиниться input из другого поля.
+    if (this.pendingInput && !isDropdownOptionLikeClick) {
       const clickedElementKey = this.getElementKey(element);
       const isInputField = element.tagName === 'INPUT' || 
                           element.tagName === 'TEXTAREA' ||
@@ -2498,6 +2860,8 @@ class ImprovedActionRecorder {
       if (this.pendingInput.elementKey !== clickedElementKey || !isInputField) {
         await this.savePendingInput();
       }
+    } else if (this.pendingInput && isDropdownOptionLikeClick) {
+      console.log('⏳ [Recorder] Откладываю savePendingInput: фиксирую соседние шаги dropdown подряд');
     }
     
     // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ ВСЕХ КЛИКОВ
@@ -2559,6 +2923,15 @@ class ImprovedActionRecorder {
     
     const isDropdownOption = this.isDropdownOption(element);
     console.log(`   - isDropdownOption: ${isDropdownOption}`);
+    this.logRecorderClickRoute('handleClick flags', {
+      tag: element.tagName,
+      textPreview: elementText.substring(0, 60),
+      classPreview: String(element.className || '').slice(0, 100),
+      isApplicationMenuItem: this.isApplicationMenuItem(element),
+      isInPanel,
+      hasNearbyPanel,
+      isDropdownOption
+    });
     
     // Специальный случай: элементы календаря / datepicker
     // Не пытаемся обрабатывать их как dropdown-опции, даже если рядом есть панели
@@ -2576,9 +2949,13 @@ class ImprovedActionRecorder {
     
     // ПРИОРИТЕТ: Если есть открытые панели, используем SeleniumUtils для поиска опций
     if (hasNearbyPanel && this.seleniumUtils) {
-      const actualDropdown = element.closest('app-select, ng-select, mat-select');
-      // Опции Angular CDK часто вне app-select — не обнуляем hasNearbyPanel/nearbyOpenPanels,
-      // иначе ниже не сработают findParentDropdownForOption и panel.contains.
+      let actualDropdown =
+        this.resolveToDropdownRoot(element) ||
+        element.closest('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select');
+      if (!actualDropdown) {
+        actualDropdown = this.findParentDropdownForOption(element);
+      }
+      // Опции Angular CDK / overlay часто вне DOM-корня виджета — корень ищем шире, иначе ветка не выполняется.
       if (actualDropdown) {
         console.log(`   🔍 [SeleniumUtils] Есть открытые панели, проверяю через SeleniumUtils...`);
         let panels = this.seleniumUtils.findDropdownPanels(actualDropdown);
@@ -2603,7 +2980,7 @@ class ImprovedActionRecorder {
           // Проверка по тексту (если элемент содержит текст опции)
           const optText = this.seleniumUtils.getElementText(opt);
           const elText = elementText;
-          if (optText && elText && optText.toLowerCase().includes(elText.toLowerCase()) && 
+          if (optText && elText && panel.contains(element) && optText.toLowerCase().includes(elText.toLowerCase()) && 
               elText.length > 0 && elText.length < 100) {
             return true;
           }
@@ -2619,13 +2996,19 @@ class ImprovedActionRecorder {
           console.log(`   ✅ [SeleniumUtils] Элемент найден как опция "${optionText}" через SeleniumUtils!`);
           console.log(`   ✅ [SeleniumUtils] ════════════════════════════════════════════════════`);
           
+          const panelHost =
+            panel.closest(
+              'app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"], [aria-haspopup="listbox"]'
+            );
+          const panelRoot =
+            panelHost && this.isDropdownRootCandidate(panelHost, { allowElementId: true }) ? panelHost : null;
           const parentDropdown = this.resolveRecentDropdownForOption(foundOption || element) ||
-                                this.findParentDropdownForOption(element) || 
+                                this.findParentDropdownForOption(element) ||
                                 this.findParentDropdownForOption(foundOption) ||
-                                panel.closest('app-select, ng-select, mat-select');
+                                panelRoot;
           
           if (parentDropdown) {
-            await this.recordDropdownOptionSelection(parentDropdown, optionText, foundOption || element);
+            await this.recordDropdownOptionSelection(parentDropdown, optionText, foundOption || element, clickTimestamp);
             // Отменяем polling, так как опция уже записана
             if (this.pendingDropdownFill) {
               this.pendingDropdownFill = null;
@@ -2636,7 +3019,13 @@ class ImprovedActionRecorder {
             }
             return; // Не обрабатываем как обычный клик
           } else {
-            console.warn(`   ⚠️ [SeleniumUtils] Родительский dropdown не найден для опции`);
+            console.warn(`   ⚠️ [SeleniumUtils] Родительский dropdown не найден для опции — fallback: обычный click`);
+            try {
+              await this.recordClickAction(foundOption || element, 'click', false, clickTimestamp);
+            } catch (e) {
+              console.warn('⚠️ [SeleniumUtils] Не удалось записать fallback click:', e?.message || e);
+            }
+            return;
           }
         } else {
           // Логируем все опции для отладки (только если опций много)
@@ -2654,85 +3043,11 @@ class ImprovedActionRecorder {
     
     // Дополнительная проверка: если элемент имеет текст опции и есть открытые панели рядом
     const isNonOptionControl = this.isNonOptionControlElement(element);
-    if (isNonOptionControl && hasNearbyPanel) {
-    }
-    if (!isDropdownOption && !isNonOptionControl && hasText && hasNearbyPanel) {
-      // Проверяем, не является ли это плейсхолдером
-      const isPlaceholder = ['выберите', 'select', 'choose', 'placeholder', 'статус'].some(ph => 
-        elementText.toLowerCase().includes(ph.toLowerCase())
-      );
-      
-      // Проверяем, что текст не слишком длинный (не весь контент dropdown)
-      const isReasonableLength = elementText.length > 0 && elementText.length < 100;
-      
-      if (!isPlaceholder && isReasonableLength) {
-        console.log(`   💡 Элемент может быть опцией: есть текст и открытые панели рядом`);
-        
-        // Пробуем найти родительский dropdown
-        const parentDropdown = this.resolveRecentDropdownForOption(element) || this.findParentDropdownForOption(element);
-        if (parentDropdown) {
-          console.log(`   ✅ Найден родительский dropdown, обрабатываю как опцию`);
-          const optionText = element.textContent?.trim() || element.innerText?.trim() || '';
-          await this.recordDropdownOptionSelection(parentDropdown, optionText, element);
-          return; // Не обрабатываем как обычный клик
-        }
-      }
-    }
-    
-    // УЛУЧШЕННАЯ ПРОВЕРКА: Если есть открытые панели рядом, но элемент еще не определен как опция,
-    // проверяем, находится ли элемент внутри одной из панелей
-    if (!isDropdownOption && !isNonOptionControl && hasNearbyPanel && nearbyOpenPanels.length > 0) {
-      console.log(`   🔍 Проверяю, находится ли элемент внутри открытых панелей...`);
-      for (const panel of nearbyOpenPanels) {
-        if (panel.contains(element)) {
-          console.log(`   ✅ Элемент находится внутри панели dropdown, обрабатываю как опцию`);
-          
-          // Проверяем, что элемент имеет текст и не является плейсхолдером
-          const text = elementText?.trim() || '';
-          const isPlaceholder = ['выберите', 'select', 'choose', 'placeholder', 'статус'].some(ph => 
-            text.toLowerCase().includes(ph.toLowerCase())
-          );
-          const isReasonableLength = text.length > 0 && text.length < 100;
-          
-          if (!isPlaceholder && isReasonableLength) {
-            // Ищем родительский dropdown для панели
-            const parentDropdown = this.resolveRecentDropdownForOption(element) ||
-                                  panel.closest('app-select, ng-select, mat-select') || 
-                                  this.findParentDropdownForOption(element);
-            
-            if (parentDropdown) {
-              console.log(`   ✅ Найден родительский dropdown для панели, записываю выбор опции`);
-              await this.recordDropdownOptionSelection(parentDropdown, text, element);
-              return; // Не обрабатываем как обычный клик
-            } else {
-              // Если не нашли через closest, ищем ближайший dropdown к панели
-              const allDropdowns = document.querySelectorAll('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select');
-              let closestDropdown = null;
-              let minDistance = Infinity;
-              
-              const panelRect = panel.getBoundingClientRect();
-              for (const dd of allDropdowns) {
-                const ddRect = dd.getBoundingClientRect();
-                const distance = Math.sqrt(
-                  Math.pow(panelRect.left - ddRect.left, 2) + 
-                  Math.pow(panelRect.top - ddRect.top, 2)
-                );
-                
-                if (distance < 1500 && distance < minDistance) {
-                  minDistance = distance;
-                  closestDropdown = dd;
-                }
-              }
-              
-              if (closestDropdown) {
-                console.log(`   ✅ Найден ближайший dropdown к панели, записываю выбор опции`);
-                await this.recordDropdownOptionSelection(closestDropdown, text, element);
-                return; // Не обрабатываем как обычный клик
-              }
-            }
-          }
-        }
-      }
+    if (isNonOptionControl) {
+      // Кнопки/ссылки/меню никогда не считаем выбором dropdown-опции,
+      // даже если рядом есть открытая панель со значениями.
+      hasNearbyPanel = false;
+      nearbyOpenPanels = [];
     }
     
     if (isDropdownOption) {
@@ -2748,7 +3063,7 @@ class ImprovedActionRecorder {
         console.log('   - Родительский dropdown найден:', parentDropdown.tagName, parentDropdown.id || 'нет id');
         
         // Записываем выбор значения
-        await this.recordDropdownOptionSelection(parentDropdown, optionText, element);
+        await this.recordDropdownOptionSelection(parentDropdown, optionText, element, clickTimestamp);
         return; // Не обрабатываем как обычный клик
       } else {
         console.warn('   ⚠️ Родительский dropdown не найден для опции');
@@ -2764,8 +3079,64 @@ class ImprovedActionRecorder {
           );
           console.log(`      - ${dd.tagName} (${dd.id || 'нет id'}): расстояние ${Math.round(distance)}px`);
         }
-        // Каждое действие должно стать шагом: если parent dropdown не определён, сохраняем как обычный клик по опции.
-        await this.recordClickAction(element, 'click', false);
+        // Если выбор опции уже был зафиксирован только что, не добавляем fallback click.
+        if (this.shouldSuppressFallbackOptionClick(element, optionText)) {
+          console.log('⏭️ [Dropdown] Пропуск fallback click: выбор опции уже записан');
+          return;
+        }
+        // Если клик похож на пункт навигационного меню приложения, сохраняем обычный click.
+        const navHost = element.closest?.('a[href], [routerlink], [ng-reflect-router-link], [data-route], [data-router-link]');
+        const navHref = (navHost?.getAttribute?.('href') || '').trim();
+        const navClass = (navHost?.className || element.className || '').toString().toLowerCase();
+        const inKnownSelectOverlay = !!element.closest?.(
+          '[role="listbox"], .cdk-overlay-pane, .mat-select-panel, .mat-mdc-select-panel, .ng-dropdown-panel, .ng-select-dropdown, .ant-select-dropdown, .select2-dropdown, .choices__list--dropdown'
+        );
+        const recentTriggerMs = Date.now() - (this.lastDropdownTriggerAt || 0);
+        const hasRecentDropdownTrigger =
+          this.lastDropdownTrigger instanceof Element &&
+          recentTriggerMs >= 0 &&
+          recentTriggerMs <= (Number(this.dropdownTriggerResolveWindowMs) > 0 ? this.dropdownTriggerResolveWindowMs : 12000);
+        const looksLikeNavigationMenu =
+          this.isApplicationMenuItem(element) ||
+          (!!navHost && (
+            (!!navHref && navHref !== '#' && !navHref.startsWith('javascript:')) ||
+            navHost.hasAttribute?.('routerlink') ||
+            navHost.hasAttribute?.('ng-reflect-router-link') ||
+            navHost.hasAttribute?.('data-route') ||
+            navHost.hasAttribute?.('data-router-link')
+          )) ||
+          (!inKnownSelectOverlay && (
+            navClass.includes('menu__subitem') ||
+            navClass.includes('sidebar') ||
+            navClass.includes('nav-item') ||
+            navClass.includes('menu-item')
+          ));
+        if (looksLikeNavigationMenu) {
+          console.log('✅ [Dropdown] Похоже на пункт меню навигации, записываю как click');
+          await this.recordClickAction(element, 'click', false, clickTimestamp);
+          return;
+        }
+        if (inKnownSelectOverlay || this.pendingDropdownFill || hasRecentDropdownTrigger) {
+          console.log('✅ [Dropdown] Родительский combobox не найден, но контекст select/overlay — записываю как click (fallback)');
+          await this.recordClickAction(element, 'click', false, clickTimestamp);
+          return;
+        }
+        // Если parent dropdown не определён, клик по option-like элементу считаем неоднозначным и не сохраняем,
+        // чтобы не добавлять "лишние" шаги в стиле "АИС СД ... @charset".
+        this.recordingRuntimeStats.skipped++;
+        this.logRecorderClickRoute('ambiguous dropdown-option click: шаг не записан (нет parent dropdown)', {
+          optionText: String(optionText || '').slice(0, 120),
+          tag: element.tagName,
+          className: String(element.className || '').slice(0, 120),
+          isApplicationMenuItem: this.isApplicationMenuItem(element)
+        });
+        this.showRecordingRuntimeNotification({
+          level: 'warning',
+          title: 'Шаг пропущен',
+          message: 'Неоднозначный клик по option-панели без связанного dropdown не записан',
+          throttleKey: 'skip:ambiguous-option-click'
+        });
+        console.warn('⚠️ [Dropdown] Пропуск fallback click: parent dropdown не определён');
         return;
       }
     }
@@ -2845,6 +3216,7 @@ class ImprovedActionRecorder {
       id: element.id,
       className: element.className,
       text: this.selectorEngine.getElementText(element),
+      controlHostTag: this.getNearestInteractiveHostTagName(element),
       attributes: this.getElementAttributes(element),
       // Добавляем информацию о dropdown
       isDropdown: isDropdown,
@@ -2852,11 +3224,13 @@ class ImprovedActionRecorder {
       parentDropdown: isDropdown ? this.getParentDropdownInfo(element) : null
     };
 
-    // Критические клики (logout/навигация) записываем немедленно, без ожидания dblclick,
-    // иначе действие может потеряться при мгновенном переходе/выходе из аккаунта.
-    const criticalTarget = element.closest('a, button, [role="button"], [onclick], [ng-click]') || element;
+    // Критические клики (сохранить / выход / навигация) — сразу, без ожидания dblclick,
+    // иначе шаг теряется при быстром переходе или при остановке записи до срабатывания таймера.
+    const criticalTarget = element.closest(
+      'a, button, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], [onclick], [ng-click], [data-action], [data-testid]'
+    ) || element;
     if (this.isCriticalNavigationClick(criticalTarget)) {
-      console.log('🚪 [Recorder] Обнаружен критический клик (logout/навигация), записываю немедленно');
+      console.log('🚪 [Recorder] Обнаружен критический клик (сохранение/выход/навигация), записываю немедленно');
       try {
         await this.recordClickAction(element, 'click', isDropdown);
       } catch (err) {
@@ -2865,15 +3239,38 @@ class ImprovedActionRecorder {
       return;
     }
 
-    // #21: Отложенная запись клика для обнаружения dblclick
-    // Сохраняем данные клика и запускаем таймер
+    // #21: Отложенная запись клика для обнаружения dblclick.
+    // ВАЖНО: если до таймаута пришёл клик по ДРУГОМУ элементу, предыдущий клик не должен теряться.
+    if (this.pendingClickAction) {
+      const prevElement = this.pendingClickAction.element;
+      const prevKey = this.getElementKey(prevElement);
+      const currentKey = this.getElementKey(element);
+      const isSameElement = !!prevKey && !!currentKey && prevKey === currentKey;
+
+      if (!isSameElement) {
+        console.log('📝 [Recorder] Фиксирую предыдущий pending click (новый клик по другому элементу)');
+        try {
+          await this.recordClickAction(
+            this.pendingClickAction.element,
+            'click',
+            this.pendingClickAction.isDropdown,
+            this.pendingClickAction.timestamp
+          );
+        } catch (e) {
+          console.warn('⚠️ [Recorder] Не удалось зафиксировать предыдущий pending click:', e?.message || e);
+        }
+      }
+
+      if (this.pendingClickTimeout) {
+        clearTimeout(this.pendingClickTimeout);
+        this.pendingClickTimeout = null;
+      }
+      this.pendingClickAction = null;
+    }
+
+    // Сохраняем данные нового клика и запускаем таймер
     this.pendingClickAction = { element, isDropdown, elementInfo, selector, timestamp: Date.now() };
     if (isDropdown) {
-    }
-    
-    // Отменяем предыдущий таймер если есть
-    if (this.pendingClickTimeout) {
-      clearTimeout(this.pendingClickTimeout);
     }
     
     // Запускаем новый таймер
@@ -2883,7 +3280,8 @@ class ImprovedActionRecorder {
         await this.recordClickAction(
           this.pendingClickAction.element, 
           'click', 
-          this.pendingClickAction.isDropdown
+          this.pendingClickAction.isDropdown,
+          this.pendingClickAction.timestamp
         );
         this.pendingClickAction = null;
         this.pendingClickTimeout = null;
@@ -2893,7 +3291,7 @@ class ImprovedActionRecorder {
     console.log(`🖱️ [Recorder] Клик отложен на ${this.dblclickDetectionDelay}мс для обнаружения dblclick`);
   }
 
-  async recordClickAction(element, clickType = 'click', isDropdown = false) {
+  async recordClickAction(element, clickType = 'click', isDropdown = false, sourceTimestamp = null) {
     // Генерируем все возможные селекторы
     const allSelectors = this.selectorEngine.generateAllSelectors(element);
     const selector = this.selectorEngine.selectBestSelector(allSelectors);
@@ -2910,12 +3308,28 @@ class ImprovedActionRecorder {
       id: element.id,
       className: element.className,
       text: this.selectorEngine.getElementText(element),
+      controlHostTag: this.getNearestInteractiveHostTagName(element),
       attributes: this.getElementAttributes(element),
       // Добавляем информацию о dropdown (только для обычного клика)
       isDropdown: clickType === 'click' ? isDropdown : false,
       dropdownType: (clickType === 'click' && isDropdown) ? this.getDropdownType(element) : null,
       parentDropdown: (clickType === 'click' && isDropdown) ? this.getParentDropdownInfo(element) : null
     };
+    const dropdownTriggerMeta = (clickType === 'click' && isDropdown)
+      ? this.buildDropdownTriggerMeta(element)
+      : null;
+    if (dropdownTriggerMeta?.selector) {
+      const selectorAlternatives = Array.isArray(selector.alternatives) ? selector.alternatives : [];
+      selector.alternatives = [...new Set([
+        ...selectorAlternatives,
+        dropdownTriggerMeta.selector,
+        ...(dropdownTriggerMeta.alternatives || [])
+      ])];
+      if (elementInfo.parentDropdown) {
+        elementInfo.parentDropdown.triggerSelector = dropdownTriggerMeta.selector;
+        elementInfo.parentDropdown.triggerAlternatives = dropdownTriggerMeta.alternatives || [];
+      }
+    }
 
     // Ищем заголовок поля, если элемент является полем формы
     const fieldLabel = this.findFieldLabel(element);
@@ -2924,10 +3338,13 @@ class ImprovedActionRecorder {
       type: clickType,
       selector: selector,
       element: elementInfo,
-      timestamp: Date.now(),
+      timestamp: (Number.isFinite(Number(sourceTimestamp)) && Number(sourceTimestamp) > 0)
+        ? Number(sourceTimestamp)
+        : Date.now(),
       url: window.location.href,
       isDropdownClick: (clickType === 'click' && isDropdown) || false,
-      fieldLabel: fieldLabel || undefined
+      fieldLabel: fieldLabel || undefined,
+      dropdownTrigger: dropdownTriggerMeta || undefined
     };
     
     await this.saveAction(action);
@@ -3002,6 +3419,9 @@ class ImprovedActionRecorder {
                 if (currentValue && currentValue !== initialValue && 
                     !['выберите', 'select', 'choose', 'placeholder'].some(ph => 
                       currentValue.toLowerCase().includes(ph.toLowerCase()))) {
+                  if (this.shouldDeferImplicitDropdownSelection(parentDropdown, null)) {
+                    return;
+                  }
                   if (this.shouldRejectDropdownValueForFieldMismatch(parentDropdown, currentValue)) {
                     console.warn(`   ⚠️ [SeleniumUtils] Пропуск записи — «${currentValue}» не из поля combobox`);
                     clearInterval(checkInterval);
@@ -3021,7 +3441,12 @@ class ImprovedActionRecorder {
                   }
                   
                   // Записываем выбор опции
-                  await this.recordDropdownOptionSelection(parentDropdown, currentValue, null);
+                  await this.recordDropdownOptionSelection(
+                    parentDropdown,
+                    currentValue,
+                    null,
+                    this.resolveActionTimestamp(null, actionMeta?.timestamp)
+                  );
                 } else if (attempts >= maxAttempts) {
                   console.log(`   ⏹️ [SeleniumUtils] Достигнут лимит попыток (${maxAttempts}), прекращаю поиск`);
                   clearInterval(checkInterval);
@@ -3197,6 +3622,19 @@ class ImprovedActionRecorder {
       dropdownType: isDropdown ? this.getDropdownType(element) : null,
       parentDropdown: isDropdown ? this.getParentDropdownInfo(element) : null
     };
+    const dropdownTriggerMeta = isDropdown ? this.buildDropdownTriggerMeta(element) : null;
+    if (dropdownTriggerMeta?.selector) {
+      const selectorAlternatives = Array.isArray(selector.alternatives) ? selector.alternatives : [];
+      selector.alternatives = [...new Set([
+        ...selectorAlternatives,
+        dropdownTriggerMeta.selector,
+        ...(dropdownTriggerMeta.alternatives || [])
+      ])];
+      if (elementInfo.parentDropdown) {
+        elementInfo.parentDropdown.triggerSelector = dropdownTriggerMeta.selector;
+        elementInfo.parentDropdown.triggerAlternatives = dropdownTriggerMeta.alternatives || [];
+      }
+    }
     
     // Ищем заголовок поля
     const fieldLabel = this.findFieldLabel(element);
@@ -3209,6 +3647,7 @@ class ImprovedActionRecorder {
       url: window.location.href,
       isDropdownClick: isDropdown || false,
       fieldLabel: fieldLabel || undefined,
+      dropdownTrigger: dropdownTriggerMeta || undefined,
       // Помечаем, что селектор был выбран вручную через пикер
       selectorManuallySelected: true,
       selectorScore: selector.score || null
@@ -3233,63 +3672,240 @@ class ImprovedActionRecorder {
   resolveToDropdownRoot(element) {
     if (!element) return null;
     const rootSelectors = 'app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select';
-    const isLikelyDropdownRoot = (el) => {
-      if (!el || !(el instanceof Element)) return false;
-      const cls = (el.className || '').toString().toLowerCase();
-      const hasSelectMarkers = !!(
-        el.querySelector?.('.select-box, .arrow, .result, [role="combobox"], [role="listbox"], [class*="option"], [class*="select"]') ||
-        cls.includes('select') || cls.includes('dropdown') || cls.includes('combo')
-      );
-      return hasSelectMarkers;
-    };
     // Уже корень dropdown
-    if (element.matches && element.matches(rootSelectors)) return element;
+    if (this.isDropdownRootCandidate(element)) return element;
     // Элемент внутри dropdown — поднимаемся до корня
     const inside = element.closest(rootSelectors);
-    if (inside) return inside;
+    if (inside && this.isDropdownRootCandidate(inside)) return inside;
     // Кастомные dropdown (как type-project) могут иметь корень не app-select, а контейнер с elementid.
     const elementIdRoot = element.closest('[elementid]');
-    if (elementIdRoot && isLikelyDropdownRoot(elementIdRoot)) {
+    if (elementIdRoot && this.isDropdownRootCandidate(elementIdRoot, { allowElementId: true })) {
       return elementIdRoot;
     }
     // Контейнер с несколькими dropdown: берём только тот, у которого открыта панель (чтобы не трогать другие поля)
     const children = element.querySelectorAll ? element.querySelectorAll(rootSelectors) : [];
     if (children.length === 0) return null;
-    if (children.length === 1) return children[0];
+    const validChildren = Array.from(children).filter(child => this.isDropdownRootCandidate(child));
+    if (validChildren.length === 0) return null;
+    if (validChildren.length === 1) return validChildren[0];
     if (this.seleniumUtils && typeof this.seleniumUtils.isDropdownOpen === 'function') {
-      for (const dd of children) {
+      for (const dd of validChildren) {
         if (this.seleniumUtils.isDropdownOpen(dd)) return dd;
       }
     }
     return null;
   }
 
+  isDropdownRootCandidate(element, options = {}) {
+    if (!element || !(element instanceof Element)) return false;
+    if (this.isApplicationMenuItem(element)) return false;
+    const allowElementId = !!options.allowElementId;
+
+    const tag = (element.tagName || '').toLowerCase();
+    const role = String(element.getAttribute?.('role') || '').toLowerCase();
+    const haspopup = String(element.getAttribute?.('aria-haspopup') || '').toLowerCase();
+    const cls = (element.className || '').toString().toLowerCase();
+
+    // Частый ложный кандидат: button-like контейнеры в header/menu.
+    if (tag.includes('button') && role !== 'combobox' && role !== 'listbox' && haspopup !== 'listbox') {
+      return false;
+    }
+
+    const dropdownTags = new Set([
+      'app-select', 'ng-select', 'mat-select', 'p-dropdown', 'p-calendar', 'v-select', 'v-autocomplete', 'v-combobox'
+    ]);
+    if (dropdownTags.has(tag)) return true;
+    if (role === 'combobox' || role === 'listbox' || haspopup === 'listbox') return true;
+
+    const hasDropdownClass = /(select|dropdown|combobox|autocomplete|ng-select|mat-select|ant-select|select2|choices|v-select)/i.test(cls);
+    if (hasDropdownClass) return true;
+
+    if (allowElementId && element.hasAttribute('elementid')) {
+      const hasInternalSignals = !!element.querySelector?.('.select-box, .result, .placeholder, .arrow, [role="combobox"], [role="listbox"], [class*="option"], [class*="select"]');
+      return hasInternalSignals;
+    }
+    return false;
+  }
+
+  isElementVisibleForRecording(element) {
+    if (!element || !(element instanceof Element)) return false;
+    const style = window.getComputedStyle ? window.getComputedStyle(element) : null;
+    if (style && (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)) {
+      return false;
+    }
+    const rect = element.getBoundingClientRect ? element.getBoundingClientRect() : null;
+    return !!(rect && rect.width > 0 && rect.height > 0);
+  }
+
+  pickPreferredSelector(selectors = []) {
+    let best = '';
+    let bestScore = -Infinity;
+    for (const entry of selectors) {
+      const selector = typeof entry === 'string' ? entry : (entry?.selector || '');
+      if (!selector) continue;
+      let score = 0;
+      if (selector.includes(':nth-of-type(')) score += 40;
+      if (selector.startsWith('.')) score += 25;
+      if (selector.includes('app-select')) score += 20;
+      if (selector.includes('[elementid')) score += 10;
+      score += Math.min(20, Math.floor(selector.length / 12));
+      if (score > bestScore) {
+        bestScore = score;
+        best = selector;
+      }
+    }
+    return best;
+  }
+
+  buildDropdownTriggerMeta(element) {
+    const dropdownRoot = this.resolveToDropdownRoot(element) || element?.closest?.('[elementid]') || element;
+    if (!dropdownRoot) return null;
+
+    const triggerSelectors = [
+      '[role="combobox"]',
+      '.select-box, [class*="select-box"]',
+      '.result, [class*="result"]',
+      '.options, [class*="options"]',
+      '.arrow, [class*="arrow"]',
+      'input[role="combobox"]'
+    ];
+
+    const candidates = [];
+    const pushCandidate = (candidate) => {
+      if (!candidate || !(candidate instanceof Element)) return;
+      if (!this.isElementVisibleForRecording(candidate)) return;
+      if (!candidates.includes(candidate)) candidates.push(candidate);
+    };
+
+    pushCandidate(element);
+    pushCandidate(dropdownRoot);
+    for (const css of triggerSelectors) {
+      pushCandidate(dropdownRoot.querySelector?.(css));
+    }
+
+    if (candidates.length === 0) return null;
+
+    let triggerElement = candidates[0];
+    let bestScore = -Infinity;
+    for (const candidate of candidates) {
+      const role = String(candidate.getAttribute?.('role') || '').toLowerCase();
+      const cls = String(candidate.className || '').toLowerCase();
+      let score = 0;
+      if (candidate === element) score += 20;
+      if (role === 'combobox') score += 30;
+      if (cls.includes('select-box')) score += 25;
+      if (cls.includes('result')) score += 20;
+      if (cls.includes('arrow')) score += 15;
+      if (cls.includes('option')) score -= 30;
+      if (score > bestScore) {
+        bestScore = score;
+        triggerElement = candidate;
+      }
+    }
+
+    const allSelectors = this.selectorEngine.generateAllSelectors(triggerElement) || [];
+    const alternatives = this.selectorEngine.findAlternativeSelectors(triggerElement) || [];
+    const mergedSelectors = [
+      ...allSelectors.map(s => s?.selector).filter(Boolean),
+      ...alternatives.map(s => typeof s === 'string' ? s : s?.selector).filter(Boolean)
+    ];
+    const unique = [...new Set(mergedSelectors)];
+    const preferred = this.pickPreferredSelector(unique) || unique[0] || '';
+    if (!preferred) return null;
+
+    return {
+      selector: preferred,
+      alternatives: unique.filter(s => s && s !== preferred).slice(0, 12)
+    };
+  }
+
   resolveRecentDropdownForOption(optionElement) {
-    const recent = this.lastDropdownTrigger;
-    if (!recent || !optionElement) return null;
-    const ageMs = Date.now() - (this.lastDropdownTriggerAt || 0);
-    if (ageMs > 5000) return null;
+    if (!optionElement) return null;
+    const panel = optionElement.closest('[class*="panel"], [class*="overlay"], [class*="dropdown"], [class*="menu"], [class*="select-group"].open, [class*="content-list"], [role="listbox"], .cdk-overlay-pane');
+
+    const candidates = [];
+    if (this.pendingDropdownFill?.dropdownRoot instanceof Element) {
+      candidates.push({ root: this.pendingDropdownFill.dropdownRoot, source: 'pending' });
+    }
+    if (this.lastDropdownTrigger instanceof Element) {
+      candidates.push({ root: this.lastDropdownTrigger, source: 'recent' });
+    }
+    if (candidates.length === 0) return null;
+
+    const maxRecentAge = Number(this.dropdownTriggerResolveWindowMs) > 0
+      ? Number(this.dropdownTriggerResolveWindowMs)
+      : 12000;
 
     try {
-      if (this.seleniumUtils && typeof this.seleniumUtils.findDropdownPanels === 'function') {
-        const panels = this.seleniumUtils.findDropdownPanels(recent) || [];
-        if (panels.some(p => p && p.contains && p.contains(optionElement))) {
-          return recent;
+      for (const candidate of candidates) {
+        const root = candidate.root;
+        if (!root?.isConnected) continue;
+        if (!this.isDropdownRootCandidate(root, { allowElementId: true })) continue;
+        if (candidate.source === 'recent') {
+          const ageMs = Date.now() - (this.lastDropdownTriggerAt || 0);
+          if (ageMs > maxRecentAge) continue;
         }
-      }
 
-      const panel = optionElement.closest('[class*="panel"], [class*="overlay"], [class*="dropdown"], [class*="menu"], [class*="select-group"].open, [class*="content-list"], [role="listbox"], .cdk-overlay-pane');
-      if (panel) {
-        const p = panel.getBoundingClientRect();
-        const r = recent.getBoundingClientRect();
-        const distance = Math.hypot(p.left - r.left, p.top - r.bottom);
-        if (distance < 650) {
-          return recent;
+        if (this.seleniumUtils && typeof this.seleniumUtils.findDropdownPanels === 'function') {
+          const panels = this.seleniumUtils.findDropdownPanels(root) || [];
+          if (panels.some(p => p && p.contains && p.contains(optionElement))) {
+            return root;
+          }
+        }
+
+        if (panel) {
+          const rootElementId = root.getAttribute?.('elementid') || root.getAttribute?.('ng-reflect-element-id') || '';
+          const panelId = panel.id || '';
+          if (!rootElementId) continue;
+          const expectedPanelId = `${rootElementId}__result`;
+          if (
+            panelId === expectedPanelId ||
+            panelId.includes(rootElementId) ||
+            (panel.getAttribute && String(panel.getAttribute('id') || '').includes(rootElementId))
+          ) {
+            return root;
+          }
         }
       }
     } catch (_) {}
 
     return null;
+  }
+
+  hasVisibleDropdownPanelsForElement(dropdownElement) {
+    if (!dropdownElement) return false;
+    try {
+      if (this.seleniumUtils && typeof this.seleniumUtils.findDropdownPanels === 'function') {
+        const panels = this.seleniumUtils.findDropdownPanels(dropdownElement) || [];
+        return panels.some(panel => {
+          if (!panel) return false;
+          const rect = panel.getBoundingClientRect?.();
+          return !!(
+            rect &&
+            rect.width > 0 &&
+            rect.height > 0 &&
+            panel.offsetParent !== null
+          );
+        });
+      }
+    } catch (_) {}
+
+    const fallbackPanel = dropdownElement.querySelector?.(
+      '[role="listbox"], .cdk-overlay-pane, .mat-select-panel, .ng-dropdown-panel, .ant-select-dropdown, .select2-dropdown'
+    );
+    if (!fallbackPanel) return false;
+    const rect = fallbackPanel.getBoundingClientRect?.();
+    return !!(rect && rect.width > 0 && rect.height > 0 && fallbackPanel.offsetParent !== null);
+  }
+
+  shouldDeferImplicitDropdownSelection(dropdownElement, optionElement = null) {
+    if (optionElement) return false;
+    if (!dropdownElement) return false;
+    if (!this.hasVisibleDropdownPanelsForElement(dropdownElement)) return false;
+
+    // При открытой панели без клика по конкретной опции значение часто "предпросмотр",
+    // а не финальный выбор пользователя.
+    return true;
   }
 
   rememberDropdownTriggerFromElement(element, reason = 'unknown') {
@@ -3306,8 +3922,22 @@ class ImprovedActionRecorder {
 
   isNonOptionControlElement(element) {
     if (!element) return false;
+    const tag = (element.tagName || '').toLowerCase();
     const classLower = (element.className || '').toString().toLowerCase();
-    const role = element.getAttribute?.('role') || '';
+    const role = (element.getAttribute?.('role') || '').toLowerCase();
+    const elementIdAttr = (element.getAttribute?.('elementid') || '').toLowerCase();
+    if (
+      tag === 'button' ||
+      tag === 'a' ||
+      tag === 'app-header-button' ||
+      role === 'button' ||
+      role === 'link' ||
+      role === 'menuitem' ||
+      /(^|[\s_-])(btn|button|big-button|header-button|menu__subitem)([\s_-]|$)/i.test(classLower) ||
+      /save-button|submit|create|apply|delete/.test(elementIdAttr)
+    ) {
+      return true;
+    }
     return (
       (classLower.includes('select-box') ||
         classLower.includes('placeholder') ||
@@ -3382,13 +4012,22 @@ class ImprovedActionRecorder {
         if (isAntSelectOption) return false;
         return true;
       }
-      // app-select / Angular: опции часто <li> в CDK overlay или .content-list без ant-select-dropdown и без role=listbox
+      // app-select / Angular: опции часто <li> в CDK overlay/listbox.
+      // Не считаем обычное меню приложения dropdown-панелью только по общим class вроде "content-list".
       const inSelectDropdownPanel = liHost.closest(
         '.cdk-overlay-pane, .mat-select-panel, .mat-mdc-select-panel, .ng-dropdown-panel, .ng-select-dropdown, ' +
-        '[class*="content-list"], .rc-virtual-list-holder, [class*="select-panel"], [class*="dropdown-panel"]'
+        '.ant-select-dropdown, .select2-dropdown, .choices__list--dropdown, .rc-virtual-list-holder, ' +
+        '[role="listbox"], [class*="select-panel"], [class*="dropdown-panel"], .content-list-container'
       );
       const inApplicationRoleMenu = liHost.closest('[role="menu"]');
-      if (inSelectDropdownPanel && !inApplicationRoleMenu) {
+      const hasOptionSignals = !!(
+        inSelectDropdownPanel &&
+        (
+          inSelectDropdownPanel.matches?.('[role="listbox"], .cdk-overlay-pane, .mat-select-panel, .mat-mdc-select-panel, .ng-dropdown-panel, .ng-select-dropdown, .ant-select-dropdown, .select2-dropdown, .choices__list--dropdown') ||
+          inSelectDropdownPanel.querySelector?.('[role="option"], .mat-option, .mat-mdc-option, .ng-option, .ant-select-item-option, .select2-results__option, .choices__item--selectable, [class*="option"]')
+        )
+      );
+      if (hasOptionSignals && !inApplicationRoleMenu) {
         return false;
       }
       // ul.dropdown-menu Bootstrap/Wicket — под [role="menu"], не попадаем в ветку выше
@@ -3424,11 +4063,23 @@ class ImprovedActionRecorder {
     }
 
     const inAppMenu = element.closest('[role="menu"]');
-    if (inAppMenu) {
+    if (inAppMenu && !element.closest('[role="listbox"]')) {
       const tag = (element.tagName || '').toLowerCase();
       if (tag === 'a') {
         const href = (element.getAttribute('href') || '').trim();
         if (href === '#' || href === '' || href.startsWith('#') || /^javascript:/i.test(href)) return true;
+      }
+      // Клик по строке меню (div/span), а не по <a> — частый кейс «Выход» с class menu_item.
+      const inSelectLikePanel = !!element.closest(
+        '.mat-select-panel, .mat-mdc-select-panel, .ng-dropdown-panel, .ng-select-dropdown, ' +
+        '.ant-select-dropdown, .rc-virtual-list-holder, .select2-results, .choices__list--dropdown, ' +
+        '[role="listbox"]'
+      );
+      if (!inSelectLikePanel && (tag === 'div' || tag === 'span' || tag === 'button')) {
+        const clsLower = (element.className || '').toString().toLowerCase();
+        if (/(^|[\s_-])(menu[_-]?item|menuitem|menu[_-]?row)([\s_-]|$)/i.test(clsLower)) {
+          return true;
+        }
       }
     }
 
@@ -3452,7 +4103,20 @@ class ImprovedActionRecorder {
   isDropdownOption(element) {
     if (!element) return false;
 
+    if (this.isNonOptionControlElement(element)) {
+      this.logRecorderClickRoute('isDropdownOption → false: non-option control', {
+        tag: element.tagName,
+        className: String(element.className || '').slice(0, 120)
+      });
+      return false;
+    }
+
     if (this.isApplicationMenuItem(element)) {
+      this.logRecorderClickRoute('isDropdownOption → false: application menu item', {
+        tag: element.tagName,
+        className: String(element.className || '').slice(0, 120),
+        text: (element.textContent || '').trim().slice(0, 80)
+      });
       return false;
     }
 
@@ -3465,6 +4129,10 @@ class ImprovedActionRecorder {
       triggerLikeClass.includes('result')
     );
     if (isDropdownTriggerLike) {
+      this.logRecorderClickRoute('isDropdownOption → false: trigger-like (result/__result)', {
+        tag: element.tagName,
+        id: element.id || ''
+      });
       return false;
     }
     
@@ -3473,6 +4141,9 @@ class ImprovedActionRecorder {
     if (cls.includes('calendar__table-cell') || cls.includes('calendar-table-cell') ||
         cls.includes('datepicker') || cls.includes('date-picker') ||
         element.closest('[class*="calendar"], [class*="datepicker"], p-calendar, p-datepicker')) {
+      this.logRecorderClickRoute('isDropdownOption → false: calendar/datepicker', {
+        tag: element.tagName
+      });
       return false;
     }
     
@@ -3485,6 +4156,9 @@ class ImprovedActionRecorder {
       role !== 'option' &&
       !classLower.includes('option')
     ) {
+      this.logRecorderClickRoute('isDropdownOption → false: select-box/placeholder/arrow/result (not option)', {
+        tag: element.tagName
+      });
       return false;
     }
     const optionClasses = [
@@ -3494,7 +4168,6 @@ class ImprovedActionRecorder {
       'dropdown-item',
       'select-option',
       'menu__item',
-      'item',
       'menu__item-active', // Для Angular меню
       'fade-in', // Анимация появления опции
       'ng-star-inserted', // Angular элемент
@@ -3521,29 +4194,28 @@ class ImprovedActionRecorder {
     // Проверяем по роли
     const hasOptionRole = role === 'option';
     
-    // Проверяем, находится ли в панели dropdown (расширенный поиск)
+    // Проверяем, находится ли в панели dropdown.
+    // Важно: generic menu/panel (toolbar, app-menu) не должен автоматически считаться dropdown.
     const selectGroupAncestor = element.closest('[class*="select-group"]');
     const isInOpenSelectGroupPanel = !!(
       selectGroupAncestor &&
       /\bopen\b/i.test((selectGroupAncestor.className || '').toString()) &&
       selectGroupAncestor.querySelector('[class*="option"], [role="option"]')
     );
+    const strongDropdownPanelHost = this.closestStrongSelectLikePanelHost(element);
+    const weakDropdownPanelHost = element.closest(
+      '[class*="panel"], [class*="overlay"], [class*="dropdown"], [class*="menu"], [class*="content-list"], [class*="menu__item"], [class*="option"]'
+    );
+    const hasSemanticOptionContext = !!element.closest(
+      'option, [role="option"], .mat-option, .mat-mdc-option, .ng-option, .ant-select-item-option, .select2-results__option, .choices__item--selectable, .v-list-item, [aria-selected="true"], [aria-selected="false"]'
+    );
+    const hasRecentDropdownContext = !!this.resolveRecentDropdownForOption(element);
+    const weakPanelOptionSignals =
+      hasOptionRole || hasOptionClass || hasSemanticOptionContext || hasRecentDropdownContext;
     const isInDropdownPanel = !!(
-      element.closest('[class*="panel"], [class*="overlay"], [class*="dropdown"], [class*="menu"], [class*="content-list"], [role="listbox"], .cdk-overlay-pane') ||
+      strongDropdownPanelHost ||
       isInOpenSelectGroupPanel ||
-      element.closest('[class*="menu__item"]') ||
-      element.closest('[class*="option"]') ||
-      // ===== ТОП-5 БИБЛИОТЕК =====
-      // Ant Design
-      element.closest('.ant-select-dropdown, .rc-virtual-list') ||
-      // Select2
-      element.closest('.select2-dropdown, .select2-results') ||
-      // Choices.js
-      element.closest('.choices__list--dropdown') ||
-      // Vuetify
-      element.closest('.v-menu__content, .v-list') ||
-      // Semantic UI
-      element.closest('.ui.dropdown .menu')
+      (weakDropdownPanelHost && weakPanelOptionSignals)
     );
     
     // Проверяем, есть ли текст (опции обычно имеют текст)
@@ -3573,6 +4245,8 @@ class ImprovedActionRecorder {
       hasOptionClass,
       hasOptionRole,
       isInDropdownPanel,
+      hasSemanticOptionContext,
+      hasRecentDropdownContext,
       hasText: !!hasText,
       text: text.substring(0, 30),
       isVisible,
@@ -3636,8 +4310,21 @@ class ImprovedActionRecorder {
         // Дополнительная проверка: элемент должен находиться внутри одной из панелей
         const isInsidePanel = nearbyPanels.some(panel => panel.contains(element));
         if (isInsidePanel) {
-          console.log('   ✅ Определено как опция: элемент внутри открытой панели dropdown');
-          return true;
+          const insideStrongPanel = nearbyPanels.some(
+            panel => panel.contains(element) && this.isStrongSelectLikePanelHost(panel)
+          );
+          if (insideStrongPanel || weakPanelOptionSignals) {
+            console.log('   ✅ Определено как опция: элемент внутри открытой панели dropdown');
+            return true;
+          }
+          this.logRecorderClickRoute('isDropdownOption → false: inside generic panel only (no strong panel / option signals)', {
+            tag: element.tagName,
+            className: String(element.className || '').slice(0, 120),
+            text: text.slice(0, 80),
+            weakPanelOptionSignals
+          });
+          console.log('   🚫 Не считаю опцией: панель без признаков listbox/select');
+          return false;
         }
         console.log('   🚫 Не считаю опцией: элемент лишь рядом с панелью, но не внутри неё');
         return false;
@@ -3645,22 +4332,33 @@ class ImprovedActionRecorder {
     }
     
     // Еще одна проверка: если элемент находится внутри элемента с классом, указывающим на опцию
-    const parentWithOptionClass = element.closest('[class*="option"], [class*="item"], [class*="menu__item"]');
+    const parentWithOptionClass = element.closest(
+      '[role="option"], .mat-option, .mat-mdc-option, .ng-option, .ant-select-item-option, .ant-select-item, ' +
+      '.select2-results__option, .choices__item--selectable, [class*="menu__item"]'
+    );
     if (parentWithOptionClass && parentWithOptionClass !== element) {
       const parentText = parentWithOptionClass.textContent?.trim() || '';
       const isParentPlaceholder = placeholderTexts.some(ph => parentText.toLowerCase().includes(ph.toLowerCase()));
       const isParentReasonableLength = parentText.length > 0 && parentText.length < 100;
       
       if (!isParentPlaceholder && isParentReasonableLength && isVisible && isClickable) {
-        // Проверяем, находится ли родитель в панели dropdown
-        const isParentInPanel = !!parentWithOptionClass.closest('[class*="panel"], [class*="overlay"], [class*="menu"], [class*="content-list"]');
-        if (isParentInPanel) {
+        const isParentInStrongPanel = !!this.closestStrongSelectLikePanelHost(parentWithOptionClass);
+        if (isParentInStrongPanel) {
           console.log('   ✅ Определено как опция: элемент внутри родителя с классом опции в панели dropdown');
           return true;
         }
       }
     }
     
+    if (weakDropdownPanelHost || strongDropdownPanelHost || isInOpenSelectGroupPanel) {
+      this.logRecorderClickRoute('isDropdownOption → false: no rule matched (was in list-like context)', {
+        tag: element.tagName,
+        className: String(element.className || '').slice(0, 120),
+        text: text.slice(0, 80),
+        isInDropdownPanel,
+        weakPanelOptionSignals
+      });
+    }
     return false;
   }
   
@@ -3700,6 +4398,12 @@ class ImprovedActionRecorder {
       console.log('🔍 [Dropdown] Пункт прикладного меню — не ищем родительский combobox');
       return null;
     }
+
+    // Быстрый путь: если недавно открывали dropdown, связываем опцию с ним.
+    const recentDropdown = this.resolveRecentDropdownForOption(optionElement);
+    if (recentDropdown) {
+      return recentDropdown;
+    }
     
     console.log('🔍 [Dropdown] Ищу родительский dropdown для опции...');
     
@@ -3709,8 +4413,9 @@ class ImprovedActionRecorder {
       // Angular CDK overlays: панели рендерятся в .cdk-overlay-container вне DOM dropdown,
       // поэтому panel.closest('app-select') всегда null. Ищем dropdown по панелям: для каждого
       // dropdown получаем его панели и проверяем, содержит ли панель опцию.
-      const dropdownSelectors = 'app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid]';
-      const allDropdowns = document.querySelectorAll(dropdownSelectors);
+      const dropdownSelectors = 'app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [role="combobox"], [aria-haspopup="listbox"], [elementid]';
+      const allDropdowns = Array.from(document.querySelectorAll(dropdownSelectors))
+        .filter(dd => this.isDropdownRootCandidate(dd, { allowElementId: true }));
       for (const dd of allDropdowns) {
         const panels = this.seleniumUtils.findDropdownPanels(dd);
         for (const panel of panels) {
@@ -3725,7 +4430,7 @@ class ImprovedActionRecorder {
       for (const panel of panels) {
         if (panel.contains(optionElement)) {
           const dropdown = panel.closest(dropdownSelectors);
-          if (dropdown) return dropdown;
+          if (dropdown && this.isDropdownRootCandidate(dropdown, { allowElementId: true })) return dropdown;
           // Панель в overlay — ищем ближайший dropdown по расстоянию
           const panelRect = panel.getBoundingClientRect();
           let closest = null;
@@ -3744,8 +4449,8 @@ class ImprovedActionRecorder {
     }
     
     // Ищем ближайший dropdown контейнер (включая PrimeNG p-dropdown, p-calendar, Vuetify v-select)
-    const dropdown = optionElement.closest('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"], .select-container');
-    if (dropdown) {
+    const dropdown = optionElement.closest('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"], [aria-haspopup="listbox"], .select-container');
+    if (dropdown && this.isDropdownRootCandidate(dropdown, { allowElementId: true })) {
       console.log('   ✅ Найден через closest:', dropdown.tagName);
       return dropdown;
     }
@@ -3757,7 +4462,8 @@ class ImprovedActionRecorder {
       const panelRect = panel.getBoundingClientRect();
       
       // Ищем app-select на странице, который может быть связан с этой панелью
-      const allDropdowns = document.querySelectorAll('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"]');
+      const allDropdowns = Array.from(document.querySelectorAll('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"], [aria-haspopup="listbox"]'))
+        .filter(dd => this.isDropdownRootCandidate(dd, { allowElementId: true }));
       console.log(`   🔍 Проверяю ${allDropdowns.length} dropdown на странице...`);
       
       let closestDropdown = null;
@@ -3789,7 +4495,8 @@ class ImprovedActionRecorder {
     // Если dropdown открыт, его значение может совпадать с текстом опции
     const optionText = optionElement.textContent?.trim() || '';
     if (optionText) {
-      const allDropdowns = document.querySelectorAll('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid]');
+      const allDropdowns = Array.from(document.querySelectorAll('app-select, ng-select, mat-select, p-dropdown, p-calendar, v-select, [elementid], [role="combobox"], [aria-haspopup="listbox"]'))
+        .filter(dd => this.isDropdownRootCandidate(dd, { allowElementId: true }));
       for (const dd of allDropdowns) {
         const resultElement = dd.querySelector('.result, [class*="result"], [id*="result"]');
         if (resultElement) {
@@ -3814,7 +4521,12 @@ class ImprovedActionRecorder {
       }
     }
     
-    console.warn('   ⚠️ Родительский dropdown не найден');
+    const hasStrongDropdownSignals =
+      optionElement.getAttribute('role') === 'option' ||
+      !!optionElement.closest('[role="listbox"], .cdk-overlay-pane, .mat-select-panel, .ng-dropdown-panel, .ant-select-dropdown');
+    if (hasStrongDropdownSignals) {
+      console.warn('   ⚠️ Родительский dropdown не найден');
+    }
     return null;
   }
   
@@ -3845,17 +4557,35 @@ class ImprovedActionRecorder {
   /**
    * Записывает выбор опции в dropdown (логика из автотеста).
    */
-  async recordDropdownOptionSelection(dropdownElement, optionText, optionElement) {
+  async recordDropdownOptionSelection(dropdownElement, optionText, optionElement, sourceTimestamp = null) {
     try {
+      optionText = this.sanitizeDropdownDetectedValue(optionText, dropdownElement);
+      if (!optionText) {
+        console.warn('⚠️ [Dropdown] Пропуск записи input: обнаружено составное/пустое значение');
+        return;
+      }
+      if (optionElement && this.isNonOptionControlElement(optionElement)) {
+        console.log(`📝 [Dropdown] Клик по button-like элементу — записываю как click, не dropdown-combobox`);
+        await this.recordClickAction(optionElement, 'click', false, sourceTimestamp);
+        return;
+      }
       if (optionElement && this.isApplicationMenuItem(optionElement)) {
         console.log(`📝 [Dropdown] Пункт меню приложения — записываю клик, не ввод в combobox`);
         await this.recordClickAction(optionElement, 'click', false);
         return;
       }
       const isDirectOptionClick = !!(optionElement && this.isDropdownOption(optionElement));
+      if (!isDirectOptionClick && this.shouldDeferImplicitDropdownSelection(dropdownElement, optionElement)) {
+        console.warn(`⚠️ [Dropdown] Пропуск записи input: "${optionText}" выглядит предварительным значением (dropdown открыт)`);
+        return;
+      }
       if (!isDirectOptionClick && this.shouldRejectDropdownValueForFieldMismatch(dropdownElement, optionText)) {
         console.warn(`⚠️ [Dropdown] Пропуск записи input: значение «${optionText}» не совпадает с полем combobox`);
         if (optionElement) {
+          if (this.shouldSuppressFallbackOptionClick(optionElement, optionText)) {
+            console.log('⏭️ [Dropdown] Пропуск fallback click после mismatch: выбор уже записан');
+            return;
+          }
           await this.recordClickAction(optionElement, 'click', false);
         }
         return;
@@ -3895,27 +4625,33 @@ class ImprovedActionRecorder {
       // Ищем заголовок поля для dropdown
       const fieldLabel = this.findFieldLabel(dropdownElement);
       
-      // Создаем действие input для выбора значения
+      // Создаем действие input для выбора значения.
+      // ВАЖНО: для type="input" subtype "dropdown-select" не поддерживается в ActionTypes
+      // (он валиден для type="click"), поэтому используем dropdown-combobox.
       const action = {
         type: 'input',
+        subtype: 'dropdown-combobox',
         selector: selector,
         element: elementInfo,
+        elementKey: this.getElementKey(dropdownElement),
         value: optionText,
         displayValue: optionText,
+        optionText: optionText,
         dropdownAutoFilled: true,
-        timestamp: Date.now(),
+        timestamp: this.resolveActionTimestamp(sourceTimestamp, this.pendingDropdownFill?.actionMeta?.timestamp),
         url: window.location.href,
         isDropdownSelection: true,
         fieldLabel: fieldLabel || undefined,
         optionElement: {
-          tag: optionElement.tagName?.toLowerCase(),
-          className: optionElement.className,
+          tag: optionElement?.tagName?.toLowerCase(),
+          className: optionElement?.className,
           text: optionText
         }
       };
       
       // Сохраняем действие
       await this.saveAction(action);
+      this.rememberDropdownSelection(selector, optionText, dropdownElement, fieldLabel);
       
       // Отменяем ожидание заполнения, так как значение уже выбрано
       if (this.pendingDropdownFill) {
@@ -3964,12 +4700,15 @@ class ImprovedActionRecorder {
       selector.alternatives = alternatives;
     }
 
+    const isDropdownChange = this.isDropdownElement(element, null);
     const elementInfo = {
       tag: element.tagName?.toLowerCase(),
       id: element.id,
       className: element.className,
       text: this.selectorEngine.getElementText(element),
-      attributes: this.getElementAttributes(element)
+      attributes: this.getElementAttributes(element),
+      isDropdown: isDropdownChange || false,
+      dropdownType: isDropdownChange ? this.getDropdownType(element) : null
     };
     
     // Ищем заголовок поля
@@ -3991,6 +4730,7 @@ class ImprovedActionRecorder {
       type: 'change',
       selector: selector,
       element: elementInfo,
+      elementKey: elementKey,
       value: selectedOptionValue,
       // #22: Добавляем текст выбранной опции для native select
       selectedOptionText: selectedOptionText,
@@ -3999,20 +4739,28 @@ class ImprovedActionRecorder {
       fieldLabel: fieldLabel || undefined
     };
     
+    if (isDropdownChange && this.shouldSkipDropdownChangeAfterSelection(selector, selectedOptionValue, element, fieldLabel)) {
+      console.log('⏭️ [Recorder] Пропуск лишнего change после выбора dropdown-опции');
+      return;
+    }
+    
     await this.saveAction(action);
     
-    // Пробуем разрешить заполнение dropdown
-    const resolved = this.resolveDropdownFill(element, action.value);
-    
-    // Если не разрешили через resolveDropdownFill, пробуем найти значение в родительском dropdown
-    if (!resolved && this.isDropdownElement(element, action)) {
-      console.log('🔍 [Dropdown] Пробую найти значение в родительском dropdown...');
-      const parentDropdown = element.closest('app-select, ng-select, mat-select, [role="combobox"]');
-      if (parentDropdown) {
-        const dropdownValue = this.findDropdownValueInParent(parentDropdown);
-        if (dropdownValue && dropdownValue.trim().length > 0) {
-          console.log(`✅ [Dropdown] Найдено значение в родительском dropdown: "${dropdownValue}"`);
-          this.resolveDropdownFill(parentDropdown, dropdownValue);
+    // Dropdown-fill запускаем только для реальных dropdown change.
+    if (isDropdownChange) {
+      // Пробуем разрешить заполнение dropdown
+      const resolved = this.resolveDropdownFill(element, action.value);
+      
+      // Если не разрешили через resolveDropdownFill, пробуем найти значение в родительском dropdown
+      if (!resolved && this.isDropdownElement(element, action)) {
+        console.log('🔍 [Dropdown] Пробую найти значение в родительском dropdown...');
+        const parentDropdown = element.closest('app-select, ng-select, mat-select, [role="combobox"]');
+        if (parentDropdown) {
+          const dropdownValue = this.findDropdownValueInParent(parentDropdown);
+          if (dropdownValue && dropdownValue.trim().length > 0) {
+            console.log(`✅ [Dropdown] Найдено значение в родительском dropdown: "${dropdownValue}"`);
+            this.resolveDropdownFill(parentDropdown, dropdownValue);
+          }
         }
       }
     }
@@ -4246,6 +4994,12 @@ class ImprovedActionRecorder {
     if (!this.isRecording) return;
 
     const element = event.target;
+
+    // Если перед вводом висит отложенный click, фиксируем его сначала,
+    // чтобы последовательность шагов не инвертировалась.
+    if (this.pendingClickAction) {
+      await this.flushPendingClickIfAny();
+    }
     
     // Пропускаем для dropdown элементов (они обрабатываются отдельно)
     if (this.isDropdownElement(element, { type: 'input' })) {
@@ -4312,15 +5066,13 @@ class ImprovedActionRecorder {
       };
     }
     
-    // Сбрасываем таймаут и устанавливаем новый
+    // Не автосохраняем input по таймеру, чтобы не писать промежуточные шаги
+    // (например "текст " и затем "текст дальше"). Финальное значение сохраняется
+    // в handleBlur/handleSubmit/при смене элемента/при остановке записи.
     if (this.pendingInputTimeout) {
       clearTimeout(this.pendingInputTimeout);
+      this.pendingInputTimeout = null;
     }
-    
-    // Автосохранение через задержку после последнего ввода
-    this.pendingInputTimeout = setTimeout(() => {
-      this.savePendingInput();
-    }, this.inputDebounceDelay);
     
     // Для dropdown элементов пробуем разрешить заполнение (используем уже полученное значение)
     this.resolveDropdownFill(element, currentValue);
@@ -4348,13 +5100,29 @@ class ImprovedActionRecorder {
       this.pendingInputTimeout = null;
     }
     
-    const { selector, elementInfo, value, timestamp, fieldLabel } = this.pendingInput;
+    const { selector, elementInfo, value, timestamp, fieldLabel, element } = this.pendingInput;
+    
+    // Берем актуальное значение из DOM в момент финального сохранения.
+    // Это покрывает случаи, когда UI меняет текст без input-события (автокомплит и т.п.).
+    let finalValue = value;
+    if (element && element.isConnected) {
+      let liveValue = '';
+      if (element.contentEditable === 'true') {
+        liveValue = element.textContent || element.innerText || '';
+      } else {
+        liveValue = element.value || '';
+      }
+      if (typeof liveValue === 'string' && liveValue !== finalValue) {
+        finalValue = liveValue;
+      }
+    }
     
     const action = {
       type: 'input',
       selector: selector,
       element: elementInfo,
-      value: value,
+      elementKey: this.pendingInput.elementKey,
+      value: finalValue,
       timestamp: timestamp,
       url: window.location.href,
       fieldLabel: fieldLabel || undefined
@@ -4400,6 +5168,271 @@ class ImprovedActionRecorder {
     
     // Сохраняем все pending input перед отправкой формы
     await this.savePendingInput();
+  }
+
+  getSelectorString(selector) {
+    if (!selector) return '';
+    if (typeof selector === 'string') return selector;
+    return selector.selector || selector.value || '';
+  }
+
+  normalizeComparableValue(value) {
+    return String(value == null ? '' : value).trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  normalizeActionType(type) {
+    if (window.ActionTypes?.normalizeActionType) {
+      return window.ActionTypes.normalizeActionType(type);
+    }
+    if (type === 'assertion') return 'assert';
+    if (type === 'navigate') return 'navigation';
+    return type;
+  }
+
+  isSelectorRequiredType(type) {
+    const selectorRequired = new Set([
+      'click', 'dblclick', 'input', 'change', 'hover', 'focus', 'blur', 'clear', 'upload', 'drag',
+      'table', 'datepicker', 'assert', 'wait'
+    ]);
+    return selectorRequired.has(type);
+  }
+
+  sanitizeActionForRecording(action) {
+    if (!action || typeof action !== 'object') return action;
+    const sanitized = { ...action };
+    if (typeof sanitized.fieldLabel === 'string') {
+      sanitized.fieldLabel = sanitized.fieldLabel.trim();
+      if (!sanitized.fieldLabel) delete sanitized.fieldLabel;
+    }
+    if (sanitized.selector && typeof sanitized.selector === 'object') {
+      sanitized.selector = { ...sanitized.selector };
+      if (typeof sanitized.selector.selector === 'string') {
+        sanitized.selector.selector = sanitized.selector.selector.trim();
+      }
+      if (typeof sanitized.selector.value === 'string') {
+        sanitized.selector.value = sanitized.selector.value.trim();
+      }
+    }
+    return sanitized;
+  }
+
+  validateActionForRecording(action) {
+    if (!action || typeof action !== 'object') {
+      return { ok: false, reasonCode: 'invalid-action', message: 'Получен пустой или некорректный шаг' };
+    }
+
+    const normalizedType = this.normalizeActionType(action.type);
+    if (!normalizedType) {
+      return { ok: false, reasonCode: 'missing-type', message: 'У шага отсутствует тип (type)' };
+    }
+
+    if (window.ActionTypes?.isActionTypeSupported && !window.ActionTypes.isActionTypeSupported(normalizedType)) {
+      return { ok: false, reasonCode: 'unsupported-type', message: `Неподдерживаемый тип шага: ${normalizedType}` };
+    }
+
+    if (action.subtype && window.ActionTypes?.isSubtypeSupported && !window.ActionTypes.isSubtypeSupported(normalizedType, action.subtype)) {
+      return { ok: false, reasonCode: 'unsupported-subtype', message: `Неподдерживаемый подтип "${action.subtype}" для "${normalizedType}"` };
+    }
+
+    if (this.isSelectorRequiredType(normalizedType)) {
+      const selectorStr = this.getSelectorString(action.selector);
+      if (!selectorStr) {
+        return { ok: false, reasonCode: 'missing-selector', message: `Для шага "${normalizedType}" отсутствует валидный селектор` };
+      }
+    }
+
+    if ((normalizedType === 'click' || normalizedType === 'dblclick') && this.isSuspiciousClickPayload(action)) {
+      return {
+        ok: false,
+        reasonCode: 'suspicious-click',
+        message: 'Подозрительный клик по служебному/декоративному блоку пропущен'
+      };
+    }
+
+    return { ok: true, reasonCode: 'ok', message: '' };
+  }
+
+  /**
+   * Ближайший «настоящий» контрол (button/a/role), если клик пришёл на span/div внутри кнопки.
+   * Нужен для фильтра suspicious-click без доступа к live DOM при валидации.
+   */
+  getNearestInteractiveHostTagName(element) {
+    if (!element || typeof element.closest !== 'function') return '';
+    try {
+      const host = element.closest(
+        'button, a, input[type="submit"], input[type="button"], input[type="reset"], ' +
+        '[role="button"], [role="menuitem"], [role="menuitemcheckbox"], [role="tab"], [role="link"]'
+      );
+      return host ? String(host.tagName || '').toLowerCase() : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /**
+   * Признаки явного UI-контрола по сериализованным полям шага (без live DOM).
+   */
+  isSerializedInteractiveClickSurface(action) {
+    const tag = String(action?.element?.tag || '').toLowerCase();
+    if (['button', 'a', 'summary', 'select', 'textarea', 'label'].includes(tag)) return true;
+    if (tag === 'input') return true;
+    const host = String(action?.element?.controlHostTag || '').toLowerCase();
+    if (['button', 'a', 'input'].includes(host)) return true;
+    const attrs = action?.element?.attributes || {};
+    const role = String(attrs.role || '').toLowerCase();
+    if (['button', 'link', 'menuitem', 'menuitemcheckbox', 'tab'].includes(role)) return true;
+    const cls = this.normalizeClassName(action?.element?.className).toLowerCase();
+    if (/(^|\s)(ant-btn|btn|button|mat-button|mdc-button|p-button)(\s|$)/.test(cls)) return true;
+    if (cls.includes('app-header-button') || cls.includes('save-button')) return true;
+    return false;
+  }
+
+  isSuspiciousClickPayload(action) {
+    if (!action || typeof action !== 'object') return false;
+    if (action.isDropdownClick || action.isDropdownSelection || action.dropdownAutoFilled) return false;
+    const text = String(action?.element?.text || '').trim();
+    const tag = String(action?.element?.tag || '').toLowerCase();
+    const selectorStr = this.getSelectorString(action.selector).toLowerCase();
+    if (['style', 'link', 'meta', 'script'].includes(tag)) return true;
+    if (selectorStr === 'html' || selectorStr === 'body' || selectorStr.endsWith(' html') || selectorStr.endsWith(' body')) return true;
+    if (!text) return false;
+    const cssArtifact = /@charset|[a-z-]+\s*:\s*[^;]+;|[.#][a-z0-9_-]+\s*\{/i.test(text);
+    if (cssArtifact) return true;
+    // textContent у обёрток (toolbar, flex-контейнер) часто >180 символов — не отбрасываем клики по кнопкам внутри
+    if (this.isSerializedInteractiveClickSurface(action)) return false;
+    return text.length > 180;
+  }
+
+  prepareActionForRecording(action) {
+    const sanitizedAction = this.sanitizeActionForRecording(action);
+    const validation = this.validateActionForRecording(sanitizedAction);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        reasonCode: validation.reasonCode,
+        message: validation.message
+      };
+    }
+
+    sanitizedAction.recordValidation = {
+      status: 'accepted',
+      reasonCode: 'ok',
+      validatedAt: Date.now()
+    };
+    return {
+      ok: true,
+      action: sanitizedAction
+    };
+  }
+
+  showRecordingRuntimeNotification({ level = 'warning', title = 'Запись', message = '', throttleKey = '' } = {}) {
+    const key = throttleKey || `${level}:${title}:${message}`;
+    const now = Date.now();
+    const prev = this.recordingAlertTimestamps.get(key) || 0;
+    if (now - prev < this.recordingAlertThrottleMs) return;
+    this.recordingAlertTimestamps.set(key, now);
+
+    let background = '#f57c00';
+    if (level === 'error') background = '#d32f2f';
+    if (level === 'info') background = '#1976d2';
+    const icon = level === 'error' ? '❌' : (level === 'info' ? 'ℹ️' : '⚠️');
+
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 56px;
+      right: 12px;
+      background: ${background};
+      color: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      z-index: 9999999;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      max-width: 420px;
+      line-height: 1.4;
+    `;
+    notification.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 3px;">${icon} ${this.escapeHtml(title)}</div>
+      <div>${this.escapeHtml(message)}</div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), level === 'error' ? 5000 : 3600);
+  }
+
+  shouldSkipDuplicateAction(action) {
+    const isDropdownRelated = !!(
+      action?.isDropdownSelection ||
+      action?.dropdownAutoFilled ||
+      action?.isDropdownClick ||
+      action?.element?.isDropdown ||
+      action?.element?.dropdownType
+    );
+    if (!isDropdownRelated) return false;
+
+    const selectorStr = this.getSelectorString(action?.selector);
+    const valueStr = action?.value == null ? '' : String(action.value).trim();
+    const key = [
+      action?.type || '',
+      selectorStr,
+      valueStr,
+      action?.isDropdownSelection ? '1' : '0',
+      action?.isDropdownClick ? '1' : '0',
+      action?.dropdownAutoFilled ? '1' : '0'
+    ].join('|');
+
+    const now = Date.now();
+    if (this.recentSavedAction && this.recentSavedAction.key === key) {
+      const delta = now - this.recentSavedAction.timestamp;
+      if (delta >= 0 && delta <= this.actionDedupWindowMs) {
+        console.log(`⏭️ [Recorder] Антидубль: пропускаю повтор шага (${action?.type})`);
+        return true;
+      }
+    }
+    this.recentSavedAction = { key, timestamp: now };
+    return false;
+  }
+
+  rememberDropdownSelection(selector, value, element = null, fieldLabel = null) {
+    this.recentDropdownSelection = {
+      selector: this.getSelectorString(selector),
+      value: value == null ? '' : String(value).trim(),
+      elementKey: this.getElementKey(element),
+      fieldLabel: fieldLabel == null ? '' : String(fieldLabel).trim(),
+      timestamp: Date.now()
+    };
+  }
+
+  shouldSkipDropdownChangeAfterSelection(selector, value, element = null, fieldLabel = null) {
+    const recent = this.recentDropdownSelection;
+    if (!recent) return false;
+    if ((Date.now() - recent.timestamp) > this.dropdownChangeDedupWindowMs) return false;
+
+    const selectorStr = this.getSelectorString(selector);
+    const elementKey = this.getElementKey(element);
+    const labelStr = fieldLabel == null ? '' : String(fieldLabel).trim();
+    const sameSelector = !!(selectorStr && recent.selector && selectorStr === recent.selector);
+    const sameElement = !!(elementKey && recent.elementKey && elementKey === recent.elementKey);
+    const sameFieldLabel = !!(labelStr && recent.fieldLabel && this.normalizeComparableValue(labelStr) === this.normalizeComparableValue(recent.fieldLabel));
+    // Для dropdown после успешного выбора опции любые мгновенные change по тому же селектору
+    // считаем служебными и не записываем отдельным шагом (даже если текст немного расходится).
+    return sameSelector || sameElement || sameFieldLabel;
+  }
+
+  shouldSuppressFallbackOptionClick(optionElement, optionText = '') {
+    const recent = this.recentDropdownSelection;
+    if (!recent) return false;
+    if ((Date.now() - recent.timestamp) > this.dropdownChangeDedupWindowMs) return false;
+
+    const currentText = String(
+      optionText ||
+      optionElement?.textContent ||
+      optionElement?.innerText ||
+      ''
+    ).trim();
+    if (!currentText || !recent.value) return false;
+    return this.normalizeComparableValue(currentText) === this.normalizeComparableValue(recent.value);
   }
 
   normalizeClassName(classValue) {
@@ -5037,11 +6070,14 @@ class ImprovedActionRecorder {
   }
 
   removeRecordingIndicator() {
-    const indicator = document.getElementById('autotest-recording-indicator');
-    if (indicator) {
+    const byId = document.getElementById('autotest-recording-indicator');
+    if (byId) {
       console.log('🗑️ [Recorder] Удаляю индикатор записи');
-      indicator.remove();
+      byId.remove();
     }
+    try {
+      document.querySelectorAll('#autotest-recording-indicator').forEach((el) => el.remove());
+    } catch (_) {}
   }
 
   /**
@@ -5085,7 +6121,10 @@ class ImprovedActionRecorder {
   isCriticalNavigationClick(element) {
     if (!element) return false;
 
-    const clickable = element.closest?.('a, button, [role="button"], [onclick], [ng-click], [data-action], [data-testid]') || element;
+    const clickable = element.closest?.(
+      'a, button, [role="button"], [role="menuitem"], [role="menuitemcheckbox"], ' +
+      '[onclick], [ng-click], [data-action], [data-testid]'
+    ) || element;
     const tag = (clickable.tagName || '').toString().toLowerCase();
     const getAttr = (name) => {
       try {
@@ -5096,7 +6135,7 @@ class ImprovedActionRecorder {
     };
 
     const href = getAttr('href');
-    const typeAttr = getAttr('type');
+    const typeAttr = (getAttr('type') || '').toLowerCase();
     const className = (clickable.className || '').toString().toLowerCase();
     const text = (clickable.textContent || '').toString().toLowerCase();
     const ariaLabel = getAttr('aria-label').toLowerCase();
@@ -5108,7 +6147,12 @@ class ImprovedActionRecorder {
       'выход', 'выйти', 'log off', 'logoff'
     ];
 
-    const hasLogoutWord = logoutKeywords.some((k) =>
+    const saveKeywords = [
+      'save', 'submit', 'apply', 'commit', 'store', 'persist',
+      'сохран', 'примен', 'запис', 'отправ', 'готово'
+    ];
+
+    const matchesAny = (keywords) => keywords.some((k) =>
       text.includes(k) ||
       className.includes(k) ||
       ariaLabel.includes(k) ||
@@ -5116,13 +6160,48 @@ class ImprovedActionRecorder {
       dataAction.includes(k)
     );
 
-    // Кнопка/ссылка навигации
-    const isNavElement =
-      (tag === 'a' && href && href !== '#' && !href.startsWith('javascript:')) ||
-      (tag === 'button' && (typeAttr === 'submit' || typeAttr === 'button')) ||
-      className.includes('btn') || className.includes('button');
+    const hasLogoutWord = matchesAny(logoutKeywords);
+    const hasSaveWord = matchesAny(saveKeywords);
 
-    return hasLogoutWord || (isNavElement && hasLogoutWord);
+    const role = (getAttr('role') || '').toLowerCase();
+    const isConcreteControl =
+      tag === 'button' ||
+      tag === 'a' ||
+      (tag === 'input' && ['submit', 'button', 'reset'].includes(typeAttr)) ||
+      role === 'button' ||
+      role === 'menuitem' ||
+      role === 'menuitemcheckbox' ||
+      className.includes('btn') ||
+      className.includes('ant-btn') ||
+      className.includes('mdc-button') ||
+      className.includes('mat-button') ||
+      className.includes('p-button') ||
+      className.includes('app-header-button') ||
+      className.includes('save-button');
+
+    // Выход/логирование — как раньше, по ключевым словам (часто пункт меню не button).
+    if (hasLogoutWord) return true;
+    // «Сохранить» и т.п.: только на явном контроле, иначе ложные срабатывания по длинным текстам страницы
+    return !!(hasSaveWord && isConcreteControl);
+  }
+
+  /**
+   * Поля, где пользователь часто делает double-click (выделение/редактирование):
+   * для них не блокируем второй быстрый клик throttle'ом.
+   */
+  isFieldLikeElementForDoubleClick(element) {
+    if (!element || element.nodeType !== 1) return false;
+    const el = element.closest?.('input, textarea, [contenteditable="true"], [contenteditable=""], [contenteditable], [role="textbox"], [role="searchbox"], [role="combobox"], .ql-editor, .ProseMirror');
+    if (!el) return false;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'input') {
+      const type = (el.getAttribute?.('type') || 'text').toLowerCase();
+      // Исключаем не-текстовые control'ы.
+      if (['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file'].includes(type)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

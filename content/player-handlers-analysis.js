@@ -138,17 +138,45 @@ TestPlayer.prototype.handleAnalysis = async function(action) {
 
   try {
     const fillOptions = action.fillOptions || action.analysisConfig?.fillOptions;
+    const containerSelector = action.containerSelector || action.analysisConfig?.containerSelector;
+    const targetValue = action.targetValue || action.analysisConfig?.targetValue;
     const response = await chrome.runtime.sendMessage({
       type: 'RUN_ANALYSIS',
       tabId: tabId,
       analysisType: subtype,
       url,
       fillOptions: fillOptions || undefined,
+      containerSelector: containerSelector || undefined,
+      targetValue: targetValue || undefined,
       testId: subtype === 'analysis-performance' ? (this.currentTest?.id || null) : undefined
     });
 
     if (!response || !response.success) {
-      throw new Error(response?.error || 'Analysis returned no results');
+      const errMessage = response?.error || 'Analysis returned no results';
+      // Для adaptive-auto/fill-fields не останавливаем выполнение:
+      // отсутствие результата анализа трактуем как "ничего не заполнено",
+      // далее adaptive может применить fallback (direct fill / combobox / app-select).
+      if (subtype === 'analysis-fill-fields') {
+        console.warn(`⚠️ [Analysis] "${subtype}" вернул пустой/ошибочный ответ, продолжаю с empty-result: ${errMessage}`);
+        const emptyResult = {
+          success: true,
+          data: {
+            fields: [],
+            summary: { total: 0, byType: {}, required: 0, empty: 0, filled: 0, validationErrors: 0 },
+            validationErrors: [],
+            _fillError: errMessage,
+            metadata: {
+              tabId: tabId || null,
+              url,
+              timestamp: new Date().toISOString(),
+              analysisType: subtype
+            }
+          }
+        };
+        if (action) action.url = url;
+        return emptyResult;
+      }
+      throw new Error(errMessage);
     }
 
     const analysisResult = {

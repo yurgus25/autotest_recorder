@@ -68,6 +68,144 @@
     };
     return map[appliedWhen] || appliedWhen;
   }
+  function getActionSelectorKey(action) {
+    const selector = action == null ? void 0 : action.selector;
+    if (!selector) return "";
+    if (typeof selector === "string") return selector;
+    return selector.selector || selector.value || "";
+  }
+  function getActionTargetKey(action) {
+    if (!action) return "";
+    if (action.elementKey) return `element:${action.elementKey}`;
+    const selectorKey = getActionSelectorKey(action);
+    return selectorKey ? `selector:${selectorKey}` : "";
+  }
+  function isSingleTargetSelector(action) {
+    const selector = action == null ? void 0 : action.selector;
+    if (!selector || typeof selector !== "object") return false;
+    return selector.isUnique === true || selector.unique === true || selector.matchCount === 1 || selector.matchesCount === 1;
+  }
+  function isActionSingleTarget(action) {
+    return !!((action == null ? void 0 : action.elementKey) || isSingleTargetSelector(action));
+  }
+  function isValueAction(action) {
+    return !!(action && (action.type === "input" || action.type === "change") && action.value !== void 0 && action.value !== null);
+  }
+  function shouldReplacePreviousValueAction(prevAction, nextAction) {
+    if (!isValueAction(prevAction) || !isValueAction(nextAction)) return false;
+    if (!isActionSingleTarget(nextAction)) return false;
+    const prevTarget = getActionTargetKey(prevAction);
+    const nextTarget = getActionTargetKey(nextAction);
+    if (!prevTarget || prevTarget !== nextTarget) return false;
+    if (prevAction.type !== nextAction.type) return false;
+    const prevTs = Number(prevAction.timestamp) || 0;
+    const nextTs = Number(nextAction.timestamp) || 0;
+    if (!prevTs || !nextTs || nextTs - prevTs > 5e3) return false;
+    return true;
+  }
+  function findPreviousValueActionIndex(actions, nextAction, fromIndex, toIndex) {
+    if (!Array.isArray(actions) || actions.length === 0) return -1;
+    if (!isValueAction(nextAction) || !isActionSingleTarget(nextAction)) return -1;
+    const nextTarget = getActionTargetKey(nextAction);
+    if (!nextTarget) return -1;
+    const nextTs = Number(nextAction.timestamp) || 0;
+    const start = Math.max(0, Number(fromIndex) || 0);
+    const end = Math.min(actions.length - 1, Number.isFinite(toIndex) ? Number(toIndex) : actions.length - 1);
+    for (let i = end; i >= start; i--) {
+      const candidate = actions[i];
+      if (!isValueAction(candidate)) continue;
+      if (candidate.type !== nextAction.type) continue;
+      if (getActionTargetKey(candidate) !== nextTarget) continue;
+      if (!isActionSingleTarget(candidate) && !isActionSingleTarget(nextAction)) continue;
+      const candidateTs = Number(candidate.timestamp) || 0;
+      if (nextTs && candidateTs && Math.abs(nextTs - candidateTs) > 5e3) continue;
+      return i;
+    }
+    return -1;
+  }
+  function removeInternalRecordMeta(action) {
+    if (!action || typeof action !== "object") return action;
+    if (Object.prototype.hasOwnProperty.call(action, "__recordArrivalOrder")) {
+      delete action.__recordArrivalOrder;
+    }
+    return action;
+  }
+  function normalizeActionTypeForIngress(type) {
+    if (self.ActionTypes && typeof self.ActionTypes.normalizeActionType === "function") {
+      return self.ActionTypes.normalizeActionType(type);
+    }
+    if (type === "assertion") return "assert";
+    if (type === "navigate") return "navigation";
+    return type;
+  }
+  function getSelectorValueFromAction(action) {
+    const selector = action == null ? void 0 : action.selector;
+    if (!selector) return "";
+    if (typeof selector === "string") return selector.trim();
+    return String(selector.selector || selector.value || "").trim();
+  }
+  function isSelectorRequiredTypeForIngress(type) {
+    const required = /* @__PURE__ */ new Set([
+      "click",
+      "dblclick",
+      "input",
+      "change",
+      "hover",
+      "focus",
+      "blur",
+      "clear",
+      "upload",
+      "drag",
+      "table",
+      "datepicker",
+      "assert",
+      "wait"
+    ]);
+    return required.has(type);
+  }
+  function validateIncomingRecordedAction(action) {
+    if (!action || typeof action !== "object") {
+      return { ok: false, error: "INVALID_ACTION_PAYLOAD", details: "action must be an object" };
+    }
+    const normalizedType = normalizeActionTypeForIngress(action.type);
+    if (!normalizedType) {
+      return { ok: false, error: "INVALID_ACTION_PAYLOAD", details: "missing action.type" };
+    }
+    if (self.ActionTypes && typeof self.ActionTypes.isActionTypeSupported === "function" && !self.ActionTypes.isActionTypeSupported(normalizedType)) {
+      return { ok: false, error: "UNSUPPORTED_ACTION_TYPE", details: normalizedType };
+    }
+    const subtype = typeof action.subtype === "string" ? action.subtype.trim() : action.subtype;
+    if (subtype && self.ActionTypes && typeof self.ActionTypes.isSubtypeSupported === "function" && !self.ActionTypes.isSubtypeSupported(normalizedType, subtype)) {
+      return { ok: false, error: "UNSUPPORTED_ACTION_SUBTYPE", details: `${normalizedType}:${subtype}` };
+    }
+    if (isSelectorRequiredTypeForIngress(normalizedType)) {
+      const selectorValue = getSelectorValueFromAction(action);
+      if (!selectorValue) {
+        return { ok: false, error: "INVALID_ACTION_SELECTOR", details: `selector is required for ${normalizedType}` };
+      }
+    }
+    return { ok: true, normalizedType };
+  }
+  function isDuplicateClientRecordedAction(manager, action) {
+    const clientActionId = String((action == null ? void 0 : action._clientActionId) || "").trim();
+    if (!clientActionId) return false;
+    if (!manager._recordedClientActionIds) {
+      manager._recordedClientActionIds = /* @__PURE__ */ new Set();
+      manager._recordedClientActionOrder = [];
+    }
+    if (manager._recordedClientActionIds.has(clientActionId)) {
+      return true;
+    }
+    manager._recordedClientActionIds.add(clientActionId);
+    manager._recordedClientActionOrder.push(clientActionId);
+    if (manager._recordedClientActionOrder.length > 1200) {
+      const staleId = manager._recordedClientActionOrder.shift();
+      if (staleId) {
+        manager._recordedClientActionIds.delete(staleId);
+      }
+    }
+    return false;
+  }
   function registerBackgroundMessageHandlers(manager, registry) {
     if (!registry) {
       return;
@@ -840,22 +978,51 @@
       if (message2.nextUrl === "__AUTO_NAV__" && prevSteps > 0 && incomingSteps === 0) {
         effectiveRunHistory = manager.playbackState.runHistory || null;
       }
+      const prevState = manager.playbackState;
+      const incomingIdx = Number(message2.actionIndex);
+      const incomingIdxSafe = Number.isFinite(incomingIdx) ? incomingIdx : 0;
+      const prevIdx = Number(prevState == null ? void 0 : prevState.actionIndex);
+      const prevIdxSafe = Number.isFinite(prevIdx) ? prevIdx : 0;
+      const sameTest = !!(testToSave && prevState != null && (prevState.test || prevState.testRefId) && String(testToSave.id) === String((prevState.test == null ? void 0 : prevState.test.id) || prevState.testRefId || ""));
+      let mergedActionIndex = incomingIdxSafe;
+      let mergedPlaybackSessionId = message2.playbackSessionId || (prevState == null ? void 0 : prevState.playbackSessionId) || null;
+      if (sameTest) {
+        mergedActionIndex = Math.max(incomingIdxSafe, prevIdxSafe);
+        if (mergedActionIndex > incomingIdxSafe) {
+          mergedPlaybackSessionId = prevState.playbackSessionId || mergedPlaybackSessionId;
+          console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] actionIndex \u043D\u0435 \u0443\u043C\u0435\u043D\u044C\u0448\u0430\u044E:", { incoming: incomingIdxSafe, previous: prevIdxSafe, merged: mergedActionIndex });
+        }
+      }
       manager.playbackState = {
         test: testToSave,
-        actionIndex: message2.actionIndex,
+        actionIndex: mergedActionIndex,
         nextUrl: message2.nextUrl,
         runMode,
         runHistory: effectiveRunHistory,
         isGroupRun: message2.isGroupRun || false,
         groupRunCurrentIndex: message2.groupRunCurrentIndex,
-        groupRunTotal: message2.groupRunTotal
+        groupRunTotal: message2.groupRunTotal,
+        playbackSessionId: mergedPlaybackSessionId
       };
+      const playbackStateForStorage = __spreadProps(__spreadValues({}, manager.playbackState), {
+        testRefId: (testToSave == null ? void 0 : testToSave.id) || null,
+        test: testToSave ? {
+          id: testToSave.id,
+          name: testToSave.name,
+          createdAt: testToSave.createdAt,
+          updatedAt: testToSave.updatedAt
+        } : null
+      });
       if (!manager.isPlaying) {
         console.log("\u26A0\uFE0F isPlaying \u0431\u044B\u043B false, \u0443\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u044E \u0432 true");
         manager.isPlaying = true;
       }
+      const isQuotaError = (e) => {
+        const msg = ((e == null ? void 0 : e.message) || (e == null ? void 0 : e.toString()) || "").toLowerCase();
+        return msg.includes("quota") || msg.includes("kquotabytes") || msg.includes("resource::");
+      };
       try {
-        yield chrome.storage.local.set({ playbackState: manager.playbackState });
+        yield chrome.storage.local.set({ playbackState: playbackStateForStorage });
         console.log("\u2705 \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E \u0432 storage");
         const verify = yield chrome.storage.local.get("playbackState");
         if (verify.playbackState) {
@@ -871,6 +1038,24 @@
       } catch (error) {
         console.error("\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F \u0432 storage:", error);
         console.error("   \u0414\u0435\u0442\u0430\u043B\u0438 \u043E\u0448\u0438\u0431\u043A\u0438:", error.message, error.stack);
+        if (isQuotaError(error)) {
+          try {
+            const trimmed = __spreadValues({}, playbackStateForStorage);
+            if ((trimmed.runHistory == null ? void 0 : trimmed.runHistory.steps) && Array.isArray(trimmed.runHistory.steps)) {
+              trimmed.runHistory = __spreadProps(__spreadValues({}, trimmed.runHistory), {
+                steps: trimmed.runHistory.steps.map((s) => __spreadProps(__spreadValues({}, s), {
+                  screenshot: void 0,
+                  beforeScreenshot: void 0,
+                  afterScreenshot: void 0
+                }))
+              });
+            }
+            yield chrome.storage.local.set({ playbackState: trimmed });
+            console.warn("\u26A0\uFE0F \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E \u0431\u0435\u0437 \u0441\u043A\u0440\u0438\u043D\u0448\u043E\u0442\u043E\u0432 \u0438\u0437-\u0437\u0430 \u043A\u0432\u043E\u0442\u044B \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430");
+          } catch (e2) {
+            console.warn("\u26A0\uFE0F \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0434\u0430\u0436\u0435 \u043E\u0431\u043B\u0435\u0433\u0447\u0451\u043D\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435:", e2 == null ? void 0 : e2.message);
+          }
+        }
       }
       console.log("\u2705 \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
       sendResponse2({ success: true });
@@ -896,6 +1081,19 @@
         actionIndex: state == null ? void 0 : state.actionIndex,
         nextUrl: state == null ? void 0 : state.nextUrl
       });
+      const stateHasActions = !!((state == null ? void 0 : state.test) && Array.isArray(state.test.actions));
+      if (state && !stateHasActions) {
+        const refId = (state == null ? void 0 : state.testRefId) || ((state == null ? void 0 : state.test) == null ? void 0 : state.test.id);
+        const fullTest = refId ? getTestById(manager, refId) : null;
+        if (fullTest) {
+          state = __spreadProps(__spreadValues({}, state), {
+            test: __spreadProps(__spreadValues({}, fullTest), {
+              actions: Array.isArray(fullTest.actions) ? [...fullTest.actions] : []
+            })
+          });
+          manager.playbackState = state;
+        }
+      }
       if (state && (manager.isPlaying || state.test)) {
         console.log("\u2705 \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u044E \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F");
         const inGroupRun = !!manager.currentGroupId;
@@ -909,11 +1107,24 @@
           runHistory: state.runHistory || null,
           isGroupRun: state.isGroupRun || inGroupRun,
           groupRunCurrentIndex: state.groupRunCurrentIndex,
-          groupRunTotal: state.groupRunTotal
+          groupRunTotal: state.groupRunTotal,
+          playbackSessionId: state.playbackSessionId || null
         });
       } else {
         console.log("\u2139\uFE0F \u0412\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u043E");
         sendResponse2({ success: true, isPlaying: false });
+      }
+    }));
+    registry.register("CLEAR_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
+      try {
+        manager.playbackState = null;
+        manager.isPlaying = false;
+        yield chrome.storage.local.remove("playbackState");
+        console.log("\u2705 [CLEAR_PLAYBACK_STATE] \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E\u0447\u0438\u0449\u0435\u043D\u043E");
+        sendResponse2({ success: true });
+      } catch (e) {
+        console.warn("\u26A0\uFE0F [CLEAR_PLAYBACK_STATE]", e == null ? void 0 : e.message);
+        sendResponse2({ success: false, error: e == null ? void 0 : e.message });
       }
     }));
     registry.register("CLEAR_ALL_SCREENSHOTS", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
@@ -1024,6 +1235,9 @@
         return;
       }
       manager.isRecording = true;
+      manager.resumePlaybackAfterRecordingStop = false;
+      manager._recordedClientActionIds = /* @__PURE__ */ new Set();
+      manager._recordedClientActionOrder = [];
       manager.currentTest = {
         id: Date.now().toString(),
         name: message2.testName || `Test ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
@@ -1044,7 +1258,11 @@
         console.error("\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0435 \u0437\u0430\u043F\u0438\u0441\u0438:", error);
         manager.isRecording = false;
         manager.currentTest = null;
-        sendResponse2({ success: false, error: error.message });
+        manager.resumePlaybackAfterRecordingStop = false;
+        sendResponse2({
+          success: false,
+          error: error && error.message ? error.message : String(error || "START_RECORDING_FAILED")
+        });
       }
     }));
     function getActionUrl(test, actionIndex) {
@@ -1066,10 +1284,13 @@
         return;
       }
       manager.isRecording = true;
+      manager._recordedClientActionIds = /* @__PURE__ */ new Set();
+      manager._recordedClientActionOrder = [];
       manager.currentTest = existingTest;
       manager.recordInsertIndex = message2.insertAfterIndex !== void 0 ? message2.insertAfterIndex + 1 : existingTest.actions.length;
       manager.recordedActionsCount = 0;
       manager.recordMarkerActionIndex = message2.insertAfterIndex;
+      manager.resumePlaybackAfterRecordingStop = false;
       console.log(`\u{1F3AC} \u041D\u0430\u0447\u0430\u043B\u043E \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 \u0442\u0435\u0441\u0442: ${existingTest.name} (ID: ${existingTest.id}), \u0432\u0441\u0442\u0430\u0432\u043A\u0430 \u043F\u043E\u0441\u043B\u0435 \u0438\u043D\u0434\u0435\u043A\u0441\u0430 ${message2.insertAfterIndex}`);
       let targetUrl = null;
       if (message2.insertAfterIndex !== void 0 && message2.insertAfterIndex !== null) {
@@ -1121,6 +1342,12 @@
             fromMarker: true
           });
         }
+        manager.resumePlaybackAfterRecordingStop = !!(
+          message2.tabId != null &&
+          String(message2.tabId).trim() !== "" &&
+          Number.isFinite(Number(message2.tabId)) &&
+          Number(message2.tabId) > 0
+        );
         console.log("\u2705 Broadcast \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D, \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u044F\u044E \u043E\u0442\u0432\u0435\u0442...");
         sendResponse2({ success: true, testId: manager.currentTest.id });
         console.log("\u2705 \u041E\u0442\u0432\u0435\u0442 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u0443\u0441\u043F\u0435\u0448\u043D\u043E");
@@ -1130,75 +1357,142 @@
         manager.currentTest = null;
         manager.recordInsertIndex = null;
         manager.recordMarkerActionIndex = null;
+        manager.resumePlaybackAfterRecordingStop = false;
         sendResponse2({ success: false, error: error.message });
       }
     }));
     registry.register("STOP_RECORDING", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      if (!manager.isRecording) {
-        sendResponse2({ success: false, error: "\u0417\u0430\u043F\u0438\u0441\u044C \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u0430" });
-        return;
-      }
-      const cancelMarkerRecording = !!(message2 == null ? void 0 : message2.cancelMarkerRecording);
-      manager.isRecording = false;
-      if (manager.currentTest) {
-        const actionsCountBefore = manager.currentTest.actions.length;
-        const wasRecordingIntoExisting = manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null;
-        const recordedCount = manager.recordedActionsCount || 0;
-        const removedCount = manager.cleanDuplicateActions(manager.currentTest);
-        if (removedCount > 0) {
-          console.log(`\u{1F9F9} \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${removedCount} \u0434\u0443\u0431\u043B\u0438\u0440\u0443\u044E\u0449\u0438\u0445\u0441\u044F \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u0438\u0437 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u043E\u0433\u043E \u0442\u0435\u0441\u0442\u0430`);
+      try {
+        if (!manager.isRecording) {
+          sendResponse2({ success: false, error: "\u0417\u0430\u043F\u0438\u0441\u044C \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u0430" });
+          return;
         }
-        if (wasRecordingIntoExisting && cancelMarkerRecording && recordedCount > 0 && manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null) {
-          manager.currentTest.actions.splice(manager.recordInsertIndex, recordedCount);
-          console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C, \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${recordedCount} \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439, \u0442\u0435\u0441\u0442 \u043E\u0441\u0442\u0430\u043B\u0441\u044F \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439.`);
-        }
-        const actionsCountAfter = manager.currentTest.actions.length;
-        manager.tests.set(manager.currentTest.id, manager.currentTest);
-        yield manager.saveTests();
-        if (wasRecordingIntoExisting && manager.recordMarkerActionIndex !== null && manager.recordMarkerActionIndex !== void 0 && !cancelMarkerRecording) {
-          const markerActionIndex2 = manager.recordMarkerActionIndex;
-          if (markerActionIndex2 >= 0 && markerActionIndex2 < manager.currentTest.actions.length) {
-            const markerAction = manager.currentTest.actions[markerActionIndex2];
-            if (markerAction && markerAction.recordMarker === true) {
-              markerAction.recordMarker = false;
-              console.log(`\u{1F534} \u041C\u0430\u0440\u043A\u0435\u0440 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043D\u044F\u0442 \u0441 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F ${markerActionIndex2 + 1}`);
+        const cancelMarkerRecording = !!(message2 == null ? void 0 : message2.cancelMarkerRecording);
+        manager.isRecording = false;
+        if (manager.currentTest) {
+          const actionsCountBefore = manager.currentTest.actions.length;
+          const wasRecordingIntoExisting = manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null;
+          const recordedCount = manager.recordedActionsCount || 0;
+          const sortStart = wasRecordingIntoExisting ? manager.recordInsertIndex : 0;
+          const sortEndExclusive = wasRecordingIntoExisting ? Math.min(manager.currentTest.actions.length, sortStart + recordedCount) : manager.currentTest.actions.length;
+          if (sortStart >= 0 && sortEndExclusive > sortStart) {
+            const before = manager.currentTest.actions.slice(0, sortStart);
+            const middle = manager.currentTest.actions.slice(sortStart, sortEndExclusive);
+            const after = manager.currentTest.actions.slice(sortEndExclusive);
+            middle.sort((a, b) => {
+              const ta = Number(a == null ? void 0 : a.timestamp) || 0;
+              const tb = Number(b == null ? void 0 : b.timestamp) || 0;
+              if (ta !== tb) return ta - tb;
+              const oa = Number(a == null ? void 0 : a.__recordArrivalOrder) || 0;
+              const ob = Number(b == null ? void 0 : b.__recordArrivalOrder) || 0;
+              return oa - ob;
+            });
+            manager.currentTest.actions = before.concat(middle, after).map(removeInternalRecordMeta);
+          }
+          const removedCount = manager.cleanDuplicateActions(manager.currentTest);
+          if (removedCount > 0) {
+            console.log(`\u{1F9F9} \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${removedCount} \u0434\u0443\u0431\u043B\u0438\u0440\u0443\u044E\u0449\u0438\u0445\u0441\u044F \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u0438\u0437 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u043E\u0433\u043E \u0442\u0435\u0441\u0442\u0430`);
+          }
+          if (wasRecordingIntoExisting && cancelMarkerRecording && recordedCount > 0 && manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null) {
+            manager.currentTest.actions.splice(manager.recordInsertIndex, recordedCount);
+            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C, \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${recordedCount} \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439, \u0442\u0435\u0441\u0442 \u043E\u0441\u0442\u0430\u043B\u0441\u044F \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439.`);
+          }
+          const actionsCountAfter = manager.currentTest.actions.length;
+          manager.tests.set(manager.currentTest.id, manager.currentTest);
+          yield manager.saveTests();
+          if (wasRecordingIntoExisting && manager.recordMarkerActionIndex !== null && manager.recordMarkerActionIndex !== void 0 && !cancelMarkerRecording) {
+            const markerActionIndex2 = manager.recordMarkerActionIndex;
+            if (markerActionIndex2 >= 0 && markerActionIndex2 < manager.currentTest.actions.length) {
+              const markerAction = manager.currentTest.actions[markerActionIndex2];
+              if (markerAction && markerAction.recordMarker === true) {
+                markerAction.recordMarker = false;
+                console.log(`\u{1F534} \u041C\u0430\u0440\u043A\u0435\u0440 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043D\u044F\u0442 \u0441 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F ${markerActionIndex2 + 1}`);
+              }
             }
           }
-        }
-        if (wasRecordingIntoExisting) {
-          if (cancelMarkerRecording) {
-            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u043E\u0432\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
+          if (wasRecordingIntoExisting) {
+            if (cancelMarkerRecording) {
+              console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u043E\u0432\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
+            } else {
+              console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E ${recordedCount} \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
+            }
           } else {
-            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E ${recordedCount} \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
+            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430. \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u0441 ${actionsCountAfter} \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F\u043C\u0438 (\u0431\u044B\u043B\u043E ${actionsCountBefore})`);
           }
+          const testId = manager.currentTest.id;
+          const markerActionIndex = manager.recordMarkerActionIndex;
+          const shouldResumePlayback = wasRecordingIntoExisting && !cancelMarkerRecording && !!manager.resumePlaybackAfterRecordingStop;
+          manager.resumePlaybackAfterRecordingStop = false;
+          manager.currentTest = null;
+          manager.recordInsertIndex = null;
+          manager.recordedActionsCount = 0;
+          manager.recordMarkerActionIndex = null;
+          yield manager.broadcast({
+            type: "RECORDING_STOPPED",
+            testId,
+            recordedCount: cancelMarkerRecording ? 0 : recordedCount,
+            markerActionIndex,
+            shouldResumePlayback
+          });
+          sendResponse2({ success: true, testId, recordedCount: cancelMarkerRecording ? 0 : recordedCount, canceledMarkerRecording: cancelMarkerRecording });
         } else {
-          console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430. \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u0441 ${actionsCountAfter} \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F\u043C\u0438 (\u0431\u044B\u043B\u043E ${actionsCountBefore})`);
+          console.warn("\u26A0\uFE0F \u041F\u043E\u043F\u044B\u0442\u043A\u0430 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C, \u043D\u043E \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0442\u0435\u0441\u0442\u0430 \u043D\u0435\u0442");
+          manager.resumePlaybackAfterRecordingStop = false;
+          sendResponse2({ success: false, error: "No active test" });
         }
-        const testId = manager.currentTest.id;
-        const markerActionIndex = manager.recordMarkerActionIndex;
-        manager.currentTest = null;
-        manager.recordInsertIndex = null;
-        manager.recordedActionsCount = 0;
-        manager.recordMarkerActionIndex = null;
-        yield manager.broadcast({
-          type: "RECORDING_STOPPED",
-          testId,
-          recordedCount: cancelMarkerRecording ? 0 : recordedCount,
-          markerActionIndex,
-          shouldResumePlayback: wasRecordingIntoExisting && !cancelMarkerRecording
-        });
-        sendResponse2({ success: true, testId, recordedCount: cancelMarkerRecording ? 0 : recordedCount, canceledMarkerRecording: cancelMarkerRecording });
-      } else {
-        console.warn("\u26A0\uFE0F \u041F\u043E\u043F\u044B\u0442\u043A\u0430 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C, \u043D\u043E \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0442\u0435\u0441\u0442\u0430 \u043D\u0435\u0442");
-        sendResponse2({ success: false, error: "No active test" });
+      } catch (error) {
+        console.error("\u274C STOP_RECORDING:", error);
+        try {
+          manager.isRecording = false;
+          manager.resumePlaybackAfterRecordingStop = false;
+        } catch (_) {
+        }
+        const msg = error && error.message ? error.message : String(error || "STOP_RECORDING_FAILED");
+        sendResponse2({ success: false, error: msg });
       }
     }));
     registry.register("ADD_ACTION", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
       if (manager.isRecording && manager.currentTest) {
+        const incomingTs = Number((message2 == null ? void 0 : message2.action) ? message2.action.timestamp : void 0);
         const newAction = __spreadProps(__spreadValues({}, message2.action), {
-          timestamp: Date.now()
+          timestamp: Number.isFinite(incomingTs) && incomingTs > 0 ? incomingTs : Date.now()
         });
-        if (manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null) {
+        manager._recordArrivalCounter = (manager._recordArrivalCounter || 0) + 1;
+        newAction.__recordArrivalOrder = manager._recordArrivalCounter;
+        if (isDuplicateClientRecordedAction(manager, newAction)) {
+          sendResponse2({ success: true, duplicateClientAction: true });
+          return;
+        }
+        const validation = validateIncomingRecordedAction(newAction);
+        if (!validation.ok) {
+          console.warn(`\u26A0\uFE0F [Background] ADD_ACTION rejected: ${validation.error}`, validation.details || "");
+          sendResponse2({ success: false, error: validation.error, details: validation.details || null });
+          return;
+        }
+        newAction.type = validation.normalizedType || newAction.type;
+        const actions = manager.currentTest.actions || [];
+        const hasInsertMode = manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null;
+        const lastRecordedIndex = hasInsertMode ? manager.recordedActionsCount > 0 ? manager.recordInsertIndex + manager.recordedActionsCount - 1 : -1 : actions.length - 1;
+        if (lastRecordedIndex >= 0 && shouldReplacePreviousValueAction(actions[lastRecordedIndex], newAction)) {
+          actions.splice(lastRecordedIndex, 1);
+          if (hasInsertMode) {
+            manager.recordedActionsCount = Math.max(0, manager.recordedActionsCount - 1);
+            actions.splice(manager.recordInsertIndex + manager.recordedActionsCount, 0, newAction);
+            manager.recordedActionsCount++;
+          } else {
+            actions.push(newAction);
+          }
+          manager.currentTest.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+          if (hasInsertMode) {
+            manager.tests.set(manager.currentTest.id, manager.currentTest);
+            yield manager.saveTests();
+          }
+          sendResponse2({ success: true, replacedPreviousValue: true });
+          return;
+        }
+        // Не заменяем "старые" value-шаги через дальний поиск по диапазону.
+        // Это сохраняет фактическую последовательность пользовательских действий.
+        if (hasInsertMode) {
           manager.currentTest.actions.splice(manager.recordInsertIndex + manager.recordedActionsCount, 0, newAction);
           manager.recordedActionsCount++;
           console.log(`\u{1F4DD} \u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u0432 \u043F\u043E\u0437\u0438\u0446\u0438\u044E ${manager.recordInsertIndex + manager.recordedActionsCount - 1} (\u0432\u0441\u0435\u0433\u043E \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043E: ${manager.recordedActionsCount})`);
@@ -1811,6 +2105,36 @@
       const actionDetails = message2.actionDetails || [];
       const detailMap = new Map(actionDetails.map((detail) => [detail.index, detail]));
       const now = (/* @__PURE__ */ new Date()).toISOString();
+      const actions = testToUpdate.actions;
+      const getActionText = (action) => String(action?.fieldLabel || action?.description || action?.name || action?.label || action?.value || "").toLowerCase();
+      const hasExplicitSelector = (action) => {
+        const selectorText = String(action?.selector?.selector || action?.selector?.value || action?.selector || "").trim();
+        if (!selectorText) return false;
+        return selectorText.startsWith("#") || /\[[^\]]+\]/.test(selectorText) || /elementid|ng-reflect-element-id|aria-label|name=|id=/.test(selectorText);
+      };
+      const hasNearbyAnalog = (index, action) => {
+        for (let j = Math.max(0, index - 2); j <= Math.min(actions.length - 1, index + 2); j++) {
+          if (j === index) continue;
+          const neighbor = actions[j];
+          if (!neighbor || neighbor.hidden) continue;
+          if (neighbor.type !== action.type) continue;
+          if (!neighbor.selector || !action.selector) continue;
+          if (manager.areSelectorsEqual(neighbor.selector, action.selector)) {
+            return true;
+          }
+        }
+        return false;
+      };
+      const shouldProtectFromAutoHide = (index, action) => {
+        if (!action) return false;
+        const type = String(action.type || "").toLowerCase();
+        if (!["click", "dblclick", "input", "change", "navigate", "navigation"].includes(type)) return false;
+        if (!hasExplicitSelector(action)) return false;
+        const text = getActionText(action);
+        const isSignificant = /(save|submit|send|create|delete|publish|apply|сохран|отправ|созда|удал|примен|опубли)/i.test(text);
+        if (!isSignificant) return false;
+        return !hasNearbyAnalog(index, action);
+      };
       const sortedIndices = [...actionIndices].sort((a, b) => b - a);
       let removedCount = 0;
       let skippedCount = 0;
@@ -1823,6 +2147,11 @@
             continue;
           }
           if (!action.hidden) {
+            if (shouldProtectFromAutoHide(index, action)) {
+              console.log(`\u{1F6E1}\uFE0F \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u044E auto-hidden \u0434\u043B\u044F \u0437\u043D\u0430\u0447\u0438\u043C\u043E\u0433\u043E \u0448\u0430\u0433\u0430 ${index + 1} (\u044F\u0432\u043D\u044B\u0439 \u0441\u0435\u043B\u0435\u043A\u0442\u043E\u0440, \u043D\u0435\u0442 \u0441\u043E\u0441\u0435\u0434\u043D\u0438\u0445 \u0430\u043D\u0430\u043B\u043E\u0433\u043E\u0432)`);
+              skippedCount++;
+              continue;
+            }
             action.hidden = true;
             removedCount++;
             action.hiddenAt = now;

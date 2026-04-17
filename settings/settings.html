@@ -253,6 +253,11 @@
               </div>
             </label>
           </div>
+          <div class="setting-item">
+            <label for="playbackSelectorNotFoundStreakThreshold">Consecutive "selector not found" warning threshold:</label>
+            <input type="number" id="playbackSelectorNotFoundStreakThreshold" class="input" value="3" min="2" max="20" style="width: 120px;">
+            <small>Default: 3. Warning appears when this many steps in a row cannot find selectors. If at least one step succeeds, the counter resets.</small>
+          </div>
         </div>
         <div class="setting-group" id="onboarding-settings">
           <h3 data-i18n="settings.onboardingSection">Welcome wizard</h3>

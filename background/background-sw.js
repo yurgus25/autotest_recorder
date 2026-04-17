@@ -218,6 +218,7 @@
       this.recordInsertIndex = null;
       this.recordedActionsCount = 0;
       this.recordMarkerActionIndex = null;
+      this.resumePlaybackAfterRecordingStop = false;
       this.testHistory = /* @__PURE__ */ new Map();
       this.currentVideoRecording = null;
       this.currentGroupId = null;
@@ -333,7 +334,7 @@
               recordingMode: "auto",
               selectorStrategy: "stability",
               pickerSettings: { timeout: 5, showScores: true, highlightBest: true, maxVisible: 4 },
-              playback: { stepTimeoutSeconds: 5, showRunNotifications: true }
+              playback: { stepTimeoutSeconds: 5, showRunNotifications: true, selectorNotFoundStreakWarningThreshold: 3 }
             };
             yield chrome.storage.local.set({ pluginSettings: defaultSettings });
             console.log("\u2705 [Background] \u0414\u0435\u0444\u043E\u043B\u0442\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043B\u0430\u0433\u0438\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u0432 storage");
@@ -893,7 +894,8 @@
           }
           testToSend = __spreadProps(__spreadValues({}, testToPlay), { variables: merged });
         }
-        const playPayloadBase = { type: "PLAY_TEST", test: testToSend, mode: runMode, debugMode: message.debugMode || false };
+        const playbackSessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        const playPayloadBase = { type: "PLAY_TEST", test: testToSend, mode: runMode, debugMode: message.debugMode || false, playbackSessionId };
         if (this.dataDrivenState && String(this.dataDrivenState.testId) === String(message.testId)) {
           playPayloadBase.dataDrivenRowIndex = this.dataDrivenState.index;
           playPayloadBase.dataDrivenRowTotal = this.dataDrivenState.rows.length;
@@ -908,7 +910,8 @@
           test: testToPlay,
           actionIndex: 0,
           nextUrl: null,
-          runMode
+          runMode,
+          playbackSessionId
         };
         const actionsToCheck = actionsForRun;
         const visualActionTypes = ["click", "dblclick", "input", "change", "scroll", "navigation", "keyboard", "javascript", "screenshot", "adaptive", "analysis"];
@@ -984,7 +987,10 @@
               actions: testToPlay.actions,
               currentActionIndex: 1,
               userVariables: userVars,
-              isPlaying: true
+              isPlaying: true,
+              runMode,
+              playbackSessionId,
+              runHistory: null
             }, message.isGroupRun && { isGroupRun: true, groupRunCurrentIndex: message.groupRunCurrentIndex, groupRunTotal: message.groupRunTotal });
             const contentFiles = _TestManager.CONTENT_SCRIPT_FILES || ["content/content.js", "content/player-core.js"];
             yield chrome.scripting.executeScript({ target: { tabId: newTab.id }, files: contentFiles });
@@ -2101,12 +2107,13 @@
         var _a, _b, _c;
         if (message.type === "PLAY_TEST" && message.targetTabId) {
           try {
-            const payload = { type: "PLAY_TEST", test: message.test, mode: message.mode, debugMode: message.debugMode || false, tabId: message.targetTabId };
-            if (message.isGroupRun) {
-              payload.isGroupRun = true;
-              payload.groupRunCurrentIndex = message.groupRunCurrentIndex;
-              payload.groupRunTotal = message.groupRunTotal;
-            }
+            const payload = __spreadValues({
+              type: "PLAY_TEST",
+              test: message.test,
+              mode: message.mode,
+              debugMode: message.debugMode || false,
+              tabId: message.targetTabId
+            }, message.playbackSessionId ? { playbackSessionId: message.playbackSessionId } : {}, message.dataDrivenRowIndex != null ? { dataDrivenRowIndex: message.dataDrivenRowIndex, dataDrivenRowTotal: message.dataDrivenRowTotal } : {}, message.isGroupRun ? { isGroupRun: true, groupRunCurrentIndex: message.groupRunCurrentIndex, groupRunTotal: message.groupRunTotal } : {});
             yield chrome.tabs.sendMessage(message.targetTabId, payload);
             console.log(`\u{1F4E1} PLAY_TEST \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0446\u0435\u043B\u0435\u0432\u0443\u044E \u0432\u043A\u043B\u0430\u0434\u043A\u0443 ${message.targetTabId} (\u0431\u0435\u0437 broadcast)`);
             return;
@@ -2135,7 +2142,7 @@
         let sentCount = 0;
         yield Promise.all(targets.map((tab) => __async(null, null, function* () {
           try {
-            const msg = message.type === "PLAY_TEST" ? __spreadValues({ type: "PLAY_TEST", test: message.test, mode: message.mode, debugMode: message.debugMode || false, tabId: tab.id }, message.isGroupRun && { isGroupRun: true, groupRunCurrentIndex: message.groupRunCurrentIndex, groupRunTotal: message.groupRunTotal }) : message;
+            const msg = message.type === "PLAY_TEST" ? __spreadValues({ type: "PLAY_TEST", test: message.test, mode: message.mode, debugMode: message.debugMode || false, tabId: tab.id }, message.playbackSessionId ? { playbackSessionId: message.playbackSessionId } : {}, message.dataDrivenRowIndex != null ? { dataDrivenRowIndex: message.dataDrivenRowIndex, dataDrivenRowTotal: message.dataDrivenRowTotal } : {}, message.isGroupRun && { isGroupRun: true, groupRunCurrentIndex: message.groupRunCurrentIndex, groupRunTotal: message.groupRunTotal }) : message;
             yield chrome.tabs.sendMessage(tab.id, msg);
             sentCount++;
             console.log(`\u{1F4E1} Broadcast \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u0432 \u0432\u043A\u043B\u0430\u0434\u043A\u0443 ${tab.id} (${tab.url})`);
@@ -2218,8 +2225,11 @@
         if (action.type === "click" && i > 0) {
           const prevAction = actions[i - 1];
           if (prevAction && !prevAction.hidden && prevAction.type === "click" && prevAction.selector && action.selector && this.areSelectorsEqual(prevAction.selector, action.selector)) {
-            const timeDiff = (action.timestamp || 0) - (prevAction.timestamp || 0);
-            if (timeDiff < 500) {
+            const currentTs = Number(action.timestamp) || 0;
+            const prevTs = Number(prevAction.timestamp) || 0;
+            const hasValidTimestamps = currentTs > 0 && prevTs > 0;
+            const timeDiff = hasValidTimestamps ? currentTs - prevTs : Number.POSITIVE_INFINITY;
+            if (hasValidTimestamps && timeDiff >= 0 && timeDiff < 500) {
               console.log(`\u{1F504} \u041D\u0430\u0439\u0434\u0435\u043D \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442: \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0439 \u043A\u043B\u0438\u043A \u043F\u043E \u0442\u043E\u043C\u0443 \u0436\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u0443 (\u0440\u0430\u0437\u043D\u0438\u0446\u0430 ${timeDiff}\u043C\u0441)`);
               console.log(`   \u{1F4DD} \u0423\u0434\u0430\u043B\u044F\u044E \u043F\u0435\u0440\u0432\u0443\u044E \u0437\u0430\u043F\u0438\u0441\u044C (\u043A\u043B\u0438\u043A, \u0438\u043D\u0434\u0435\u043A\u0441 ${i - 1}), \u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u043A\u043B\u0438\u043A (\u0438\u043D\u0434\u0435\u043A\u0441 ${i})`);
               if (!actionsToRemove.includes(i - 1)) {
@@ -2230,9 +2240,95 @@
           }
         }
       }
+      const getSelectorKey = (selector) => {
+        if (!selector) return "";
+        if (typeof selector === "string") return selector;
+        return selector.selector || selector.value || "";
+      };
+      const getTargetKey = (action) => {
+        if (!action) return "";
+        if (action.elementKey) return `element:${action.elementKey}`;
+        const sel = getSelectorKey(action.selector);
+        return sel ? `selector:${sel}` : "";
+      };
+      const isValueAction = (action) => !!(action && !action.hidden && (action.type === "input" || action.type === "change") && action.value !== void 0 && action.value !== null && getTargetKey(action));
+      const normalizeValue = (value) => String(value == null ? "" : value).trim().replace(/\s+/g, " ").toLowerCase();
+      const shouldReplaceBestValueAction = (prevAction, nextAction) => {
+        if (!prevAction) return true;
+        const prevTs = Number(prevAction.timestamp) || 0;
+        const nextTs = Number(nextAction.timestamp) || 0;
+        const dt = nextTs - prevTs;
+        const prevIsDropdownSelect = !!(prevAction.isDropdownSelection || prevAction.dropdownAutoFilled);
+        const nextIsDropdownSelect = !!(nextAction.isDropdownSelection || nextAction.dropdownAutoFilled);
+        if (nextIsDropdownSelect && !prevIsDropdownSelect) return true;
+        if (prevIsDropdownSelect && !nextIsDropdownSelect && dt >= 0 && dt <= 5e3) return false;
+        const prevNorm = normalizeValue(prevAction.value);
+        const nextNorm = normalizeValue(nextAction.value);
+        if (prevNorm && nextNorm && prevNorm === nextNorm) {
+          return nextTs >= prevTs;
+        }
+        return nextTs >= prevTs;
+      };
+      const lastValueIndexByTarget = /* @__PURE__ */ new Map();
+      for (let i = 0; i < actions.length; i++) {
+        const action = actions[i];
+        if (!isValueAction(action)) continue;
+        const target = getTargetKey(action);
+        const currentBestIndex = lastValueIndexByTarget.get(target);
+        const currentBest = currentBestIndex !== void 0 ? actions[currentBestIndex] : null;
+        if (shouldReplaceBestValueAction(currentBest, action)) {
+          lastValueIndexByTarget.set(target, i);
+        }
+      }
+      for (let i = 0; i < actions.length; i++) {
+        const action = actions[i];
+        if (!isValueAction(action)) continue;
+        const targetKey = getTargetKey(action);
+        const lastIdx = lastValueIndexByTarget.get(targetKey);
+        if (lastIdx !== i && !actionsToRemove.includes(i)) {
+          console.log(`\u{1F9F9} \u0423\u0434\u0430\u043B\u044F\u044E \u043F\u0440\u043E\u043C\u0435\u0436\u0443\u0442\u043E\u0447\u043D\u043E\u0435 value-\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 (${action.type}) \u0434\u043B\u044F ${targetKey}, \u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E \u0438\u043D\u0434\u0435\u043A\u0441 ${lastIdx}`);
+          actionsToRemove.push(i);
+        }
+      }
+      // Phase 3 disabled: keep dropdown "open" click step.
+      // Hiding it causes open/select sequence drift and hidden dropdown actions.
+      const getActionText = (action) => String(action?.fieldLabel || action?.description || action?.name || action?.label || action?.value || "").toLowerCase();
+      const hasExplicitSelector = (action) => {
+        const selectorText = String(action?.selector?.selector || action?.selector?.value || action?.selector || "").trim();
+        if (!selectorText) return false;
+        return selectorText.startsWith("#") || /\[[^\]]+\]/.test(selectorText) || /elementid|ng-reflect-element-id|aria-label|name=|id=/.test(selectorText);
+      };
+      const isSignificantAction = (action) => {
+        if (!action) return false;
+        const type = String(action.type || "").toLowerCase();
+        if (!["click", "dblclick", "input", "change", "navigate", "navigation"].includes(type)) return false;
+        const text = getActionText(action);
+        return /(save|submit|send|create|delete|publish|apply|сохран|отправ|созда|удал|примен|опубли)/i.test(text);
+      };
+      const hasNearbyAnalog = (index) => {
+        const action = actions[index];
+        if (!action) return false;
+        const currentSelector = action.selector;
+        const currentType = action.type;
+        for (let j = Math.max(0, index - 2); j <= Math.min(actions.length - 1, index + 2); j++) {
+          if (j === index) continue;
+          const other = actions[j];
+          if (!other || other.hidden) continue;
+          if (other.type !== currentType) continue;
+          if (currentSelector && other.selector && this.areSelectorsEqual(currentSelector, other.selector)) {
+            return true;
+          }
+        }
+        return false;
+      };
       actionsToRemove.sort((a, b) => b - a);
       for (const index of actionsToRemove) {
         if (index >= 0 && index < actions.length) {
+          const candidate = actions[index];
+          if (isSignificantAction(candidate) && hasExplicitSelector(candidate) && !hasNearbyAnalog(index)) {
+            console.log(`\u{1F6E1}\uFE0F \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u044E auto-hidden \u0434\u043B\u044F \u0437\u043D\u0430\u0447\u0438\u043C\u043E\u0433\u043E \u0448\u0430\u0433\u0430 ${index + 1} (\u044F\u0432\u043D\u044B\u0439 \u0441\u0435\u043B\u0435\u043A\u0442\u043E\u0440, \u043D\u0435\u0442 \u0441\u043E\u0441\u0435\u0434\u043D\u0438\u0445 \u0430\u043D\u0430\u043B\u043E\u0433\u043E\u0432)`);
+            continue;
+          }
           actions[index].hidden = true;
           actions[index].hiddenReason = "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0443\u0434\u0430\u043B\u0435\u043D \u043A\u0430\u043A \u0434\u0443\u0431\u043B\u0438\u0440\u0443\u044E\u0449\u0435\u0435\u0441\u044F \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435";
           actions[index].hiddenAt = (/* @__PURE__ */ new Date()).toISOString();

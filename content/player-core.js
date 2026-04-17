@@ -142,6 +142,10 @@ class AdaptiveNavigationGraph {
   }
 }
 
+// Экспортируем в window для модулей-расширений (player-handlers-*.js),
+// которые выполняются в другом IIFE и не видят локальные классы player-core.js.
+window.AdaptiveNavigationGraph = AdaptiveNavigationGraph;
+
 /**
  * Стратегии восстановления при ошибках
  * Используются в adaptive-auto для обработки различных типов ошибок
@@ -398,6 +402,14 @@ class TestPlayer {
     this.urlCheckFunction = null; // Функция проверки URL для удаления слушателя
     this.runHistoryCleanupTimer = null;
     this._debugRunId = `run-${Date.now()}`; // для группировки debug-логов
+    this._lastReplayFindEvidence = null;
+    this.strictReplayTargetValidation = true;
+    this.strictReplayTargetRequireEvidence = false;
+    /** Идентификатор текущего запуска воспроизведения (с background); уходит в SAVE_PLAYBACK_STATE, чтобы не затирать прогресс чужим сохранением */
+    this.playbackSessionId = null;
+    this.consecutiveSelectorNotFoundSteps = 0;
+    this.lastSelectorNotFoundWarningAt = 0;
+    this.selectorNotFoundWarningThreshold = 3;
     
     // Система пользовательских переменных
     this.userVariables = {}; // Хранилище пользовательских переменных {имя: значение}
@@ -481,6 +493,23 @@ class TestPlayer {
   }
 
   /**
+   * Загружает runtime-настройки воспроизведения для предупреждений по селекторам.
+   */
+  async loadPlaybackWarningSettings() {
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
+      const thresholdRaw = Number(response?.settings?.playback?.selectorNotFoundStreakWarningThreshold);
+      if (Number.isFinite(thresholdRaw)) {
+        this.selectorNotFoundWarningThreshold = Math.min(20, Math.max(2, Math.floor(thresholdRaw)));
+      } else {
+        this.selectorNotFoundWarningThreshold = 3;
+      }
+    } catch (_) {
+      this.selectorNotFoundWarningThreshold = 3;
+    }
+  }
+
+  /**
    * Загружает настройки скриншотов
    */
   async loadScreenshotSettings() {
@@ -493,6 +522,73 @@ class TestPlayer {
       this.screenshotSettings = { saveToDisk: false, onlyOnError: false, storeInMemory: true, savePath: '' };
     }
     this.screenshotSettingsLoaded = true;
+  }
+
+  /**
+   * Сбрасывает счётчик последовательных шагов, где селектор не найден.
+   */
+  resetSelectorNotFoundStreak() {
+    this.consecutiveSelectorNotFoundSteps = 0;
+  }
+
+  /**
+   * Регистрирует шаг с ошибкой поиска селектора и показывает предупреждение при серии.
+   */
+  registerSelectorNotFoundFailure(stepNumber, totalSteps, errorMessage) {
+    this.consecutiveSelectorNotFoundSteps += 1;
+    const streak = this.consecutiveSelectorNotFoundSteps;
+    if (streak < this.selectorNotFoundWarningThreshold) return streak;
+
+    const now = Date.now();
+    if (now - this.lastSelectorNotFoundWarningAt < 5000) return streak;
+    this.lastSelectorNotFoundWarningAt = now;
+
+    const warnText = 'Возможно стоит добавить задеркжку для того, чтобы селекторы подгрузились.';
+    const details = `Подряд не найдено селекторов: ${streak} (шаг ${stepNumber} из ${totalSteps})`;
+    console.warn(`⚠️ [SelectorLoadDelayHint] ${details}. ${warnText} Ошибка: ${errorMessage || 'не указана'}`);
+    this.showSelectorLoadDelayWarning(`${details}. ${warnText}`);
+    return streak;
+  }
+
+  /**
+   * Возвращает true, если primary-селектор не сработал и шаг ушёл в fallback/alternative.
+   */
+  hasSelectorLookupMiss(validation) {
+    return !!(validation?.evidence?.selectorLookupMiss === true);
+  }
+
+  /**
+   * Показывает краткое in-page предупреждение во время воспроизведения.
+   */
+  showSelectorLoadDelayWarning(message) {
+    try {
+      const existing = document.getElementById('autotest-selector-delay-warning');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      const note = document.createElement('div');
+      note.id = 'autotest-selector-delay-warning';
+      note.style.cssText = [
+        'position:fixed',
+        'top:20px',
+        'right:20px',
+        'max-width:460px',
+        'z-index:100000',
+        'background:#ff9800',
+        'color:#111',
+        'padding:12px 14px',
+        'border-radius:8px',
+        'box-shadow:0 4px 12px rgba(0,0,0,.2)',
+        'font-size:13px',
+        'line-height:1.35',
+        'font-family:Arial,sans-serif'
+      ].join(';');
+      note.textContent = `⚠️ ${message}`;
+      (document.body || document.documentElement).appendChild(note);
+      setTimeout(() => {
+        try {
+          if (note && note.parentNode) note.parentNode.removeChild(note);
+        } catch (_) {}
+      }, 7000);
+    } catch (_) {}
   }
 
   /**
@@ -519,7 +615,11 @@ class TestPlayer {
             actionIndex: response.actionIndex,
             nextUrl: response.nextUrl,
             runMode: response.runMode,
-            runHistory: response.runHistory
+            runHistory: response.runHistory,
+            playbackSessionId: response.playbackSessionId ?? null,
+            isGroupRun: response.isGroupRun,
+            groupRunCurrentIndex: response.groupRunCurrentIndex,
+            groupRunTotal: response.groupRunTotal
           } : null))
         : null;
       if (state) {
@@ -534,7 +634,7 @@ class TestPlayer {
           this.isGroupRun = state.isGroupRun || false;
           this.groupRunCurrentIndex = state.groupRunCurrentIndex;
           this.groupRunTotal = state.groupRunTotal;
-          this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory);
+          this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory, state.playbackSessionId ?? null);
           return;
         }
 
@@ -550,7 +650,7 @@ class TestPlayer {
             this.isGroupRun = state.isGroupRun || false;
             this.groupRunCurrentIndex = state.groupRunCurrentIndex;
             this.groupRunTotal = state.groupRunTotal;
-            this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory);
+            this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory, state.playbackSessionId ?? null);
           } else {
             console.log(`⚠️ URL не совпадает: текущий=${currentUrl}, ожидаемый=${nextUrl}`);
           }
@@ -629,6 +729,140 @@ class TestPlayer {
     return selectorData.selector || selectorData.value || '';
   }
 
+  isReplayTargetValidationRequired(action) {
+    if (!action || !action.type) return false;
+    const subtype = String(action.subtype || '').toLowerCase();
+    const isDropdownAction = subtype.startsWith('dropdown-') ||
+      action.isDropdownSelection === true ||
+      action.dropdownAutoFilled === true ||
+      action.isDropdownClick === true ||
+      action.element?.isDropdown === true;
+    // Для dropdown-операций фактический target часто живёт в overlay/панели и может
+    // не совпадать по tag/id с сохранённым root-элементом поля.
+    if (isDropdownAction) return false;
+    const normalizedType = this.normalizeActionType(action.type);
+    const selectorDependentTypes = new Set([
+      'click', 'dblclick', 'input', 'change', 'hover', 'focus', 'blur', 'clear', 'upload', 'drag', 'table', 'datepicker'
+    ]);
+    if (!selectorDependentTypes.has(normalizedType)) return false;
+    return !!this.extractSelectorString(action.selector);
+  }
+
+  normalizeClassSet(value) {
+    const text = String(value || '').trim();
+    if (!text) return new Set();
+    return new Set(text.split(/\s+/).filter(Boolean).map(item => item.toLowerCase()));
+  }
+
+  getReplayTargetValidation(action) {
+    const evidence = this._lastReplayFindEvidence || null;
+    if (!this.isReplayTargetValidationRequired(action)) {
+      return {
+        ok: true,
+        reasonCode: 'not-required',
+        message: '',
+        evidence
+      };
+    }
+
+    if (!evidence?.element || !(evidence.element instanceof Element)) {
+      if (!this.strictReplayTargetRequireEvidence) {
+        return {
+          ok: true,
+          reasonCode: 'missing-element-evidence-soft',
+          message: 'Нет подтверждения целевого элемента, шаг принят в мягком режиме',
+          evidence
+        };
+      }
+      return {
+        ok: false,
+        reasonCode: 'missing-element-evidence',
+        message: 'Нет подтверждения целевого элемента для шага с селектором',
+        evidence
+      };
+    }
+
+    const expected = action.element || {};
+    const actual = evidence.element;
+    const checks = [];
+
+    if (expected.tag) {
+      const ok = String(expected.tag).toLowerCase() === String(actual.tagName || '').toLowerCase();
+      checks.push({ name: 'tag', ok, expected: String(expected.tag).toLowerCase(), actual: String(actual.tagName || '').toLowerCase() });
+    }
+    if (expected.id) {
+      const ok = String(expected.id) === String(actual.id || '');
+      checks.push({ name: 'id', ok, expected: String(expected.id), actual: String(actual.id || '') });
+    }
+    if (expected.className) {
+      const expectedClasses = this.normalizeClassSet(expected.className);
+      const actualClasses = this.normalizeClassSet(actual.className || '');
+      if (expectedClasses.size > 0) {
+        const matched = [...expectedClasses].filter(cls => actualClasses.has(cls)).length;
+        const ratio = matched / expectedClasses.size;
+        checks.push({ name: 'className', ok: ratio >= 0.5, expected: expected.className, actual: actual.className || '', ratio });
+      }
+    }
+    if (expected.text) {
+      const expectedText = String(expected.text).trim();
+      const actualText = String(this.selectorEngine?.getElementText?.(actual) || actual.textContent || '').trim();
+      if (expectedText) {
+        const ok = actualText === expectedText || actualText.includes(expectedText) || expectedText.includes(actualText);
+        checks.push({ name: 'text', ok, expected: expectedText, actual: actualText });
+      }
+    }
+
+    const strictChecks = checks.filter(check => check.name === 'tag' || check.name === 'id');
+    const strictFailed = strictChecks.some(check => !check.ok);
+    if (strictFailed) {
+      return {
+        ok: false,
+        reasonCode: 'target-mismatch',
+        message: 'Найденный элемент не совпадает с ожидаемым (tag/id)',
+        evidence: { ...evidence, checks }
+      };
+    }
+
+    const optionalChecks = checks.filter(check => check.name === 'className' || check.name === 'text');
+    if (optionalChecks.length > 0 && optionalChecks.every(check => !check.ok)) {
+      return {
+        ok: false,
+        reasonCode: 'target-weak-match',
+        message: 'Слабое совпадение целевого элемента (class/text)',
+        evidence: { ...evidence, checks }
+      };
+    }
+
+    return {
+      ok: true,
+      reasonCode: 'target-confirmed',
+      message: '',
+      evidence: { ...evidence, checks }
+    };
+  }
+
+  setReplayFindEvidence(payload) {
+    const data = payload || {};
+    const source = data.source || 'unknown';
+    const inferredLookupMissSources = new Set([
+      'user-selector-fallback',
+      'alternative-parent-selector',
+      'alternative-selector',
+      'fallbacks-pipeline',
+      'fallback-selector',
+      'not-found'
+    ]);
+    this._lastReplayFindEvidence = {
+      element: data.element || null,
+      usedSelector: data.usedSelector || null,
+      source,
+      selectorLookupMiss: data.selectorLookupMiss === true || inferredLookupMissSources.has(source),
+      attempt: data.attempt || null,
+      selectorType: data.selectorType || null,
+      timestamp: Date.now()
+    };
+  }
+
   countMatchingElements(selectorData) {
     const selector = this.extractSelectorString(selectorData);
     if (!selector) return 0;
@@ -689,9 +923,26 @@ class TestPlayer {
   getRuntimeActions(actions) {
     if (!actions) return [];
     if (this.playMode === 'full') return actions;
-    // В optimized режиме скрытые шаги пропускаем, но маркеры записи должны оставаться,
-    // иначе автозапись на маркере никогда не сработает, если маркер поставлен на hidden шаг.
-    return actions.filter(a => !a.hidden || a.recordMarker === true);
+    // В optimized режиме скрытые шаги обычно пропускаем, но:
+    // 1) маркеры записи должны оставаться;
+    // 2) hidden dropdown-open click нужно сохранять, если сразу после него есть dropdown-select/input шаг.
+    // Иначе ломается последовательность open -> select в старых тестах.
+    return actions.filter((a, idx) => {
+      if (!a) return false;
+      if (!a.hidden) return true;
+      if (a.recordMarker === true) return true;
+      if (!(a.type === 'click' && a.isDropdownClick === true)) return false;
+      for (let j = idx + 1; j < Math.min(actions.length, idx + 6); j++) {
+        const next = actions[j];
+        if (!next) continue;
+        if (next.hidden) continue;
+        const subtype = String(next.subtype || '').toLowerCase();
+        const isDropdownNext = subtype.startsWith('dropdown-') || next.isDropdownSelection === true || next.dropdownAutoFilled === true;
+        if (!isDropdownNext) continue;
+        return true;
+      }
+      return false;
+    });
   }
 
   /**
@@ -756,6 +1007,51 @@ class TestPlayer {
   }
 
   /**
+   * Виден ли элемент пользователю (предки, aria-hidden, type=hidden, размеры).
+   * В optimized/debug не выполняем клик/ввод по полностью скрытым полям — иначе цепляется «дубликат» в DOM.
+   */
+  isElementDomInteractiveVisible(element) {
+    if (!element || !(element instanceof Element) || !element.isConnected) return false;
+    const tag = String(element.tagName || '').toLowerCase();
+    if (tag === 'input' && String(element.getAttribute('type') || '').toLowerCase() === 'hidden') return false;
+    if (typeof element.hasAttribute === 'function' && element.hasAttribute('hidden')) return false;
+    let node = element;
+    while (node && node !== document.documentElement) {
+      if (node.nodeType !== 1) {
+        node = node.parentElement;
+        continue;
+      }
+      try {
+        const st = window.getComputedStyle(node);
+        if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity || '1') === 0) {
+          return false;
+        }
+        if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') {
+          return false;
+        }
+      } catch (_) {
+        return false;
+      }
+      node = node.parentElement;
+    }
+    try {
+      const rect = element.getBoundingClientRect();
+      if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || (rect.width < 1 && rect.height < 1)) {
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
+    return true;
+  }
+
+  /** В full-режиме взаимодействуем и со скрытыми; в optimized/debug — нет. */
+  shouldSkipPlaybackForDomHiddenTarget(element) {
+    if (this.playMode === 'full' || !element) return false;
+    return !this.isElementDomInteractiveVisible(element);
+  }
+
+  /**
    * Получает пользовательские селекторы для действия
    */
   getUserSelectors(action) {
@@ -791,6 +1087,7 @@ class TestPlayer {
         const el = this.selectorEngine?.findElementSync?.(sel);
         if (el && el instanceof Element) {
           console.log('✅ Элемент найден через пользовательский резервный селектор');
+          this.setReplayFindEvidence({ element: el, usedSelector: this.formatSelector(sel), source: 'user-selector-fallback' });
           return el;
         }
       } catch (e) {
@@ -804,6 +1101,7 @@ class TestPlayer {
         const el = this.selectorEngine?.findElementSync?.(action.selector);
         if (el && el instanceof Element) {
           console.log('✅ Элемент найден по оригинальному селектору из действия');
+          this.setReplayFindEvidence({ element: el, usedSelector: this.formatSelector(action.selector), source: 'action-selector-retry' });
           return el;
         }
       } catch (e) {
@@ -824,6 +1122,7 @@ class TestPlayer {
               const el = this.selectorEngine?.findElementSync?.(sel);
               if (el && el instanceof Element) {
                 console.log('✅ Элемент найден через альтернативный родительский селектор');
+                this.setReplayFindEvidence({ element: el, usedSelector: this.formatSelector(sel), source: 'alternative-parent-selector' });
                 return el;
               }
             }
@@ -831,6 +1130,7 @@ class TestPlayer {
             const el = this.selectorEngine?.findElementSync?.(sel);
             if (el && el instanceof Element) {
               console.log(`✅ Элемент найден через альтернативный селектор: ${sel.selector}`);
+              this.setReplayFindEvidence({ element: el, usedSelector: this.formatSelector(sel), source: 'alternative-selector' });
               return el;
             }
           }
@@ -841,7 +1141,17 @@ class TestPlayer {
     }
 
     // 4) Fallbacks: dropdown-триггеры, поле статуса, поиск по тексту/href/value/name, частичный ID, кнопки по тексту, aria-label
-    return this._tryAlternativeSelectorsFallbacks(action);
+    const fallbackElement = this._tryAlternativeSelectorsFallbacks(action);
+    if (fallbackElement && fallbackElement instanceof Element) {
+      this.setReplayFindEvidence({
+        element: fallbackElement,
+        usedSelector: this.formatSelector(action?.selector || action),
+        source: 'fallbacks-pipeline',
+        selectorLookupMiss: true
+      });
+      return fallbackElement;
+    }
+    return null;
   }
 
   /**
@@ -908,14 +1218,22 @@ class TestPlayer {
    * Запускает воспроизведение теста
    * @param {Object} test - Объект теста
    * @param {string} mode - Режим воспроизведения: 'full' | 'optimized'
+   * @param {string|null} [playbackSessionId] - Идентификатор сессии из background (для SAVE_PLAYBACK_STATE после навигации)
    */
-  async playTest(test, mode = 'optimized') {
+  async playTest(test, mode = 'optimized', playbackSessionId = null) {
     if (this.isPlaying) {
       console.warn('⚠️ Тест уже воспроизводится');
       return;
     }
 
     this.isPlaying = true;
+    this.playbackSessionId = (playbackSessionId != null && String(playbackSessionId).trim() !== '')
+      ? String(playbackSessionId).trim()
+      : null;
+    if (this.runHistoryCleanupTimer) {
+      clearTimeout(this.runHistoryCleanupTimer);
+      this.runHistoryCleanupTimer = null;
+    }
     // При новом запуске теста сбрасываем флаг паузы по маркеру
     this.pausedOnRecordMarker = false;
     this.currentTest = test;
@@ -924,6 +1242,8 @@ class TestPlayer {
     this.lastKnownUrl = window.location.href;
     this.ineffectiveActions = [];
     this.consoleErrors = [];
+    await this.loadPlaybackWarningSettings();
+    this.resetSelectorNotFoundStreak();
 
     // Индикатор «ЗАПИСЬ» не должен отображаться при воспроизведении
     const recordingIndicator = document.getElementById('autotest-recording-indicator');
@@ -1084,6 +1404,7 @@ class TestPlayer {
     const totalSteps = this.getEffectiveStepCount(allActions);
     this._lastFillFieldsUrl = null;
     let lastExecutedStepNumber = startStepNumber;
+    const runtimeSkipIndexes = new Set(); // Индексы runtime-шага, которые нужно пропустить как уже выполненные
     for (let i = 0; i < actions.length; i++) {
       if (!this.isPlaying) {
         console.log('⏹️ Воспроизведение остановлено');
@@ -1105,6 +1426,30 @@ class TestPlayer {
       const originalActionIndex = Array.isArray(allActions) ? allActions.indexOf(action) : -1;
       const stepIndexInTest = originalActionIndex !== -1 ? originalActionIndex : (startActionIndex + i);
       const realStepNumber = this.getStepNumberForIndex(allActions, stepIndexInTest, startStepNumber);
+
+      if (runtimeSkipIndexes.has(i)) {
+        this.currentActionIndex = stepIndexInTest;
+        lastExecutedStepNumber = realStepNumber;
+        console.log(`⏭️ Шаг ${realStepNumber} / ${totalSteps} пропущен: целевая страница уже открыта предыдущим кликом`);
+        this.notifyStepProgress({
+          current: realStepNumber,
+          total: totalSteps,
+          type: action.type,
+          action: action
+        });
+        try {
+          chrome.runtime.sendMessage({
+            type: 'TEST_STEP_COMPLETED',
+            testId: this.currentTest?.id,
+            step: realStepNumber,
+            total: totalSteps,
+            success: true,
+            error: null,
+            duration: 0
+          }).catch(() => {});
+        } catch (e) { /* ignore */ }
+        continue;
+      }
 
       // Маркер записи: как только дошли до маркера — запускаем запись и НЕ выполняем сам шаг,
       // чтобы не падать на селекторах и дать пользователю "дозаписать" нужные действия.
@@ -1199,7 +1544,9 @@ class TestPlayer {
       const stepStartTime = Date.now();
       let stepSuccess = true;
       let stepError = null;
+      let replayValidationResult = null;
       let usedSelectorStr = this.formatSelector(action?.selector);
+      this._lastReplayFindEvidence = null;
 
       this.lastScreenshotResult = null;
       let analysisActionResult = null;
@@ -1222,7 +1569,10 @@ class TestPlayer {
         beforeScreenshot: beforeScreenshot,
         afterScreenshot: null,
         consoleErrors: this.consoleErrors.length > 0 ? [...this.consoleErrors] : undefined,
-        fieldLabel: action?.fieldLabel ?? null
+        fieldLabel: action?.fieldLabel ?? null,
+        validation: {
+          replayTarget: null
+        }
       };
       this.runHistory.steps.push(pendingStepRecord);
       if (this.runHistory.transcript && action) {
@@ -1234,6 +1584,20 @@ class TestPlayer {
       if (mayCauseUnload) {
         const nextActionIndex = stepIndexInTest + 1;
         await this.savePlaybackState('__AUTO_NAV__', nextActionIndex).catch(() => {});
+        // Для клика заранее подтверждаем шаг: страница может уйти в unload раньше финального TEST_STEP_COMPLETED.
+        if (action?.type === 'click') {
+          try {
+            chrome.runtime.sendMessage({
+              type: 'TEST_STEP_COMPLETED',
+              testId: this.currentTest?.id,
+              step: realStepNumber,
+              total: totalSteps,
+              success: true,
+              error: null,
+              duration: 0
+            }).catch(() => {});
+          } catch (e) { /* ignore */ }
+        }
       }
 
       try {
@@ -1242,6 +1606,16 @@ class TestPlayer {
         this._currentStepContext = (action.type === 'adaptive') ? { realStepNumber, totalSteps, actionIndex: stepIndexInTest } : null;
         this._collectedAdaptiveSubSteps = (action.type === 'adaptive') ? [] : null;
         analysisActionResult = await this.executeActionWithFallback(action, actions, allActions, i, realStepNumber, totalSteps);
+
+        const replayValidation = this.getReplayTargetValidation(action);
+        replayValidationResult = replayValidation;
+        if (pendingStepRecord?.validation) {
+          pendingStepRecord.validation.replayTarget = replayValidation;
+        }
+        if (this.strictReplayTargetValidation && !replayValidation.ok) {
+          throw new Error(`Replay target validation failed: ${replayValidation.message || replayValidation.reasonCode}`);
+        }
+
         for (let poll = 0; poll < 10; poll++) {
           await this.delay(poll === 0 ? 400 : 300);
           for (let r = 0; r < 3; r++) {
@@ -1255,6 +1629,36 @@ class TestPlayer {
           if (!postDialog) break;
         }
         console.log(`✅ Шаг ${realStepNumber} выполнен успешно`);
+        if (this.hasSelectorLookupMiss(replayValidationResult)) {
+          this.registerSelectorNotFoundFailure(realStepNumber, totalSteps, 'Primary selector miss; used alternative/fallback target');
+        } else {
+          this.resetSelectorNotFoundStreak();
+        }
+
+        // Если клик уже открыл страницу, совпадающую с URL следующего шага navigation,
+        // пропускаем сам navigation и сразу идем дальше.
+        if (action?.type === 'click' && i < actions.length - 1) {
+          const nextAction = actions[i + 1];
+          if (nextAction && (nextAction.type === 'navigate' || nextAction.type === 'navigation')) {
+            const rawTargetUrl = nextAction.value || nextAction.url;
+            if (rawTargetUrl) {
+              try {
+                const processedTargetUrl = this.normalizeUrlForNavigation(await this.processVariables(rawTargetUrl));
+                const currentNorm = this._normalizeUrlForSamePage(window.location.href);
+                const targetNorm = this._normalizeUrlForSamePage(processedTargetUrl);
+                if (currentNorm && targetNorm && currentNorm === targetNorm) {
+                  runtimeSkipIndexes.add(i + 1);
+                  const nextOriginalIndex = Array.isArray(allActions) ? allActions.indexOf(nextAction) : -1;
+                  const nextStepIndex = nextOriginalIndex !== -1 ? nextOriginalIndex : (stepIndexInTest + 1);
+                  const nextRealStep = this.getStepNumberForIndex(allActions, nextStepIndex, startStepNumber);
+                  console.log(`⏭️ Navigation шаг ${nextRealStep} пропущен: после клика уже открыта целевая страница`);
+                }
+              } catch (e) {
+                // Игнорируем ошибки сравнения URL
+              }
+            }
+          }
+        }
         
         // НОВОЕ: Отправка performance mark ПОСЛЕ выполнения с executionTime (только если включён analysis-performance)
         if (this.performanceMonitoringEnabled) {
@@ -1317,10 +1721,12 @@ class TestPlayer {
         }
         console.error(`❌ Шаг ${realStepNumber} / ${totalSteps} завершился с ошибкой: ${stepError}`);
 
-        // Критическая ошибка поиска элемента: прекращаем прогон сразу,
-        // чтобы не оставлять тест "висеть" на последующих шагах.
+        // Ошибка поиска элемента: фиксируем серию последовательных промахов по селекторам
+        // и показываем пользователю подсказку про возможную задержку загрузки DOM.
         const isElementNotFound = /Элемент не найден|Element not found|не найден/i.test(stepError);
-        if (isElementNotFound) {
+        const hasSelectorLookupMiss = this.hasSelectorLookupMiss(replayValidationResult);
+        if (isElementNotFound || hasSelectorLookupMiss) {
+          this.registerSelectorNotFoundFailure(realStepNumber, totalSteps, stepError);
           const last = this.runHistory?.steps?.[this.runHistory.steps.length - 1];
           if (last && last.stepNumber === realStepNumber) {
             last.success = false;
@@ -1329,9 +1735,8 @@ class TestPlayer {
           }
           this._currentStepContext = null;
           this._collectedAdaptiveSubSteps = null;
-          this.notifyCompletion(false, stepError);
-          this.stopPlaying();
-          return;
+        } else {
+          this.resetSelectorNotFoundStreak();
         }
       }
 
@@ -1378,7 +1783,8 @@ class TestPlayer {
         beforeScreenshot: beforeScreenshot,
         afterScreenshot: afterScreenshot,
         consoleErrors: this.consoleErrors.length > 0 ? [...this.consoleErrors] : undefined,
-        fieldLabel: action?.fieldLabel ?? null
+        fieldLabel: action?.fieldLabel ?? null,
+        validation: pendingStepRecord?.validation || null
       };
 
       // Для шага screenshot сохраняем результат действия
@@ -1574,6 +1980,36 @@ class TestPlayer {
       // ЭТАП 2: Селекторы из соседних шагов (включая hidden!)
       //         Порядок: сначала следующие (до +5), потом предыдущие (до -2)
       // =================================================================
+      const getSelectorKey = (a) => {
+        const s = a?.selector;
+        if (!s) return '';
+        if (typeof s === 'string') return s;
+        return String(s.selector || s.value || '');
+      };
+      const normalizeLabel = (v) => String(v || '').trim().toLowerCase();
+      const isDropdownLike = (a) => {
+        const subtype = String(a?.subtype || '').toLowerCase();
+        return subtype.startsWith('dropdown-') || a?.isDropdownSelection === true || a?.dropdownAutoFilled === true || a?.isDropdownClick === true;
+      };
+      const shouldAllowNeighborSelectorFallback = (currentAction, donorAction, direction) => {
+        if (!currentAction || !donorAction) return false;
+        // Для dropdown-операций не используем соседние селекторы вообще:
+        // иначе легко уйти в другое поле и нарушить последовательность.
+        if (isDropdownLike(currentAction)) return false;
+        const strictTypes = new Set(['click', 'dblclick', 'input', 'change', 'clear', 'focus', 'blur']);
+        if (!strictTypes.has(currentAction.type)) return true;
+        // Для обычных пользовательских шагов не берём селекторы из БУДУЩИХ шагов:
+        // это может визуально менять порядок сценария (шаг 4 кликает в поле шага 5).
+        if (direction === 'next') return false;
+        // Для предыдущих шагов разрешаем fallback только при явном совпадении поля/селектора/типа dropdown.
+        const sameLabel = normalizeLabel(currentAction.fieldLabel) &&
+          normalizeLabel(currentAction.fieldLabel) === normalizeLabel(donorAction.fieldLabel);
+        const sameSelector = getSelectorKey(currentAction) &&
+          getSelectorKey(currentAction) === getSelectorKey(donorAction);
+        const sameDropdownGroup = isDropdownLike(currentAction) && isDropdownLike(donorAction);
+        return sameLabel || sameSelector || sameDropdownGroup;
+      };
+
       // Используем allActions (полный массив с hidden), чтобы видеть все шаги
       const currentActionInAll = allActions.indexOf(action);
       const searchInAll = currentActionInAll >= 0;
@@ -1604,6 +2040,7 @@ class TestPlayer {
         if (!donorAction || !donorAction.selector) continue;
         // Пропускаем wait, api, variable — у них нет осмысленных селекторов
         if (['wait', 'api', 'variable', 'setVariable'].includes(donorAction.type)) continue;
+        if (!shouldAllowNeighborSelectorFallback(action, donorAction, cand.direction)) continue;
         // Не берём свой же селектор
         if (this.formatSelector(donorAction.selector) === originalSelectorStr) continue;
 

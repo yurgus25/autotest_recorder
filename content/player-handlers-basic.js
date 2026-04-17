@@ -36,6 +36,99 @@ TestPlayer.prototype.isClickCommandLinkOrMenuItem = function(element) {
   return false;
 };
 
+TestPlayer.prototype.extractDropdownOptionTargetText = function(action) {
+  const candidates = [
+    action?.displayValue,
+    action?.optionText,
+    action?.value,
+    action?.optionElement?.text,
+    action?.element?.text
+  ];
+  for (const candidate of candidates) {
+    const text = String(candidate || '').trim();
+    if (text && text.length <= 140) return text;
+  }
+  return '';
+};
+
+TestPlayer.prototype.isDropdownPlaceholderText = function(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return true;
+  const placeholders = new Set([
+    'выберите',
+    'выберите...',
+    'выберите значение',
+    'выбрать',
+    'select',
+    'select...',
+    'choose',
+    'choose...'
+  ]);
+  return placeholders.has(text);
+};
+
+TestPlayer.prototype.isLikelyDropdownOptionClick = function(action, element) {
+  if (!action || action.type !== 'click') return false;
+  const selectorInfo = this.formatSelector(action.selector).toLowerCase();
+  const role = String(element?.getAttribute?.('role') || '').toLowerCase();
+  const cls = String(element?.className || '').toLowerCase();
+  const tag = String(element?.tagName || '').toLowerCase();
+  const attrClass = String(action?.element?.attributes?.class || '').toLowerCase();
+  const targetText = this.extractDropdownOptionTargetText(action);
+
+  const looksLikeOptionRole = role === 'option' || role === 'listitem';
+  const looksLikeOptionClass = /option|mat-option|ng-option|result__item|result__content|group-item|select-item/.test(cls) ||
+    /option|mat-option|ng-option|result__item|result__content|group-item|select-item/.test(attrClass);
+  const looksLikeOptionSelector = /role=\"?option|__result|\.option|mat-option|ng-option|result__item|result__content|group-item|listbox/.test(selectorInfo);
+  const allowedTag = tag === 'div' || tag === 'li' || tag === 'span' || tag === 'mat-option' || tag === 'ng-option';
+  const hasDropdownHint = action?.isDropdownClick === true || !!action?.fieldLabel || !!action?.optionElement;
+  const isTriggerRole = role === 'combobox' || role === 'listbox' || role === 'textbox';
+  const looksLikeTriggerClass = /select-box|arrow|result|placeholder|input/.test(cls) ||
+    /select-box|arrow|result|placeholder|input/.test(attrClass);
+  const targetIsPlaceholder = this.isDropdownPlaceholderText(targetText);
+
+  if (targetIsPlaceholder) return false;
+  if (isTriggerRole && !looksLikeOptionRole) return false;
+  if (looksLikeTriggerClass && !looksLikeOptionClass) return false;
+
+  return !!(targetText && allowedTag && hasDropdownHint && (looksLikeOptionRole || looksLikeOptionClass || looksLikeOptionSelector));
+};
+
+TestPlayer.prototype.resolveActionDropdownTriggerElement = function(action) {
+  const selectorCandidates = [];
+  const pushSelector = (candidate) => {
+    if (!candidate || typeof candidate !== 'string') return;
+    const trimmed = candidate.trim();
+    if (!trimmed) return;
+    if (!selectorCandidates.includes(trimmed)) selectorCandidates.push(trimmed);
+  };
+
+  pushSelector(action?.dropdownTrigger?.selector);
+  if (Array.isArray(action?.dropdownTrigger?.alternatives)) {
+    action.dropdownTrigger.alternatives.forEach(pushSelector);
+  }
+  pushSelector(action?.element?.parentDropdown?.triggerSelector);
+  if (Array.isArray(action?.element?.parentDropdown?.triggerAlternatives)) {
+    action.element.parentDropdown.triggerAlternatives.forEach(pushSelector);
+  }
+
+  for (const selector of selectorCandidates) {
+    let candidate = null;
+    try {
+      candidate = document.querySelector(selector);
+    } catch (e) {
+      candidate = null;
+    }
+    if (!candidate) continue;
+    const style = window.getComputedStyle(candidate);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    const rect = candidate.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    return candidate;
+  }
+  return null;
+};
+
 TestPlayer.prototype.handleClick = async function(action) {
   const clickStartedAt = Date.now();
   const selectorInfo = this.formatSelector(action.selector);
@@ -53,10 +146,56 @@ TestPlayer.prototype.handleClick = async function(action) {
   if (!element) {
     // Пробуем альтернативные селекторы
     element = await this.tryAlternativeSelectors(action);
+    // Для dropdown-кликов пробуем восстановить trigger по elementId/fieldLabel,
+    // если исходный селектор (например ".close > .select-box > .arrow") устарел.
+    if (!element) {
+      const elementId = String(
+        action?.element?.parentDropdown?.elementId ||
+        action?.element?.attributes?.elementid ||
+        action?.element?.attributes?.['ng-reflect-element-id'] ||
+        ''
+      ).trim();
+      if (elementId) {
+        const escaped = elementId.replace(/"/g, '\\"');
+        const root = document.querySelector(`app-select[elementid="${escaped}"], app-select[ng-reflect-element-id="${escaped}"], [elementid="${escaped}"]`);
+        if (root) {
+          const trigger = root.querySelector('.select-box, [class*="select-box"], .result, [class*="result"], .options, [class*="options"], .arrow, [class*="arrow"], [role="combobox"]');
+          element = (this.resolvePreferredDropdownTrigger && this.resolvePreferredDropdownTrigger(action, trigger || root)) || trigger || root;
+          console.log(`✅ [DropdownClickFallback] Trigger восстановлен по elementId="${elementId}"`);
+        }
+      }
+    }
+    if (!element && action?.fieldLabel && typeof this.resolveDropdownElementByFieldLabel === 'function') {
+      const byLabel = this.resolveDropdownElementByFieldLabel(action, document.body);
+      if (byLabel) {
+        element = (this.resolvePreferredDropdownTrigger && this.resolvePreferredDropdownTrigger(action, byLabel)) || byLabel;
+        console.log(`✅ [DropdownClickFallback] Trigger восстановлен по fieldLabel="${action.fieldLabel}"`);
+      }
+    }
+    if (!element && action?.isDropdownClick) {
+      const triggerByAction = this.resolveActionDropdownTriggerElement(action);
+      if (triggerByAction) {
+        element = triggerByAction;
+        console.log('✅ [DropdownClickFallback] Trigger восстановлен из записанного dropdownTrigger');
+      }
+    }
     if (!element) {
       throw new Error(`Элемент не найден: ${selectorInfo}`);
     }
     console.log('✅ Элемент найден через альтернативный селектор');
+  }
+
+  if (action?.isDropdownClick) {
+    const triggerByAction = this.resolveActionDropdownTriggerElement(action);
+    if (triggerByAction) {
+      element = triggerByAction;
+      console.log('🎯 [DropdownClick] Использую записанный trigger selector для открытия списка');
+    }
+  }
+
+  if (this.shouldSkipPlaybackForDomHiddenTarget?.(element)) {
+    console.log('⏭️ [Player] Клик пропущен: цель не видна пользователю (скрыта в DOM); в optimized-режиме шаг не выполняется');
+    return;
   }
 
   // Прокручиваем к элементу
@@ -85,6 +224,25 @@ TestPlayer.prototype.handleClick = async function(action) {
     return;
   }
 
+  // Клик по значению в раскрытом dropdown должен выбирать опцию, а не выполнять «обычный» клик.
+  // Это предотвращает сценарии, где широкий селектор (например, контейнер/body) ломает форму.
+  if (this.isLikelyDropdownOptionClick(action, element)) {
+    const targetText = await this.processVariables(this.extractDropdownOptionTargetText(action));
+    if (targetText && this.trySelectOptionInRevealedPanels) {
+      const preferredContext = this.resolveDropdownElementByFieldLabel
+        ? (this.resolveDropdownElementByFieldLabel(action, element) || element)
+        : element;
+      const picked = await this.trySelectOptionInRevealedPanels(targetText, preferredContext);
+      if (picked?.success) {
+        console.log(`✅ Выбрана опция dropdown по клику: "${targetText}"`);
+        return;
+      }
+    }
+
+    // В строгом режиме лучше зафейлить шаг, чем кликнуть по неверному контейнеру и испортить состояние формы.
+    throw new Error(`Не удалось выбрать dropdown-опцию по клику: "${targetText || 'unknown'}"`);
+  }
+
   // Проверяем, является ли это dropdown с необходимостью выбора значения
   // Не смешивать с пунктами меню <a href="#"> / кнопками — иначе value от старого шага «ввод» вызывает autoSelectDropdownValue и портит поля
   if (action.value && this.isDropdownElement(element) && !this.isClickCommandLinkOrMenuItem(element)) {
@@ -96,7 +254,13 @@ TestPlayer.prototype.handleClick = async function(action) {
     // Пробуем выбрать значение
     const processedValue = await this.processVariables(action.value);
     try {
-      let result = await this.autoSelectDropdownValue(element, processedValue);
+      let result = null;
+      if (typeof this.selectDropdownAdaptiveValue === 'function') {
+        result = await this.selectDropdownAdaptiveValue(element, processedValue, action);
+      }
+      if (!result?.success) {
+        result = await this.autoSelectDropdownValue(element, processedValue);
+      }
       if (!result?.success) {
         const container = element.closest('[class*="select"], [class*="dropdown"], [class*="combo"]') || 
                          element.closest('[role="combobox"], [role="listbox"]') ||
@@ -163,6 +327,11 @@ TestPlayer.prototype.handleDblClick = async function(action) {
     if (!element) {
       throw new Error(`Элемент не найден: ${selectorInfo}`);
     }
+  }
+
+  if (this.shouldSkipPlaybackForDomHiddenTarget?.(element)) {
+    console.log('⏭️ [Player] Двойной клик пропущен: цель не видна (скрыта в DOM)');
+    return;
   }
 
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });

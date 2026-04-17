@@ -416,6 +416,18 @@ class TestEditor {
         }
         return;
       }
+
+      // Быстрая смена типа по клику на бейдж действия (без дополнительных кнопок)
+      const typeBadge = e.target.closest('.action-type-badge[data-action="quick-cycle-type"]');
+      if (typeBadge) {
+        e.preventDefault();
+        e.stopPropagation();
+        const indexStr = typeBadge.getAttribute('data-action-index');
+        if (indexStr != null) {
+          this.quickCycleActionType(indexStr);
+        }
+        return;
+      }
       
       // Проверяем клик по номеру действия (для переключения видимости или редактирования номера)
       const numberElement = e.target.closest('.clickable-number');
@@ -1066,10 +1078,15 @@ class TestEditor {
         });
 
         if (!response) {
-          throw new Error(this.t('editorUI.backgroundNoResponse'));
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 300 * attempt));
+            continue;
+          }
+          // Не показываем пользователю техническую ошибку канала — пробуем fallback из storage ниже.
+          console.warn('⚠️ [Editor] GET_TEST: background не вернул ответ, пробую fallback из storage');
         }
 
-        if (response.success && response.test) {
+        if (response?.success && response.test) {
           this.test = response.test;
           if (!this.test.actions) this.test.actions = [];
           // Порядок шагов (actions) не меняется: отображаем и сохраняем строго в порядке массива.
@@ -1087,7 +1104,7 @@ class TestEditor {
         }
 
         // Fallback: загрузка напрямую из storage (если background ещё не инициализирован или тест не в памяти)
-        if (!response.test && (attempt === 1 || attempt === maxRetries)) {
+        if ((!response || !response.test) && (attempt === 1 || attempt === maxRetries)) {
           try {
             const stored = await chrome.storage.local.get('tests');
             const testsObj = stored?.tests || {};

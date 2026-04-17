@@ -1990,8 +1990,13 @@ TestPlayer.prototype.handleAdaptiveAuto = async function(adaptiveAction) {
   };
   const stats = adaptiveAction._statistics;
 
-  // Создаём граф навигации для backtracking
-  const navGraph = new AdaptiveNavigationGraph();
+  // Создаём граф навигации для backtracking.
+  // Класс объявлен в player-core.js и экспортируется в window.
+  const AdaptiveNavigationGraphCtor = window.AdaptiveNavigationGraph;
+  if (typeof AdaptiveNavigationGraphCtor !== 'function') {
+    throw new Error('AdaptiveNavigationGraph is not available. Ensure player-core.js is loaded before adaptive handlers.');
+  }
+  const navGraph = new AdaptiveNavigationGraphCtor();
 
   const state = {
     visitedUrls: new Set(),

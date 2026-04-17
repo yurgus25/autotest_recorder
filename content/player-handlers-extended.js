@@ -29,6 +29,112 @@
     }
   }
 
+/**
+ * Текст для поиска/выбора в combobox: value иногда обрезан до первого токена,
+ * тогда как optionText / displayValue / selectedOptionText держат полную подпись опции.
+ */
+TestPlayer.prototype.resolveRecordedOptionSearchText = function(action, processedValue) {
+  const pick = (v) => (v == null || v === '') ? '' : String(v).trim();
+  let s = pick(action?.selectedOptionText);
+  if (!s) s = pick(action?.optionText);
+  if (!s) s = pick(action?.searchText);
+  if (!s) s = pick(action?.displayValue);
+  if (!s) s = pick(processedValue);
+  if (!s) s = pick(action?.value);
+  if (!s) return '';
+  const candidates = [
+    pick(action?.optionText),
+    pick(action?.searchText),
+    pick(action?.displayValue),
+    pick(action?.selectedOptionText),
+    pick(processedValue),
+    pick(action?.value)
+  ].filter(Boolean);
+  const sLow = s.toLowerCase();
+  for (const c of candidates) {
+    if (c.length <= s.length) continue;
+    const cLow = c.toLowerCase();
+    if (cLow.includes(sLow) || sLow.includes(cLow)) s = c;
+  }
+  return s;
+};
+
+/** Текст выбранной опции в Ant Design Select (а не value поискового input). */
+TestPlayer.prototype.getComboboxDisplayedChoiceText = function(el) {
+  if (!el || !(el instanceof Element)) return '';
+  try {
+    const ant = el.closest?.('.ant-select');
+    if (ant) {
+      const item = ant.querySelector?.('.ant-select-selection-item');
+      const t = (item?.textContent || item?.innerText || '').trim();
+      if (t) return t;
+    }
+  } catch (_) {}
+  return '';
+};
+
+TestPlayer.prototype.shouldTreatInputAsDropdown = function(action, element, expectedValue = '') {
+  if (!element) return false;
+
+  const subtype = String(action?.subtype || '').toLowerCase();
+  if (subtype.startsWith('dropdown-')) return true;
+  if (action?.isDropdownSelection === true || action?.dropdownAutoFilled === true || action?.isDropdownClick === true) {
+    return true;
+  }
+
+  const tag = String(element.tagName || '').toLowerCase();
+  const role = String(element.getAttribute?.('role') || '').toLowerCase();
+  const ariaHaspopup = String(element.getAttribute?.('aria-haspopup') || '').toLowerCase();
+  const ariaAutocomplete = String(element.getAttribute?.('aria-autocomplete') || '').toLowerCase();
+  const ariaControls = String(element.getAttribute?.('aria-controls') || '').toLowerCase();
+  const classText = String(element.className || '').toLowerCase();
+  const elementIdText = String(element.getAttribute?.('elementid') || element.id || '').toLowerCase();
+
+  const selectorText = String(this.formatSelector?.(action?.selector) || '').toLowerCase();
+  const fieldLabelText = String(action?.fieldLabel || '').toLowerCase();
+  const valueText = String(expectedValue || action?.optionText || action?.searchText || action?.value || '').toLowerCase();
+  const optionText = String(action?.optionText || action?.searchText || '').trim();
+
+  const explicitDropdownTags = new Set([
+    'select', 'app-select', 'ng-select', 'mat-select', 'p-dropdown',
+    'v-select', 'el-select', 'app-group-item-search-select', 'app-group-item-select'
+  ]);
+  if (explicitDropdownTags.has(tag)) return true;
+
+  const buttonLike = tag === 'button' ||
+    tag === 'a' ||
+    tag === 'app-header-button' ||
+    role === 'button' ||
+    role === 'link' ||
+    role === 'menuitem' ||
+    /(^|[\s_-])(btn|button|big-button|menu__subitem)([\s_-]|$)/i.test(classText);
+  if (buttonLike) return false;
+
+  const dropdownIntentPattern = /(dropdown|select|combobox|listbox|autocomplete|автодоп|список|выберите|option|статус|тип|account|сотрудник|исполнитель|ответствен)/i;
+  const hasContextIntent = dropdownIntentPattern.test(selectorText) ||
+    dropdownIntentPattern.test(fieldLabelText) ||
+    dropdownIntentPattern.test(valueText) ||
+    dropdownIntentPattern.test(elementIdText);
+
+  const hasDropdownAttrs = role === 'combobox' ||
+    role === 'listbox' ||
+    ariaHaspopup === 'listbox' ||
+    ariaAutocomplete === 'list' ||
+    ariaAutocomplete === 'both' ||
+    /(list|panel|option)/i.test(ariaControls);
+
+  if (tag === 'input' || tag === 'textarea') {
+    const hasDatalist = !!element.getAttribute?.('list');
+    if (element.id === 'account' || element.id === 'SELECTED_ACCOUNT') return true;
+    if (hasDatalist) return true;
+    if (!hasDropdownAttrs) return false;
+    if (optionText) return true;
+    return hasContextIntent;
+  }
+
+  return hasDropdownAttrs || hasContextIntent;
+};
+
 TestPlayer.prototype.retryFillWithAlternativesOrThrow = async function(action, processedValue, actionType, currentElement) {
   const verify = (el) => el && this.verifyFieldFilled(el, processedValue, { actionType });
   if (verify(currentElement)) {
@@ -104,6 +210,11 @@ TestPlayer.prototype.handleChange = async function(action) {
     console.log('✅ Элемент найден по запасному селектору');
   } else {
     console.log('✅ Элемент найден');
+  }
+
+  if (this.shouldSkipPlaybackForDomHiddenTarget?.(element)) {
+    console.log('⏭️ [Player] Изменение (change) пропущено: элемент не виден (скрыт в DOM)');
+    return;
   }
 
   // Умные ожидания по типу элемента
@@ -205,15 +316,29 @@ TestPlayer.prototype.handleChange = async function(action) {
     }
     
     // input с role="combobox" или id="account" (поле ФИО/сотрудник): ввод + выбор из выпадающего списка
-    const isComboboxInput = element.getAttribute('role') === 'combobox' ||
+    const isComboboxInput = this.shouldTreatInputAsDropdown(action, element, processedValue) && (
+      element.getAttribute('role') === 'combobox' ||
       element.getAttribute('aria-haspopup') === 'listbox' ||
       element.id === 'account' ||
-      (element.type === 'search' && /сотрудник|account|фio|fio|user|пользователь/i.test(element.name || element.placeholder || element.id || ''));
+      element.id === 'SELECTED_ACCOUNT' ||
+      !!element.closest?.('.ant-select-show-search, .ant-select.ant-select-show-search') ||
+      (element.type === 'search' && /сотрудник|account|фio|fio|user|пользователь/i.test(element.name || element.placeholder || element.id || ''))
+    );
     if (isComboboxInput) {
-      const searchText = String(processedValue || '').trim();
+      const searchText = this.resolveRecordedOptionSearchText
+        ? this.resolveRecordedOptionSearchText(action, processedValue)
+        : String(processedValue || '').trim();
       if (searchText) {
+        const shown = this.getComboboxDisplayedChoiceText ? this.getComboboxDisplayedChoiceText(element) : '';
+        const nShown = shown && this.normalizeTextValue ? this.normalizeTextValue(shown) : '';
+        const nWant = this.normalizeTextValue ? this.normalizeTextValue(searchText) : String(searchText).toLowerCase();
+        if (shown && nShown && nWant && nShown.includes(nWant) && nWant.length >= 6) {
+          console.log(`⏭️ change (combobox): уже выбрано «${shown.trim()}», шаг пропущен`);
+          await this.delay(120);
+          return;
+        }
         try {
-          await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox');
+          await this.handleDropdownDatalistCombobox(element, searchText, 'dropdown-combobox', action);
           console.log(`✅ Изменение (combobox): введено "${searchText}"`);
           await this.delay(300);
           return;
@@ -1043,14 +1168,18 @@ TestPlayer.prototype.navigateToUrl = async function(url, actionIndexInOriginalAr
  */
 TestPlayer.prototype._runHistoryForStorage = function() {
   if (!this.runHistory) return null;
-  const MAX_B = 1000000; // 1MB — чтобы viewport-скриншоты ~950KB сохранялись в history
-  const strip = (s) => (s && typeof s === 'string' && s.length > MAX_B);
+  // Для playbackState не храним base64-скриншоты, иначе легко вылететь в kQuotaBytes.
+  const strip = (s) => (s && typeof s === 'string' && s.length > 0);
   const steps = (this.runHistory.steps || []).map((step) => {
     const copy = { ...step };
     if (strip(copy.beforeScreenshot)) delete copy.beforeScreenshot;
     if (strip(copy.afterScreenshot)) delete copy.afterScreenshot;
     if (strip(copy.screenshot)) delete copy.screenshot;
     if (strip(copy.errorScreenshot)) delete copy.errorScreenshot;
+    if (copy.screenshotComparison?.diffImage) {
+      copy.screenshotComparison = { ...copy.screenshotComparison, diffImage: undefined };
+    }
+    if (copy.screenshotComparisonView) delete copy.screenshotComparisonView;
     return copy;
   });
   return {
@@ -1063,7 +1192,9 @@ TestPlayer.prototype._runHistoryForStorage = function() {
     success: this.runHistory.success,
     error: this.runHistory.error,
     totalDuration: this.runHistory.totalDuration,
-    transcript: Array.isArray(this.runHistory.transcript) ? [...this.runHistory.transcript] : []
+    transcript: Array.isArray(this.runHistory.transcript)
+      ? this.runHistory.transcript.slice(-80)
+      : []
   };
 }
 
@@ -1077,41 +1208,59 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
       isPlaying: this.isPlaying,
       hasTest: !!this.currentTest
     });
-    const runHistoryForStorage = this._runHistoryForStorage();
+    let runHistoryForStorage = this._runHistoryForStorage();
+    const buildPayload = (rh) => ({
+      type: 'SAVE_PLAYBACK_STATE',
+      test: this.currentTest,
+      actionIndex: nextActionIndex,
+      nextUrl: nextUrl,
+      runMode: this.playMode,
+      runHistory: rh,
+      isGroupRun: this.isGroupRun,
+      groupRunCurrentIndex: this.groupRunCurrentIndex,
+      groupRunTotal: this.groupRunTotal,
+      playbackSessionId: this.playbackSessionId || null
+    });
+    const slimRunHistory = (rh) => {
+      if (!rh || typeof rh !== 'object') return rh;
+      const out = { ...rh };
+      if (Array.isArray(out.steps) && out.steps.length > 40) {
+        out.steps = out.steps.slice(-40);
+      }
+      if (Array.isArray(out.transcript) && out.transcript.length > 40) {
+        out.transcript = out.transcript.slice(-40);
+      }
+      return out;
+    };
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'SAVE_PLAYBACK_STATE',
-        test: this.currentTest,
-        actionIndex: nextActionIndex,
-        nextUrl: nextUrl,
-        runMode: this.playMode,
-        runHistory: runHistoryForStorage,
-        isGroupRun: this.isGroupRun,
-        groupRunCurrentIndex: this.groupRunCurrentIndex,
-        groupRunTotal: this.groupRunTotal
-      });
-      
+      let response = await chrome.runtime.sendMessage(buildPayload(runHistoryForStorage));
       if (response && response.success) {
         console.log('✅ Состояние воспроизведения успешно сохранено в background script');
+      } else if (response == null && runHistoryForStorage) {
+        await this.delay(80);
+        const slimmer = slimRunHistory(runHistoryForStorage);
+        response = await chrome.runtime.sendMessage(buildPayload(slimmer));
+        if (response && response.success) {
+          console.log('✅ Состояние сохранено после повтора с укороченной runHistory');
+        } else {
+          const detail = response == null
+            ? 'нет ответа от service worker (канал закрыт, SW перезапуск или сообщение слишком большое)'
+            : (response.error || JSON.stringify(response));
+          console.error('❌ Ошибка при сохранении состояния:', detail);
+        }
       } else {
-        console.error('❌ Ошибка при сохранении состояния:', response?.error || 'Unknown error');
+        const detail = response == null
+          ? 'нет ответа от service worker (канал закрыт, SW перезапуск или сообщение слишком большое)'
+          : (response.error || JSON.stringify(response));
+        console.error('❌ Ошибка при сохранении состояния:', detail);
       }
     } catch (error) {
       console.error('❌ Ошибка при отправке сообщения для сохранения состояния:', error);
       // Пробуем еще раз через небольшую задержку
       try {
         await this.delay(100);
-        const retryResponse = await chrome.runtime.sendMessage({
-          type: 'SAVE_PLAYBACK_STATE',
-          test: this.currentTest,
-          actionIndex: nextActionIndex,
-          nextUrl: nextUrl,
-          runMode: this.playMode,
-          runHistory: runHistoryForStorage,
-          isGroupRun: this.isGroupRun,
-          groupRunCurrentIndex: this.groupRunCurrentIndex,
-          groupRunTotal: this.groupRunTotal
-        });
+        runHistoryForStorage = slimRunHistory(this._runHistoryForStorage());
+        const retryResponse = await chrome.runtime.sendMessage(buildPayload(runHistoryForStorage));
         if (retryResponse && retryResponse.success) {
           console.log('✅ Состояние воспроизведения успешно сохранено после повтора');
         }
@@ -1124,7 +1273,7 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
   }
 }
 
-TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mode = 'optimized', savedRunHistory = null) {
+TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mode = 'optimized', savedRunHistory = null, playbackSessionId = null) {
   if (this.isPlaying) {
     if (this.currentTest?.id === test?.id) {
       if (this.debugMode) console.log('ℹ️ [Resume] Тест уже воспроизводится на этой вкладке, пропуск дубликата');
@@ -1134,8 +1283,15 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     return;
   }
 
+  if (this.runHistoryCleanupTimer) {
+    clearTimeout(this.runHistoryCleanupTimer);
+    this.runHistoryCleanupTimer = null;
+  }
   this.isPlaying = true;
   this.currentTest = test;
+  if (playbackSessionId != null && String(playbackSessionId).trim() !== '') {
+    this.playbackSessionId = playbackSessionId;
+  }
   const recordingIndicator = document.getElementById('autotest-recording-indicator');
   if (recordingIndicator) recordingIndicator.remove();
   this.playMode = mode || 'optimized';
@@ -1413,14 +1569,48 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     
     const normalizedCurrent = normalizeUrlForMatching(currentUrl);
     console.log(`🔍 Нормализованный текущий URL (без чисел): ${normalizedCurrent}`);
+    let currentPageOrigin = '';
+    try {
+      currentPageOrigin = new URL(currentUrl).origin;
+    } catch (_) {
+      currentPageOrigin = '';
+    }
+    const isUnsupportedMatchUrl = (url) => {
+      const raw = String(url || '').trim().toLowerCase();
+      if (!raw) return true;
+      if (raw.startsWith('chrome-extension://') || raw.startsWith('chrome://') || raw.startsWith('edge://') || raw.startsWith('about:')) {
+        return true;
+      }
+      return raw.includes('/editor/editor.html') || raw.includes('editor_ru.html') || raw.includes('/editor.html');
+    };
+
+    const originOfRecordedUrl = (url) => {
+      if (!url || isUnsupportedMatchUrl(url)) return '';
+      try {
+        return new URL(url, currentPageOrigin || window.location.origin).origin;
+      } catch (_) {
+        return '';
+      }
+    };
+
+    /**
+     * При resume с середины теста не сканируем шаги 0..N-1: на текущей вкладке (другой домен после SSO)
+     * это давало ложные findElement по старым селекторам в логах и лишнюю нагрузку. Назад к более ранним
+     * шагам мы всё равно не прыгаем (см. bestMatchIndex >= startActionIndex).
+     */
+    const urlMatchScanStart = startActionIndex > 0 ? startActionIndex : 0;
+    if (urlMatchScanStart > 0) {
+      console.log(`🔍 [Resume] Подбор URL/DOM только с шага ${urlMatchScanStart + 1} (сохранённая точка ${startActionIndex + 1}), ранние шаги не проверяются`);
+    }
     
     // Ищем действие, которое лучше всего соответствует текущей странице
     let bestMatchIndex = startActionIndex;
     let bestMatchScore = 0;
     
-    for (let i = 0; i < test.actions.length; i++) {
+    for (let i = urlMatchScanStart; i < test.actions.length; i++) {
       const action = test.actions[i];
       if (!action.url) continue;
+      if (isUnsupportedMatchUrl(action.url)) continue;
       
       const normalizedAction = normalizeUrlForMatching(action.url);
       let score = 0;
@@ -1442,6 +1632,12 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
           if (nextIndex >= test.actions.length) break;
           const nextAction = test.actions[nextIndex];
           if (nextAction?.selector && nextAction.type !== 'wait' && !nextAction.hidden) {
+            // Не ищем в DOM селекторы шага, записанного для другого origin (типичный SSO: уже на login, а шаг — npa)
+            const probeUrl = nextAction.url || action.url;
+            const probeOrigin = originOfRecordedUrl(probeUrl);
+            if (currentPageOrigin && probeOrigin && probeOrigin !== currentPageOrigin) {
+              continue;
+            }
             try {
               const findResult = await this.findElementWithRetry(nextAction.selector, 5, 200);
               if (findResult?.element) foundElementsCount++;
@@ -1458,11 +1654,29 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     }
     
     // Никогда не перезаписываем на более ранний шаг (при любом resume, не только после навигации/перезагрузки):
-    // сохранённый startActionIndex authoritative — иначе возможен бесконечный цикл
+    // сохранённый startActionIndex authoritative — иначе возможен бесконечный цикл.
+    // ВАЖНО: не допускаем перескок через несокрытые шаги.
+    const canJumpForwardWithoutLosingVisibleSteps = (fromIndex, toIndex) => {
+      if (toIndex <= fromIndex) return true;
+      for (let k = fromIndex; k < toIndex; k++) {
+        const candidate = test.actions[k];
+        if (!candidate) continue;
+        if (candidate.hidden !== true) {
+          return false;
+        }
+      }
+      return true;
+    };
+
     if (bestMatchScore > 0 && bestMatchIndex !== startActionIndex && bestMatchIndex >= startActionIndex) {
-      console.log(`✅ Найдена лучшая точка начала: действие ${bestMatchIndex + 1} (оценка: ${bestMatchScore})`);
-      console.log(`   Оригинальная точка: действие ${startActionIndex + 1}`);
-      actualStartIndex = bestMatchIndex;
+      if (canJumpForwardWithoutLosingVisibleSteps(startActionIndex, bestMatchIndex)) {
+        console.log(`✅ Найдена лучшая точка начала: действие ${bestMatchIndex + 1} (оценка: ${bestMatchScore})`);
+        console.log(`   Оригинальная точка: действие ${startActionIndex + 1}`);
+        actualStartIndex = bestMatchIndex;
+      } else {
+        console.log(`🛡️ Пропускаю автосдвиг старта на ${bestMatchIndex + 1}: между шагами есть несокрытые действия`);
+        console.log(`ℹ️ Оставляю указанную точку начала: действие ${startActionIndex + 1}`);
+      }
     } else {
       console.log(`ℹ️ Использую указанную точку начала: действие ${startActionIndex + 1}`);
     }
@@ -1647,10 +1861,11 @@ TestPlayer.prototype.stopPlaying = function() {
       if (response && response.success) {
         console.log('✅ История прогона успешно сохранена при остановке');
       } else {
-        console.error('❌ Ошибка при сохранении истории:', response?.error);
+        const details = response?.error || response?.message || 'Background did not return a response';
+        console.error('❌ Ошибка при сохранении истории:', details);
       }
     }).catch(err => {
-      console.error('❌ Ошибка при сохранении истории прогона при остановке:', err);
+      console.error('❌ Ошибка при сохранении истории прогона при остановке:', err?.message || String(err));
     });
   }
   
@@ -2023,6 +2238,42 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
     const child = el.querySelector && el.querySelector('[role="option"], .mat-option');
     return child || el;
   };
+  const getVisiblePoint = (el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.max(1, Math.min(window.innerWidth - 1, Math.floor(r.left + r.width / 2))),
+      y: Math.max(1, Math.min(window.innerHeight - 1, Math.floor(r.top + Math.min(r.height / 2, 16))))
+    };
+  };
+  const isPointHittable = (el) => {
+    try {
+      const p = getVisiblePoint(el);
+      const top = document.elementFromPoint(p.x, p.y);
+      return !!(top && (top === el || el.contains(top) || top.contains(el)));
+    } catch (_) {
+      return true;
+    }
+  };
+  const safeOptionClick = async (el) => {
+    if (!el) return false;
+    try { el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' }); } catch (_) {}
+    await this.delay(20);
+    let target = el;
+    if (!isPointHittable(target)) {
+      const p = getVisiblePoint(target);
+      const top = document.elementFromPoint(p.x, p.y);
+      const candidate = top && top.closest ? top.closest('[role="option"], .mat-option, .ng-option, .option, .group-item, .result__item, .result__content') : null;
+      if (candidate) target = candidate;
+    }
+    try {
+      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, buttons: 1 }));
+      target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window, buttons: 1 }));
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, buttons: 1 }));
+      return true;
+    } catch (_) {
+      try { target.click(); return true; } catch (__) { return false; }
+    }
+  };
   if (!targetNorm) return { success: false };
 
   const isVisible = (el) => {
@@ -2080,7 +2331,8 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
         const { root, opt } = candidates[i];
         try {
           const toClick = getClickableOption(opt);
-          toClick.click();
+          const clicked = await safeOptionClick(toClick);
+          if (!clicked) continue;
           await this.delay(50);
           const triggerValueAfter = contextElement ? getTriggerDisplayValue(contextElement) : '';
           const valueChanged = triggerValueBefore !== triggerValueAfter;
@@ -2103,7 +2355,8 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
         if (!textMatches(opt)) continue;
         try {
           const toClickRoots = getClickableOption(opt);
-          toClickRoots.click();
+          const clickedRoots = await safeOptionClick(toClickRoots);
+          if (!clickedRoots) continue;
           await this.delay(50);
           const triggerValueAfterRoots = contextElement ? getTriggerDisplayValue(contextElement) : '';
           const valueChangedRoots = triggerValueBefore !== triggerValueAfterRoots;
@@ -2136,7 +2389,8 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
     for (const { panel, opt } of fallbackCandidates) {
       try {
         const toClickFb = getClickableOption(opt);
-        toClickFb.click();
+        const clickedFb = await safeOptionClick(toClickFb);
+        if (!clickedFb) continue;
         await this.delay(50);
         const triggerValueAfterFb = contextElement ? getTriggerDisplayValue(contextElement) : '';
         const valueChangedFb = triggerValueBeforeFallback !== triggerValueAfterFb;
@@ -2160,7 +2414,7 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
  * Находит элемент с повторными попытками
  * @returns {Promise<{element: Element, usedSelector: string}>} Объект с найденным элементом и фактически использованным селектором
  */
-TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetries = 5, delayMs = 200) {
+TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetries = 5, delayMs = 200, actionContext = null) {
   // Проверяем, что selectorData валиден
   if (!selectorData) {
     console.error('❌ Селектор не указан');
@@ -2218,7 +2472,18 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
         }
       }
       
-      return { element: result.element, usedSelector: this.formatSelector(selectorData) };
+      const proof = {
+        element: result.element,
+        usedSelector: this.formatSelector(selectorData),
+        source: 'optimizer-backoff',
+        selectorLookupMiss: false,
+        attempt: result.attempts || 1,
+        selectorType: selectorData?.type || null
+      };
+      if (typeof this.setReplayFindEvidence === 'function') {
+        this.setReplayFindEvidence(proof);
+      }
+      return proof;
     }
     
     console.log(`⚠️ [Optimizer] Элемент не найден после ${result.attempts} попыток`);
@@ -2251,7 +2516,18 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
           }
           
           // Возвращаем элемент и фактически использованный селектор
-          return { element, usedSelector: this.formatSelector(currentSelector) };
+          const proof = {
+            element,
+            usedSelector: this.formatSelector(currentSelector),
+            source: 'primary-selector',
+            selectorLookupMiss: false,
+            attempt,
+            selectorType: currentSelector?.type || null
+          };
+          if (typeof this.setReplayFindEvidence === 'function') {
+            this.setReplayFindEvidence(proof);
+          }
+          return proof;
         } else {
           console.warn(`⚠️ Найденный объект не является DOM элементом:`, typeof element);
         }
@@ -2264,35 +2540,53 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
         const backoffDelay = Math.min(delayMs * Math.pow(1.5, attempt - 1), 1000);
         await this.delay(backoffDelay);
         
-        // Пробуем альтернативные селекторы на средних попытках
-        if (attempt >= 2 && attempt < maxRetries) {
-          const altElement = await this.tryAlternativeSelectors({ selector: currentSelector });
-          if (altElement) {
-            console.log(`✅ Элемент найден через альтернативный селектор на попытке ${attempt}`);
-            
-            // Если элемент найден во время воспроизведения, уведомляем background для снятия метки проблемного селектора
-            if (this.isPlaying && this.currentTest) {
-              try {
-                chrome.runtime.sendMessage({
-                  type: 'SELECTOR_FOUND_DURING_PLAYBACK',
-                  testId: this.currentTest.id,
-                  selector: this.formatSelector(currentSelector)
-                });
-              } catch (error) {
-                console.warn('⚠️ Не удалось отправить сообщение о найденном селекторе:', error);
-              }
-            }
-            
-            return { element: altElement, usedSelector: this.formatSelector(currentSelector) };
-          }
-        }
       }
     }
   }
   
+  // Fallback пробуем только после исчерпания primary retries.
+  const altElement = await this.tryAlternativeSelectors(actionContext || { selector: selectorData });
+  if (altElement && (altElement instanceof Element || altElement instanceof HTMLElement)) {
+    console.log('✅ Элемент найден через fallback-селектор после исчерпания primary retries');
+    if (this.isPlaying && this.currentTest) {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'SELECTOR_FOUND_DURING_PLAYBACK',
+          testId: this.currentTest.id,
+          selector: `${this.formatSelector(selectorData)} [fallback]`
+        });
+      } catch (error) {
+        console.warn('⚠️ Не удалось отправить сообщение о fallback-селекторе:', error);
+      }
+    }
+    const proof = {
+      element: altElement,
+      usedSelector: `${this.formatSelector(selectorData)} [fallback]`,
+      source: 'fallback-selector',
+      selectorLookupMiss: true,
+      attempt: maxRetries,
+      selectorType: selectorData?.type || null
+    };
+    if (typeof this.setReplayFindEvidence === 'function') {
+      this.setReplayFindEvidence(proof);
+    }
+    return proof;
+  }
+  
   const selectorInfo = selectorData.selector || JSON.stringify(selectorData);
   console.warn(`⚠️ Элемент не найден по основному селектору после ${maxRetries} попыток: ${selectorInfo}`);
-  return { element: null, usedSelector: this.formatSelector(selectorData) };
+  const proof = {
+    element: null,
+    usedSelector: this.formatSelector(selectorData),
+    source: 'not-found',
+    selectorLookupMiss: true,
+    attempt: maxRetries,
+    selectorType: selectorData?.type || null
+  };
+  if (typeof this.setReplayFindEvidence === 'function') {
+    this.setReplayFindEvidence(proof);
+  }
+  return proof;
 }
 
 TestPlayer.prototype._tryAlternativeSelectorsFallbacks = function(action) {
@@ -2547,6 +2841,34 @@ TestPlayer.prototype._tryAlternativeSelectorsFallbacks = function(action) {
     
     console.warn('⚠️ Не удалось найти элемент для поля статуса через специальные селекторы');
   }
+
+  // Универсальный fallback для хрупких class-only селекторов (например ".big-button")
+  // между стендами классы/структура часто отличаются, но текст кнопки остаётся.
+  const classOnlySelector = selectorStr.trim();
+  const isSimpleClassSelector = /^\.[a-zA-Z0-9_-]+$/.test(classOnlySelector);
+  if (isSimpleClassSelector) {
+    const className = classOnlySelector.slice(1);
+    const byClass = Array.from(document.querySelectorAll(`[class~="${className}"], button.${className}, [role="button"].${className}, a.${className}`));
+    const visibleByClass = byClass.filter(el => !this.isElementVisible || this.isElementVisible(el));
+    const classCandidates = visibleByClass.length > 0 ? visibleByClass : byClass;
+
+    if (classCandidates.length === 1 && classCandidates[0] instanceof Element) {
+      console.log(`✅ Найден единственный элемент по class-only селектору: ${classOnlySelector}`);
+      return classCandidates[0];
+    }
+
+    const expectedText = String(action?.element?.text || '').trim().toLowerCase();
+    if (expectedText) {
+      const matchedByText = classCandidates.find(el => {
+        const t = String(this.selectorEngine?.getElementText?.(el) || el.textContent || '').trim().toLowerCase();
+        return !!t && (t === expectedText || t.includes(expectedText) || expectedText.includes(t));
+      });
+      if (matchedByText && matchedByText instanceof Element) {
+        console.log(`✅ Найден элемент ${classOnlySelector} по совпадению текста кнопки`);
+        return matchedByText;
+      }
+    }
+  }
   
   // Если есть информация об элементе, пробуем найти по тексту или другим атрибутам
   if (action.element) {
@@ -2554,97 +2876,107 @@ TestPlayer.prototype._tryAlternativeSelectorsFallbacks = function(action) {
     if (action.element.text) {
       const text = action.element.text.trim();
       const textLower = text.toLowerCase();
-      console.log(`🔍 Ищу элемент по тексту: "${text}"`);
+      const actionType = String(action.type || '').toLowerCase();
+      /** Запись «текста» как склейки всей формы — includes даёт ложные совпадения с кнопками */
+      const isWallText = text.length >= 100;
+
+      if (isWallText) {
+        console.warn(`⚠️ Пропускаю поиск по element.text (${text.length} симв.): слишком длинная метка, чтобы не сматчить чужую кнопку/контейнер`);
+      } else {
+        console.log(`🔍 Ищу элемент по тексту: "${text}"`);
       
-      // НЕ ищем среди ссылок, если это поле статуса (чтобы не кликнуть на меню)
-      const isStatusField = text.includes('Статус') || text.includes('статус') || 
+        // НЕ ищем среди ссылок, если это поле статуса (чтобы не кликнуть на меню)
+        const isStatusField = text.includes('Статус') || text.includes('статус') || 
                            text.includes('выберите') || text.includes('Плановый');
       
-      if (!isStatusField) {
-        // Сначала пробуем найти среди интерактивных элементов (кнопки, ссылки)
-        const interactiveSelectors = ['button', 'a', 'input[type="button"]', 'input[type="submit"]', '[role="button"]', '[onclick]'];
-        for (const selector of interactiveSelectors) {
-          const elements = Array.from(document.querySelectorAll(selector));
-          const matching = elements.find(el => {
-            const elText = this.selectorEngine.getElementText(el).trim();
-            const elTextLower = elText.toLowerCase();
-            return elText === text || 
+        if (!isStatusField) {
+          // Для ввода/изменения не ищем по button/a — иначе «маршрутов граф» попадает на неверную кнопку
+          const interactiveSelectors = (actionType === 'change' || actionType === 'input')
+            ? ['select', 'input', 'textarea', '[role="combobox"]', '[role="textbox"]', '[role="searchbox"]', '[contenteditable="true"]']
+            : ['button', 'a', 'input[type="button"]', 'input[type="submit"]', '[role="button"]', '[onclick]'];
+          for (const selector of interactiveSelectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            const matching = elements.find(el => {
+              const elText = this.selectorEngine.getElementText(el).trim();
+              const elTextLower = elText.toLowerCase();
+              return elText === text || 
                    elTextLower === textLower ||
                    elText.includes(text) || 
                    text.includes(elText) ||
                    // Для кнопок с текстом "ВОЙТИ" ищем также "войти", "Войти" и т.д.
                    (textLower.includes('войти') && elTextLower.includes('войти'));
-          });
+            });
           
-          if (matching && matching instanceof Element) {
-            console.log(`✅ Найден интерактивный элемент по тексту "${text}" через селектор ${selector}`);
-            return matching;
+            if (matching && matching instanceof Element) {
+              console.log(`✅ Найден интерактивный элемент по тексту "${text}" через селектор ${selector}`);
+              return matching;
+            }
           }
+        } else {
+          console.log('⚠️ Пропускаю поиск среди ссылок для поля статуса (чтобы не кликнуть на меню)');
         }
-      } else {
-        console.log('⚠️ Пропускаю поиск среди ссылок для поля статуса (чтобы не кликнуть на меню)');
-      }
       
-      // Если не нашли среди интерактивных, ищем среди всех элементов
-      // Для поля статуса исключаем ссылки и элементы с текстом "пакет документа"
-      const selector = isStatusField ? '*:not(a)' : '*';
-      const allElements = Array.from(document.querySelectorAll(selector));
+        // Если не нашли среди интерактивных, ищем среди всех элементов
+        // Для поля статуса исключаем ссылки и элементы с текстом "пакет документа"
+        const selector = isStatusField ? '*:not(a)' : '*';
+        const allElements = Array.from(document.querySelectorAll(selector));
       
-      // Исключаем тексты, которые НЕ относятся к полю статуса
-      const excludedTexts = ['пакет документа', 'пакет', 'документ', 'тип проекта', 'тип'];
+        // Исключаем тексты, которые НЕ относятся к полю статуса
+        const excludedTexts = ['пакет документа', 'пакет', 'документ', 'тип проекта', 'тип'];
       
-      const matchingElements = allElements.filter(el => {
-        // Для поля статуса дополнительно проверяем, что это не ссылка
-        if (isStatusField && (el.tagName === 'A' || el.closest('a'))) {
-          return false;
-        }
-        
-        const elText = this.selectorEngine.getElementText(el).trim();
-        const elTextLower = elText.toLowerCase();
-        
-        // Для поля статуса исключаем элементы с текстом "пакет документа" и подобными
-        if (isStatusField) {
-          const isExcluded = excludedTexts.some(excluded => elTextLower.includes(excluded.toLowerCase()));
-          if (isExcluded) {
-            console.log(`⚠️ Исключаю элемент с текстом "${elText}" (не относится к полю статуса)`);
+        const matchingElements = allElements.filter(el => {
+          // Для поля статуса дополнительно проверяем, что это не ссылка
+          if (isStatusField && (el.tagName === 'A' || el.closest('a'))) {
             return false;
           }
+        
+          const elText = this.selectorEngine.getElementText(el).trim();
+          const elTextLower = elText.toLowerCase();
+        
+          // Для поля статуса исключаем элементы с текстом "пакет документа" и подобными
+          if (isStatusField) {
+            const isExcluded = excludedTexts.some(excluded => elTextLower.includes(excluded.toLowerCase()));
+            if (isExcluded) {
+              console.log(`⚠️ Исключаю элемент с текстом "${elText}" (не относится к полю статуса)`);
+              return false;
+            }
           
-          // Для поля статуса ищем ТОЛЬКО в app-select[elementid="status-project"] или .input-project-status
-          const isInStatusField = el.closest('app-select[elementid="status-project"]') ||
+            // Для поля статуса ищем ТОЛЬКО в app-select[elementid="status-project"] или .input-project-status
+            const isInStatusField = el.closest('app-select[elementid="status-project"]') ||
                                  el.closest('.input-project-status') ||
                                  el.closest('app-select[ng-reflect-element-id="status-project"]');
-          if (!isInStatusField) {
-            return false; // Не ищем элементы вне поля статуса
+            if (!isInStatusField) {
+              return false; // Не ищем элементы вне поля статуса
+            }
           }
-        }
         
-        return elText === text || 
+          return elText === text || 
                elTextLower === textLower ||
                elText.includes(text) || 
                text.includes(elText);
-      });
+        });
       
-      if (matchingElements.length > 0) {
-        // Для поля статуса приоритет отдаем .select-box
-        if (isStatusField) {
-          const selectBox = matchingElements.find(el => 
-            el.classList.contains('select-box') || 
-            el.className.includes('select-box') ||
-            el.closest('.select-box') ||
-            el.classList.contains('select-group') ||
-            el.className.includes('select-group')
-          );
-          if (selectBox) {
-            console.log(`✅ Найден .select-box по тексту "${text}"`);
-            return selectBox;
+        if (matchingElements.length > 0) {
+          // Для поля статуса приоритет отдаем .select-box
+          if (isStatusField) {
+            const selectBox = matchingElements.find(el => 
+              el.classList.contains('select-box') || 
+              el.className.includes('select-box') ||
+              el.closest('.select-box') ||
+              el.classList.contains('select-group') ||
+              el.className.includes('select-group')
+            );
+            if (selectBox) {
+              console.log(`✅ Найден .select-box по тексту "${text}"`);
+              return selectBox;
+            }
           }
-        }
         
-        const found = matchingElements[0];
-        if (found instanceof Element) {
-          console.log(`✅ Найдено ${matchingElements.length} элементов по тексту, беру первый`);
-          return found;
+          const found = matchingElements[0];
+          if (found instanceof Element) {
+            console.log(`✅ Найдено ${matchingElements.length} элементов по тексту, беру первый`);
+            return found;
+          }
         }
       }
     }
@@ -3463,11 +3795,20 @@ TestPlayer.prototype._showGroupSummaryPopupBody = function(summary) {
 /**
  * Проверяет, было ли значение выбрано в dropdown
  */
-TestPlayer.prototype.checkIfValueSelected = async function(selectBoxElement, expectedValue) {
+TestPlayer.prototype.checkIfValueSelected = async function(selectBoxElement, expectedValue, options = {}) {
   const expectedLower = this.normalizeTextValue(expectedValue);
+  const strict = options?.strict === true;
+  const normalizeCompact = (value) => this.normalizeTextValue(String(value || '').replace(/[^\p{L}\p{N}\s()]+/gu, ' '));
+  const expectedCompact = normalizeCompact(expectedValue);
   const placeholderValues = ['выберите', 'выберите или введите', 'select'];
   const isMeaningful = (val) => !!val && !placeholderValues.some(ph => val.includes(ph));
-  const matchesExpected = (val) => !!val && (!!expectedLower ? (val === expectedLower || val.includes(expectedLower) || expectedLower.includes(val)) : !!val);
+  const matchesExpected = (val) => {
+    if (!val) return false;
+    if (!expectedLower) return true;
+    if (val === expectedLower || normalizeCompact(val) === expectedCompact) return true;
+    if (!strict && (val.includes(expectedLower) || expectedLower.includes(val))) return true;
+    return false;
+  };
   
   const currentLower = this.normalizeTextValue(selectBoxElement.textContent);
   if (isMeaningful(currentLower) && matchesExpected(currentLower)) {
@@ -5916,12 +6257,15 @@ TestPlayer.prototype.collectAngularOptionArrays = function(componentInstance) {
   return arrays;
 }
 
-TestPlayer.prototype.findMatchingAngularOption = function(componentInstance, targetValue) {
+TestPlayer.prototype.findMatchingAngularOption = function(componentInstance, targetValue, options = {}) {
   if (!componentInstance || !targetValue) return null;
   const optionArrays = this.collectAngularOptionArrays(componentInstance);
   if (!optionArrays.length) return null;
   
   const targetLower = this.normalizeTextValue(targetValue);
+  const strict = options?.strict === true;
+  const normalizeCompact = (value) => this.normalizeTextValue(String(value || '').replace(/[^\p{L}\p{N}\s()]+/gu, ' '));
+  const targetCompact = normalizeCompact(targetValue);
   for (const entry of optionArrays) {
     for (const option of entry.list) {
       const optionText = typeof option === 'object'
@@ -5929,7 +6273,10 @@ TestPlayer.prototype.findMatchingAngularOption = function(componentInstance, tar
         : option;
       const optionLower = this.normalizeTextValue(optionText);
       if (!optionLower) continue;
-      if (optionLower === targetLower || optionLower.includes(targetLower) || targetLower.includes(optionLower)) {
+      if (optionLower === targetLower || normalizeCompact(optionText) === targetCompact) {
+        return { option, sourceProperty: entry.prop };
+      }
+      if (!strict && (optionLower.includes(targetLower) || targetLower.includes(optionLower))) {
         return { option, sourceProperty: entry.prop };
       }
     }
@@ -5939,6 +6286,7 @@ TestPlayer.prototype.findMatchingAngularOption = function(componentInstance, tar
 
 TestPlayer.prototype.trySelectViaAngularAPIs = async function({ appSelect, selectBoxElement, targetValue, controlName, reason }) {
   if (!appSelect || !targetValue) return { success: false };
+  const appSelectRoot = appSelect.closest('app-select') || appSelect;
   const resolvedControlName = controlName || this.getControlNameFromElement(appSelect, selectBoxElement);
   
   const ngComponent = this.getAngularComponent(appSelect);
@@ -5949,7 +6297,8 @@ TestPlayer.prototype.trySelectViaAngularAPIs = async function({ appSelect, selec
     return { success: false };
   }
   
-  const matchingOption = this.findMatchingAngularOption(componentInstance, targetValue);
+  const strictAngularMatch = String(reason || '').toLowerCase().includes('strong-binding');
+  const matchingOption = this.findMatchingAngularOption(componentInstance, targetValue, { strict: strictAngularMatch });
   
   const selectMethodNames = ['select', 'selectValue', 'selectOption', 'setSelected', 'choose', 'onSelect', 'handleSelect'];
   if (matchingOption) {

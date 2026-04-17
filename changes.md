@@ -1,5 +1,104 @@
 # Журнал изменений (changes)
 
+## 2026-04-17 (v0.9.7.6) 🔁 Воспроизведение: сессия прогона и устойчивый resume
+
+- **Проблема:** после навигации / перезагрузки контента / смены origin прогресс воспроизведения мог откатываться (низкий `actionIndex` при уже пройденных шагах), в логах — `STEP_PROGRESS_UPDATE` с `resuming` и рассинхрон с фактическим шагом.
+- **`playbackSessionId`:**
+  - Генерируется/прокидывается при запуске теста и передаётся в **`PLAY_TEST`**, сохранении состояния (**`SAVE_PLAYBACK_STATE`**, в т.ч. `pagehide`) и в цепочке **resume** (`checkResumePlayback` → `resumePlayback`, **`RESUME_TEST`**).
+  - В **`content/player-core.js`**: `playTest(test, mode, playbackSessionId)` сохраняет сессию на старте прогона; при resume передаётся сохранённый идентификатор.
+- **Background (`background/background.js`, `background/background-sw.js`, `background/message-handlers.js`, `background/message-handlers-sw.js`):**
+  - Слияние **`SAVE_PLAYBACK_STATE`**: не перезаписывать прогресс устаревшим или частичным сообщением — для одного теста учитывается **`Math.max`** по **`actionIndex`** (и согласованность с **`playbackSessionId`** там, где применимо).
+  - **`PLAY_TEST`** и связанные сценарии (группа / data-driven при наличии) выравнены по передаче **`playbackSessionId`**.
+- **Content:**
+  - **`content/player-handlers-form.js`**: `PLAY_TEST` → `playTest(..., message.playbackSessionId)`; **`RESUME_TEST`** подхватывает **`runMode`**, **`runHistory`**, **`playbackSessionId`** из `testState`, а не захардкоженный только `optimized`.
+  - **`content/player-handlers-extended.js`**: выравнивание **`savePlaybackState`** / **`resumePlayback`** с полем сессии в payload.
+
+- **Версия:** `manifest.json` **0.9.7.6**; обновлены `changes.md`, `versions.txt`.
+
+## 2026-04-15 (v0.9.7.5) 🔧 Стабилизация recording/replay на разных стендах
+
+- **Recording: устойчивая доставка шагов при перезапуске service worker**
+  - В `content/recorder.js` добавлена очередь отложенных действий `pendingActionQueue` для `ADD_ACTION`.
+  - Реализованы многократные retry с backoff (`sendAddActionWithRetries`) и автоматический flush очереди.
+  - Перед остановкой записи выполняется принудительный flush очереди, чтобы минимизировать потерю шагов.
+  - Для действий добавлен `_clientActionId`, чтобы безопасно переотправлять шаги.
+
+- **Background: защита от дублей переотправленных шагов**
+  - В `background/message-handlers.js` и `background/message-handlers-sw.js` добавлена дедупликация по `_clientActionId`.
+  - При повторном получении того же шага возвращается `success: true` без повторного добавления в тест.
+  - Кеш id действий очищается по FIFO (ограничение размера), чтобы не разрастался в долгих сессиях.
+
+- **Replay: исправление ложных падений `Replay target validation failed`**
+  - В `content/player-core.js` fallback-ветка `tryAlternativeSelectors` теперь фиксирует `replay evidence` (`setReplayFindEvidence`) при успешном fallback-поиске.
+  - Добавлен мягкий режим для отсутствующего evidence: `strictReplayTargetRequireEvidence = false` (шаг не падает, если сам успешно выполнен).
+  - Сохранены строгие проверки `target-mismatch` и `target-weak-match` при наличии evidence.
+
+- **Fallback для хрупких селекторов на другой системе**
+  - В `content/player-handlers-extended.js` добавлен универсальный fallback для простых class-only селекторов (например `.big-button`):
+    - выбор единственного видимого кандидата;
+    - при нескольких — выбор по совпадению `action.element.text`.
+
+## 2026-04-14 (v0.9.7.5) ✅ Строгая автоматизация записи + strict replay validation
+
+- **Запись без ручного участия:**
+  - В `content/recorder.js` добавлен строгий pre-save gate:
+    - `sanitizeActionForRecording(...)`
+    - `validateActionForRecording(...)`
+    - `prepareActionForRecording(...)`
+  - Невалидные/шумные шаги автоматически **не сохраняются** (тип/подтип/селекторный контракт, hard-errors валидации селектора, быстрые дубли и throttle-клики).
+  - Принудительно включен авто-режим записи (`forceAutoRecordingMode`), режим выбора селектора (picker) отключается для минимизации ручных действий.
+
+- **Оповещения во время записи (live):**
+  - Добавлены runtime-уведомления в `content/recorder.js`:
+    - предупреждение при пропуске шага,
+    - ошибка при сбое сохранения шага,
+    - throttling уведомлений, чтобы не спамить пользователя.
+  - Добавлена runtime-статистика записи: `saved/skipped/failed`.
+
+- **Защитная валидация на входе background:**
+  - В `background/message-handlers.js` добавлен defensive ingress-gate для `ADD_ACTION`:
+    - `normalizeActionTypeForIngress(...)`
+    - `validateIncomingRecordedAction(...)`
+    - отклонение некорректного payload с явными `error/details`.
+  - Аналогичная логика синхронизирована в `background/message-handlers-sw.js`.
+  - Дополнительно усилена `cleanDuplicateActions` в `background/background.js` и `background/background-sw.js`:
+    - удаление лишнего первичного `click` по dropdown, если сразу после него идет `input/change` с `isDropdownSelection/dropdownAutoFilled`,
+    - сравнение не только по `targetKey`, но и по совпадающему селектору (фикс кейса `#SELECTED_ACCOUNT`).
+
+- **Strict replay target validation:**
+  - В `content/player-core.js` добавлены:
+    - `strictReplayTargetValidation`,
+    - `setReplayFindEvidence(...)`,
+    - `getReplayTargetValidation(...)` и проверки совпадения цели (`tag/id/class/text`) для selector-dependent шагов.
+  - Шаг replay теперь не считается успешным без target proof; результат проверки пишется в `runHistory.steps[].validation.replayTarget`.
+  - В `content/player-handlers-extended.js` `findElementWithRetry(...)` возвращает/передает расширенный proof (`source`, `attempt`, `selectorType`, `usedSelector`), включая fallback-пути.
+
+- **Задачи и процесс:**
+  - Обновлены `tasks/todo.md` (чеклист + review по записи и replay).
+  - Обновлены `tasks/lessons.md` (правила после пользовательских корректировок).
+
+- **Проверки:**
+  - Пройдены `node --check` для:
+    - `content/recorder.js`
+    - `background/message-handlers.js`
+    - `background/message-handlers-sw.js`
+    - `content/player-core.js`
+    - `content/player-handlers-extended.js`
+  - По `ReadLints` для измененных файлов — ошибок нет.
+
+- **Проверка JSON-сценариев из `Controller/json`:**
+  - Контрактная валидация шагов (тип/селектор) — без ошибок.
+  - Полный E2E replay всех шагов ограничен внешними факторами:
+    - часть шагов ведет на `chrome-extension://...` (требуется активный контекст расширения),
+    - часть URL требует авторизации (CAS/login).
+
+## 2026-04-13 (v0.9.7.5) 🛑 Запись: без автозаполнения полей
+
+- **Версия:** `manifest.json` **0.9.7.5**; обновлены `changes.md`, `versions.txt`.
+- **Исправление режима записи:** убрано программное заполнение dropdown/combobox при детекте значения в `recorder`.
+- **Ожидаемое поведение:** в режиме записи фиксируются только действия и ввод пользователя; визуальных автозаполнений/автовводов как при воспроизведении больше нет.
+- **Файл:** `content/recorder.js`.
+
 ## 2026-04-02 (v0.9.7.4) 🎬 Воспроизведение: закрытие вкладки и шаг NAVIGATE
 
 - **Версия:** `manifest.json` **0.9.7.4**; обновлены `changes.md`, `versions.txt`.
