@@ -830,12 +830,18 @@ function registerBackgroundMessageHandlers(manager, registry) {
   });
 
   registry.register('GET_STATE', async ({ sendResponse }) => {
+    const playbackTestId =
+      manager.activePlaybackTestId ||
+      manager.playbackState?.test?.id ||
+      manager.playbackState?.testRefId ||
+      null;
     sendResponse({
       success: true,
       state: {
         isRecording: manager.isRecording,
         isPlaying: manager.isPlaying,
-        currentTestId: manager.currentTest?.id,
+        isPaused: manager.isPaused === true,
+        currentTestId: manager.currentTest?.id ?? playbackTestId ?? null,
         testsCount: manager.tests.size,
         currentStep: manager.currentStep || 0,
         totalSteps: manager.totalSteps || 0,
@@ -847,6 +853,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
 
   registry.register('PAUSE_PLAYBACK', async ({ sendResponse }) => {
     if (manager.isPlaying) {
+      manager.isPaused = true;
       await manager.broadcast({ type: 'PAUSE_PLAYBACK' });
       console.log('⏸️ [Background] Отправлена команда паузы воспроизведения');
     } else {
@@ -857,6 +864,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
   });
 
   registry.register('RESUME_PLAYBACK_FROM_PAUSE', async ({ sendResponse }) => {
+    manager.isPaused = false;
     await manager.broadcast({ type: 'RESUME_PLAYBACK_FROM_PAUSE' });
     console.log('▶️ [Background] Отправлена команда возобновления воспроизведения');
     sendResponse({ success: true });
@@ -880,6 +888,8 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
     if (manager.isPlaying) {
       manager.isPlaying = false;
+      manager.isPaused = false;
+      manager.activePlaybackTestId = null;
       manager.currentStep = 0;
       manager.totalSteps = 0;
       manager.stepType = null;
@@ -914,6 +924,8 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
     if (manager.isPlaying) {
       manager.isPlaying = false;
+      manager.isPaused = false;
+      manager.activePlaybackTestId = null;
       manager.currentStep = 0;
       manager.totalSteps = 0;
       manager.stepType = null;
@@ -1164,7 +1176,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
       console.error('❌ ОШИБКА: message.test отсутствует!');
     }
 
-    const testToSave = message.test ? {
+    let testToSave = message.test ? {
       id: message.test.id,
       name: message.test.name,
       actions: message.test.actions ? [...message.test.actions] : [],
@@ -1181,13 +1193,29 @@ function registerBackgroundMessageHandlers(manager, registry) {
       : 0;
     let effectiveRunHistory = message.runHistory || null;
 
-    // Если уже есть runHistory с шагами, а новое сохранение (__AUTO_NAV__) приходит пустым,
-    // не затираем существующую историю.
-    if (message.nextUrl === '__AUTO_NAV__' && prevSteps > 0 && incomingSteps === 0) {
+    const prevState = manager.playbackState;
+    const sameTestEarly = !!(testToSave && prevState?.test &&
+      String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || ''));
+    // Если уже есть runHistory с шагами, а новое сохранение приходит без шагов (пауза с реальным URL,
+    // гонка SW, слишком большое сообщение — повтор с null), не затираем существующую историю.
+    if (sameTestEarly && prevSteps > 0 && incomingSteps === 0) {
       effectiveRunHistory = manager.playbackState.runHistory || null;
+      if (effectiveRunHistory !== message.runHistory) {
+        console.log('🛡️ [SAVE_PLAYBACK_STATE] Сохранена предыдущая runHistory (входящая без шагов):', { prevSteps, nextUrl: message.nextUrl });
+      }
     }
 
-    const prevState = manager.playbackState;
+    // Контент-скрипт может прислать «микро»-тест без actions (уменьшение sendMessage); восстанавливаем из памяти SW.
+    if (testToSave && prevState?.test && Array.isArray(prevState.test.actions) && prevState.test.actions.length > 0 &&
+        (!Array.isArray(testToSave.actions) || testToSave.actions.length === 0) &&
+        String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || '')) {
+      testToSave = {
+        ...testToSave,
+        actions: [...prevState.test.actions]
+      };
+      console.log('🛡️ [SAVE_PLAYBACK_STATE] Восстановлены actions из предыдущего состояния:', prevState.test.actions.length);
+    }
+
     const incomingIdx = Number(message.actionIndex);
     const incomingIdxSafe = Number.isFinite(incomingIdx) ? incomingIdx : 0;
     const prevIdx = Number(prevState?.actionIndex);
@@ -1208,6 +1236,33 @@ function registerBackgroundMessageHandlers(manager, registry) {
       }
     }
 
+    const inferMinIndexFromRunHistory = (rh) => {
+      if (!rh || !Array.isArray(rh.steps) || rh.steps.length === 0) return null;
+      let maxDone = -1;
+      for (const st of rh.steps) {
+        if (!st || st.success === false) continue;
+        const ai = Number(st.actionIndex);
+        if (Number.isFinite(ai)) maxDone = Math.max(maxDone, ai);
+      }
+      if (maxDone < 0) return null;
+      return maxDone + 1;
+    };
+    const inferredFromRh = inferMinIndexFromRunHistory(effectiveRunHistory);
+    if (inferredFromRh != null && inferredFromRh > mergedActionIndex) {
+      console.log('🛡️ [SAVE_PLAYBACK_STATE] actionIndex поднят по runHistory:', {
+        inferredFromRh,
+        mergedBefore: mergedActionIndex
+      });
+      mergedActionIndex = inferredFromRh;
+    }
+
+    const mergedRunFinished = !!(message.playbackRunFinished || prevState?.playbackRunFinished);
+    let mergedIsPaused = prevState?.isPaused === true;
+    if (message && Object.prototype.hasOwnProperty.call(message, 'isPaused')) {
+      mergedIsPaused = message.isPaused === true;
+    }
+    manager.isPaused = mergedIsPaused;
+
     manager.playbackState = {
       test: testToSave,
       actionIndex: mergedActionIndex,
@@ -1217,8 +1272,13 @@ function registerBackgroundMessageHandlers(manager, registry) {
       isGroupRun: message.isGroupRun || false,
       groupRunCurrentIndex: message.groupRunCurrentIndex,
       groupRunTotal: message.groupRunTotal,
-      playbackSessionId: mergedPlaybackSessionId
+      playbackSessionId: mergedPlaybackSessionId,
+      playbackRunFinished: mergedRunFinished,
+      isPaused: mergedIsPaused
     };
+    if (testToSave?.id != null) {
+      manager.activePlaybackTestId = String(testToSave.id);
+    }
     const playbackStateForStorage = {
       ...manager.playbackState,
       testRefId: testToSave?.id || null,
@@ -1296,6 +1356,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
           state = data.playbackState;
           manager.playbackState = state;
           manager.isPlaying = true;
+          manager.isPaused = state.isPaused === true;
           console.log('📥 Восстановлено playbackState из storage (service worker перезапущен)');
         }
       } catch (e) {
@@ -1329,6 +1390,7 @@ function registerBackgroundMessageHandlers(manager, registry) {
     if (state && (manager.isPlaying || state.test)) {
       console.log('✅ Возвращаю активное состояние воспроизведения');
       const inGroupRun = !!manager.currentGroupId;
+      manager.isPaused = state.isPaused === true;
       sendResponse({
         success: true,
         isPlaying: true,
@@ -1340,18 +1402,48 @@ function registerBackgroundMessageHandlers(manager, registry) {
         isGroupRun: state.isGroupRun || inGroupRun,
         groupRunCurrentIndex: state.groupRunCurrentIndex,
         groupRunTotal: state.groupRunTotal,
-        playbackSessionId: state.playbackSessionId || null
+        playbackSessionId: state.playbackSessionId || null,
+        playbackRunFinished: state.playbackRunFinished === true,
+        isPaused: state.isPaused === true
       });
     } else {
       console.log('ℹ️ Воспроизведение не активно');
-      sendResponse({ success: true, isPlaying: false });
+      if (!manager.isPlaying) manager.isPaused = false;
+      sendResponse({ success: true, isPlaying: false, isPaused: false });
+    }
+  });
+
+  /** Загрузка JSON локализации из service worker (надёжнее fetch из content script при навигации / unload). */
+  registry.register('GET_I18N_TRANSLATIONS', async ({ message, sendResponse }) => {
+    const lang = message.lang === 'ru' ? 'ru' : 'en';
+    try {
+      const url = chrome.runtime.getURL(`i18n/${lang}.json`);
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        sendResponse({ success: false, error: `HTTP ${resp.status}` });
+        return;
+      }
+      const translations = await resp.json();
+      let enFallback = null;
+      if (lang !== 'en') {
+        try {
+          const enResp = await fetch(chrome.runtime.getURL('i18n/en.json'));
+          if (enResp.ok) enFallback = await enResp.json();
+        } catch (_) {
+          /* optional fallback */
+        }
+      }
+      sendResponse({ success: true, translations, enFallback });
+    } catch (e) {
+      sendResponse({ success: false, error: e?.message || String(e) });
     }
   });
 
   registry.register('CLEAR_PLAYBACK_STATE', async ({ sendResponse }) => {
     try {
       manager.playbackState = null;
-      manager.isPlaying = false;
+      // Не сбрасываем manager.isPlaying: очистка нужна только для resume в storage,
+      // пока вкладка продолжает прогон — иначе popup на GET_STATE показывает «Готов» и нет «Стоп».
       await chrome.storage.local.remove('playbackState');
       console.log('✅ [CLEAR_PLAYBACK_STATE] Состояние воспроизведения очищено');
       sendResponse({ success: true });
@@ -2171,6 +2263,9 @@ function registerBackgroundMessageHandlers(manager, registry) {
     if (sender?.tab?.id != null) {
       manager.playbackTabId = sender.tab.id;
     }
+    if (message.testId != null && message.testId !== '') {
+      manager.activePlaybackTestId = String(message.testId);
+    }
     manager.currentStep = message.step;
     manager.totalSteps = message.total;
     manager.stepType = message.stepType;
@@ -2187,6 +2282,9 @@ function registerBackgroundMessageHandlers(manager, registry) {
   registry.register('TEST_STEP_COMPLETED', async ({ message, sender, sendResponse }) => {
     if (sender?.tab?.id != null) {
       manager.playbackTabId = sender.tab.id;
+    }
+    if (message.testId != null && message.testId !== '') {
+      manager.activePlaybackTestId = String(message.testId);
     }
     if (!manager.completedSteps) {
       manager.completedSteps = new Map();
@@ -2363,6 +2461,8 @@ function registerBackgroundMessageHandlers(manager, registry) {
     }
 
     manager.isPlaying = false;
+    manager.isPaused = false;
+    manager.activePlaybackTestId = null;
     manager.currentStep = 0;
     manager.totalSteps = 0;
     manager.stepType = null;

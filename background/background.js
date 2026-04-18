@@ -139,11 +139,15 @@ class TestManager {
     this.currentTest = null;
     this.isRecording = false;
     this.isPlaying = false;
+    /** Пауза прогона (синхронизируется с SAVE_PLAYBACK_STATE / PAUSE / RESUME для popup) */
+    this.isPaused = false;
     this.currentStep = 0;
     this.totalSteps = 0;
     this.stepType = null;
     this.playbackState = null; // Состояние воспроизведения для восстановления
     this.playbackTabId = null; // Вкладка, где идёт воспроизведение (для сброса при закрытии)
+    /** id теста во время прогона (в т.ч. после CLEAR_PLAYBACK_STATE, когда playbackState в памяти уже null) — для GET_STATE / popup */
+    this.activePlaybackTestId = null;
     this.recordInsertIndex = null; // Индекс для вставки записанных действий в существующий тест
     this.recordedActionsCount = 0; // Счетчик записанных действий
     this.recordMarkerActionIndex = null; // Индекс действия с маркером записи
@@ -247,7 +251,9 @@ class TestManager {
           runMode: data.playbackState.runMode || 'optimized'
         };
         this.isPlaying = true;
-        
+        this.isPaused = this.playbackState.isPaused === true;
+        this.activePlaybackTestId = this.playbackState.test?.id != null ? String(this.playbackState.test.id) : null;
+
         console.log('✅ Восстановлено состояние воспроизведения из storage:', {
           testId: this.playbackState.test?.id,
           testName: this.playbackState.test?.name,
@@ -258,6 +264,8 @@ class TestManager {
         });
       } else {
         console.log('ℹ️ Состояние воспроизведения не найдено в storage');
+        this.activePlaybackTestId = null;
+        this.isPaused = false;
       }
     } catch (error) {
       console.error('❌ Ошибка при загрузке данных из storage:', error);
@@ -324,6 +332,8 @@ class TestManager {
         if (testId) await this.stopVideoRecordingIfActive(testId);
       } catch (e) { /* ignore */ }
       this.isPlaying = false;
+      this.isPaused = false;
+      this.activePlaybackTestId = null;
       this.currentStep = 0;
       this.totalSteps = 0;
       this.stepType = null;
@@ -886,6 +896,8 @@ class TestManager {
     }
 
     this.isPlaying = true;
+    this.isPaused = false;
+    this.activePlaybackTestId = testToPlay?.id != null ? String(testToPlay.id) : null;
     this.currentStep = 0;
     this.totalSteps = 0;
     this.stepType = null;

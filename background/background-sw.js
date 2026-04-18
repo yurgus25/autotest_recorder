@@ -210,11 +210,13 @@
       this.currentTest = null;
       this.isRecording = false;
       this.isPlaying = false;
+      this.isPaused = false;
       this.currentStep = 0;
       this.totalSteps = 0;
       this.stepType = null;
       this.playbackState = null;
       this.playbackTabId = null;
+      this.activePlaybackTestId = null;
       this.recordInsertIndex = null;
       this.recordedActionsCount = 0;
       this.recordMarkerActionIndex = null;
@@ -302,6 +304,8 @@
               runMode: data.playbackState.runMode || "optimized"
             });
             this.isPlaying = true;
+            this.isPaused = this.playbackState.isPaused === true;
+            this.activePlaybackTestId = this.playbackState.test?.id != null ? String(this.playbackState.test.id) : null;
             console.log("\u2705 \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u0438\u0437 storage:", {
               testId: (_f = this.playbackState.test) == null ? void 0 : _f.id,
               testName: (_g = this.playbackState.test) == null ? void 0 : _g.name,
@@ -312,6 +316,8 @@
             });
           } else {
             console.log("\u2139\uFE0F \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0432 storage");
+            this.activePlaybackTestId = null;
+            this.isPaused = false;
           }
         } catch (error) {
           console.error("\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0435 \u0434\u0430\u043D\u043D\u044B\u0445 \u0438\u0437 storage:", error);
@@ -372,6 +378,8 @@
         } catch (e) {
         }
         self.isPlaying = false;
+        self.isPaused = false;
+        self.activePlaybackTestId = null;
         self.currentStep = 0;
         self.totalSteps = 0;
         self.stepType = null;
@@ -864,6 +872,8 @@
           return;
         }
         this.isPlaying = true;
+        this.isPaused = false;
+        this.activePlaybackTestId = testToPlay?.id != null ? String(testToPlay.id) : null;
         this.currentStep = 0;
         this.totalSteps = 0;
         this.stepType = null;

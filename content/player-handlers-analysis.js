@@ -153,6 +153,25 @@ TestPlayer.prototype.handleAnalysis = async function(action) {
 
     if (!response || !response.success) {
       const errMessage = response?.error || 'Analysis returned no results';
+      // fill-single-dropdown вызывается как необязательный помощник при проигрывании;
+      // пустой ответ не должен ронять весь шаг — продолжаем локальные стратегии без stack-ошибки.
+      if (subtype === 'fill-single-dropdown') {
+        console.warn(`⚠️ [Analysis] "${subtype}" недоступен или пустой ответ: ${errMessage} (продолжаю локальный выбор в плеере)`);
+        if (action) action.url = url;
+        return {
+          success: false,
+          data: {
+            success: false,
+            _fillError: errMessage,
+            metadata: {
+              tabId: tabId || null,
+              url,
+              timestamp: new Date().toISOString(),
+              analysisType: subtype
+            }
+          }
+        };
+      }
       // Для adaptive-auto/fill-fields не останавливаем выполнение:
       // отсутствие результата анализа трактуем как "ничего не заполнено",
       // далее adaptive может применить fallback (direct fill / combobox / app-select).

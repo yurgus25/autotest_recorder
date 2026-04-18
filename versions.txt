@@ -2,6 +2,22 @@
   AutoTest Recorder & Player - История изменений
 ═══════════════════════════════════════════════════════════════════════════════
 
+Версия 0.9.7.7 (2026-04-17) ⏸️ Пауза прогона; 🎯 app-autocomplete / .ng-invalid (воспроизведение)
+───────────────────────────────────────────────────────────────────────────────
+• manager.isPaused + запись/чтение isPaused в playbackState (SAVE/GET_PLAYBACK_STATE, storage)
+• GET_STATE: isPaused для popup; PAUSE/RESUME_FROM_PAUSE обновляют manager.isPaused
+• STOP_PLAYING, FORCE_STOP, TEST_COMPLETED, новый PLAY, закрытие вкладки — сброс паузы где нужно
+• savePlaybackState: поле isPaused в payload; pausePlayback — async + немедленное сохранение
+• resumePlayback(..., isPausedFromState): восстановление паузы после навигации; checkResumePlayback прокидывает флаг
+• checkAndSavePauseState: корректный actionIndex (индекс в полном тесте)
+• player-handlers-form: RESUME_PLAYBACK / RESUME_TEST с isPaused; PAUSE_PLAYBACK — await pausePlayback
+• popup loadState: isPaused из background при isPlaying
+• manifest 0.9.7.7
+• (доп.) player-handlers-dropdown.js: _isAutocompleteInlineOptionContainer; app-autocomplete в ownerRoot;
+  панели options-list / options-list-container; inline-список не режется из-за пустого id
+• (доп.) player-handlers-extended.js: trySelectOptionInRevealedPanels — корни внутри app-autocomplete
+• (доп.) player-core.js: tryAlternativeSelectors — селектор без .ng-invalid для resume
+
 Версия 0.9.7.6 (2026-04-17) 🔁 Воспроизведение: сессия прогона и устойчивый resume
 ───────────────────────────────────────────────────────────────────────────────
 • playbackSessionId на всём цикле прогона:

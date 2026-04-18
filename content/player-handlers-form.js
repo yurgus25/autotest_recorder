@@ -1317,13 +1317,30 @@ TestPlayer.prototype.init = function() {
     window.addEventListener('pagehide', () => {
       if (!this.isPlaying) return;
       if (!this.navigationInitiatedByPlayer && this.currentTest) {
-        const nextActionIndex = Number(this.currentActionIndex) + 1;
+        let nextActionIndex = Number(this.currentActionIndex) + 1;
+        if (Number.isNaN(nextActionIndex)) nextActionIndex = Number(this.currentActionIndex) || 0;
+        const steps = this.runHistory?.steps;
+        if (Array.isArray(steps) && steps.length > 0) {
+          let maxDone = -1;
+          for (const st of steps) {
+            if (!st || st.success === false) continue;
+            const ai = Number(st.actionIndex);
+            if (Number.isFinite(ai)) maxDone = Math.max(maxDone, ai);
+          }
+          if (maxDone >= 0) {
+            const fromHistory = maxDone + 1;
+            if (fromHistory > nextActionIndex) {
+              console.log(`🛡️ [pagehide] Поднимаю actionIndex по runHistory: ${nextActionIndex} → ${fromHistory} (unload, устаревший currentActionIndex)`);
+              nextActionIndex = fromHistory;
+            }
+          }
+        }
         try {
           const runHistoryForStorage = this._runHistoryForStorage();
           chrome.runtime.sendMessage({
             type: 'SAVE_PLAYBACK_STATE',
             test: this.currentTest,
-            actionIndex: Number.isNaN(nextActionIndex) ? this.currentActionIndex : nextActionIndex,
+            actionIndex: nextActionIndex,
             nextUrl: '__AUTO_NAV__',
             runMode: this.playMode,
             runHistory: runHistoryForStorage,
@@ -1416,9 +1433,13 @@ TestPlayer.prototype.init = function() {
       this.stopPlaying();
       sendResponse({ success: true });
     } else if (message.type === 'PAUSE_PLAYBACK') {
-      // Ставим воспроизведение на паузу
-      this.pausePlayback();
-      sendResponse({ success: true, paused: true });
+      this.pausePlayback()
+        .then(() => sendResponse({ success: true, paused: true }))
+        .catch((e) => {
+          console.warn('⚠️ [Player] pausePlayback:', e);
+          sendResponse({ success: false, error: e?.message || String(e) });
+        });
+      return true;
     } else if (message.type === 'RESUME_PLAYBACK_FROM_PAUSE') {
       // Возобновляем воспроизведение с места паузы
       this.resumePlaybackFromPause();
@@ -1433,7 +1454,9 @@ TestPlayer.prototype.init = function() {
         message.actionIndex,
         message.mode || 'optimized',
         message.runHistory || null,
-        message.playbackSessionId != null ? message.playbackSessionId : this.playbackSessionId
+        message.playbackSessionId != null ? message.playbackSessionId : this.playbackSessionId,
+        message.playbackRunFinished === true,
+        message.isPaused === true
       );
       sendResponse({ success: true });
     } else if (message.type === 'RESUME_TEST') {
@@ -1449,7 +1472,7 @@ TestPlayer.prototype.init = function() {
         const resumeHistory = ts.runHistory || null;
         const resumeSessionId = ts.playbackSessionId != null ? ts.playbackSessionId : null;
         console.log(`▶️ RESUME_TEST: продолжаю тест в новой вкладке с шага ${actionIndex + 1}`);
-        this.resumePlayback(test, actionIndex, resumeMode, resumeHistory, resumeSessionId);
+        this.resumePlayback(test, actionIndex, resumeMode, resumeHistory, resumeSessionId, ts.playbackRunFinished === true, ts.isPaused === true);
       }
       sendResponse({ success: true });
     } else if (message.type === 'RECORDING_STOPPED') {

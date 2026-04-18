@@ -1,5 +1,33 @@
 # Журнал изменений (changes)
 
+## 2026-04-17 (v0.9.7.7) ⏸️ Пауза прогона; 🎯 воспроизведение `app-autocomplete` и селектор `.ng-invalid`
+
+### ⏸️ Пауза прогона: персистентность и синхронизация с popup
+
+- **Проблема:** после паузы прогон мог продолжаться визуально или терялся флаг паузы при навигации / перезапуске контент-скрипта; в popup состояние «на паузе» не совпадало с background; сообщение «Нельзя возобновить: воспроизведение не на паузе» при корректной паузе пользователя.
+- **Background (`background/background.js`, `background/background-sw.js`, `background/message-handlers.js`, `background/message-handlers-sw.js`):**
+  - Поле **`manager.isPaused`**: восстановление из **`playbackState`** при старте SW, сброс при новом запуске теста, закрытии вкладки прогона, **`STOP_PLAYING`**, **`FORCE_STOP`**, **`TEST_COMPLETED`**.
+  - **`SAVE_PLAYBACK_STATE`**: сохранение и слияние **`isPaused`** в **`playbackState`** (и в storage); явное **`isPaused` в сообщении** переопределяет, иначе сохраняется предыдущее значение.
+  - **`GET_PLAYBACK_STATE`**: отдаёт **`isPaused`**; при загрузке state из storage синхронизируется **`manager.isPaused`**.
+  - **`GET_STATE`**: в ответ для popup добавлено **`isPaused`**.
+  - **`PAUSE_PLAYBACK`**: **`manager.isPaused = true`** до broadcast; **`RESUME_PLAYBACK_FROM_PAUSE`**: **`manager.isPaused = false`**.
+- **Content:**
+  - **`content/player-handlers-extended.js`**: **`savePlaybackState`** передаёт **`isPaused`**; **`pausePlayback`** — async, сразу сохраняет состояние после паузы; **`resumePlayback`** — седьмой аргумент **`isPausedFromState`**, после resume при паузе пересохраняет state и индикатор; **`resumePlaybackFromPause`** — сохранение с **`isPaused: false`**; **`checkAndSavePauseState`** — корректный **`actionIndex`** через индекс шага в полном тесте.
+  - **`content/player-core.js`**: **`checkResumePlayback`** передаёт **`isPaused`** в **`resumePlayback`**; при старте **`playTest`** сбрасывается **`isPaused`**.
+  - **`content/player-handlers-form.js`**: **`RESUME_PLAYBACK`** / **`RESUME_TEST`** пробрасывают **`isPaused`**; обработчик **`PAUSE_PLAYBACK`** ждёт завершения **`pausePlayback`** (async **`sendResponse`**).
+- **Popup (`popup/popup.js`):** при активном прогоне **`isPaused`** берётся из ответа **`GET_STATE`**, а не из устаревшего локального кэша.
+
+### 🎯 Дополнение: `app-autocomplete` (inline-панель) и селектор `.ng-invalid`
+
+- **Проблема:** при проигрывании шага ввода в `app-autocomplete` список опций открывался многократно, но панель не находилась (`nearby-panel-not-found`), выбор не фиксировался; при **resume** падало «Элемент не найден: `.ng-invalid app-autocomplete`», т.к. после валидации класс `ng-invalid` исчезает.
+- **`content/player-handlers-dropdown.js`:**
+  - Метод **`_isAutocompleteInlineOptionContainer`**: встроенный список внутри **`app-autocomplete`** (`options-list`, `options-list-container`, `role="listbox"`) не отбрасывается правилами для «локального `__result`» с пустым `id`.
+  - **`_isPanelRelevantForBoundDropdown`**, **`_findNearbyOpenDropdownPanel`**, **`_findPanelByValueAffinity`**, **`_getBoundDropdownOpenTriggers`**: в цепочку хоста добавлен **`app-autocomplete`**; в селекторы панелей — **`[class*="options-list"]`**, **`.options-list-container`**.
+- **`content/player-handlers-extended.js` — `trySelectOptionInRevealedPanels`:** в корни поиска добавлены видимые контейнеры списка **внутри** ближайшего `app-autocomplete`; расширен **`closest`** для fallback-панели.
+- **`content/player-core.js` — `tryAlternativeSelectors`:** шаг **2b** — повтор поиска по CSS с удалёнными фрагментами **`.ng-invalid`** (устойчивый resume после валидации формы).
+
+- **Версия:** `manifest.json` **0.9.7.7**; обновлены `changes.md`, `versions.txt`.
+
 ## 2026-04-17 (v0.9.7.6) 🔁 Воспроизведение: сессия прогона и устойчивый resume
 
 - **Проблема:** после навигации / перезагрузки контента / смены origin прогресс воспроизведения мог откатываться (низкий `actionIndex` при уже пройденных шагах), в логах — `STEP_PROGRESS_UPDATE` с `resuming` и рассинхрон с фактическим шагом.

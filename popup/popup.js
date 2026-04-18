@@ -744,9 +744,10 @@ class PopupController {
 
         const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
         if (response && response.success) {
-          // Сохраняем currentTestId и isPaused перед обновлением
+          // Сохраняем currentTestId перед обновлением (fallback, если background ещё не знает id вкладки)
           const savedTestId = this.state.currentTestId;
-          const savedIsPaused = this.state.isPaused;
+          const priorPlayingCard = !!(this.state.isPlaying && this.state.currentTestId);
+          const bgPlaying = !!response.state?.isPlaying;
 
           const merged = { ...this.state, ...response.state };
           // Не даём периодическому GET_STATE откатывать шаг назад, если popup уже видел завершённые шаги.
@@ -756,17 +757,24 @@ class PopupController {
           }, 0);
           const minAllowedStep = completedMaxStep > 0 ? completedMaxStep + 1 : 0;
           merged.currentStep = Math.max(Number(merged.currentStep) || 0, minAllowedStep);
-          this.state = merged;
 
-          // Восстанавливаем currentTestId и isPaused, если тест все еще воспроизводится
-          if (this.state.isPlaying) {
-            if (savedTestId) {
-              this.state.currentTestId = savedTestId;
+          // Источник истины — флаг isPlaying из background. Если прогон завершён / остановлен,
+          // принудительно сбрасываем id и паузу: иначе в merged остаётся старый currentTestId
+          // (поле могло не прийти в JSON как undefined), и карточка «залипает» на ⏸️.
+          if (!bgPlaying) {
+            merged.isPlaying = false;
+            merged.isPaused = false;
+            merged.currentTestId = null;
+          } else {
+            if (!merged.currentTestId && savedTestId) {
+              merged.currentTestId = savedTestId;
             }
-            if (savedIsPaused !== undefined) {
-              this.state.isPaused = savedIsPaused;
+            if (response.state && typeof response.state.isPaused === 'boolean') {
+              merged.isPaused = response.state.isPaused;
             }
           }
+
+          this.state = merged;
 
           // Если background сообщает о текущей группе — окрашиваем прогресс цветом группы;
           // иначе сбрасываем, чтобы не показывать цвет предыдущей группы при одиночном запуске.
@@ -778,6 +786,9 @@ class PopupController {
 
           this.stateHydrated = true;
           this.updateUI();
+          if (priorPlayingCard && !this.state.isPlaying) {
+            this.renderTests();
+          }
           return;
         }
         if (attempt < maxRetries - 1) {

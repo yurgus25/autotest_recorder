@@ -50,6 +50,9 @@ class ImprovedActionRecorder {
     this.pendingClickAction = null;
     this.pageHideFlushHandler = null;
     this.dblclickDetectionDelay = 350; // мс ожидания dblclick
+    /** После клика по combobox список может появиться с задержкой (сеть/рендер) — доп. опрос до записи шага */
+    this.dropdownOpenProbeMaxMs = 3200;
+    this.dropdownOpenProbeIntervalMs = 160;
     this.recentSavedAction = null; // Антидубль для быстрых повторов одного шага
     this.actionDedupWindowMs = 450;
     this.recentDropdownSelection = null; // { selector, value, timestamp }
@@ -521,14 +524,86 @@ class ImprovedActionRecorder {
     
     // 7. Проверка родительского контейнера
     if (el?.closest) {
-      const dropdownParent = el.closest('app-select, ng-select, mat-select, [role="combobox"], .select-container');
+      const dropdownParent = el.closest(
+        'app-select, ng-select, mat-select, [role="combobox"], .select-container, [elementid], [ng-reflect-element-id]'
+      );
       if (dropdownParent) {
-        console.log('✅ [Dropdown] Элемент находится внутри dropdown контейнера');
-        return true;
+        if (dropdownParent.hasAttribute?.('elementid') || dropdownParent.hasAttribute?.('ng-reflect-element-id')) {
+          if (this.isDropdownRootCandidate(dropdownParent, { allowElementId: true })) {
+            console.log('✅ [Dropdown] Элемент внутри контейнера с elementid (как app-select в редакторе)');
+            return true;
+          }
+        } else {
+          console.log('✅ [Dropdown] Элемент находится внутри dropdown контейнера');
+          return true;
+        }
       }
     }
     
     return false;
+  }
+
+  /**
+   * После клика по триггеру панель с опциями может появиться с задержкой (новая форма / Angular).
+   * Используется при фиксации отложенного клика, чтобы не терять isDropdownClick.
+   */
+  detectOpenedDropdownPanelNearElement(element) {
+    if (!element || !(element instanceof Element) || !element.isConnected) return false;
+    let rect;
+    try {
+      rect = element.getBoundingClientRect();
+    } catch (_) {
+      return false;
+    }
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const candidates = document.querySelectorAll(
+      '.cdk-overlay-pane, .cdk-overlay-container [role="listbox"], [role="listbox"], ' +
+      '[class*="select-group"], [class*="ng-dropdown-panel"], [class*="mat-select-panel"], ' +
+      '.ant-select-dropdown, .rc-select-dropdown, .el-select-dropdown'
+    );
+    for (const p of candidates) {
+      try {
+        const st = window.getComputedStyle(p);
+        if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) continue;
+        const pr = p.getBoundingClientRect();
+        if (pr.width < 4 || pr.height < 4) continue;
+        const cls = (p.className || '').toString().toLowerCase();
+        if (cls.includes('select-group') && !/\bopen\b/i.test(cls)) continue;
+        const pad = 100;
+        const looseNear =
+          cx >= pr.left - pad && cx <= pr.right + pad &&
+          cy >= pr.top - pad && cy <= pr.bottom + pad;
+        if (!looseNear) continue;
+        const hasOpt = !!p.querySelector(
+          '[role="option"], [class*="option"], .mat-option, .ng-option, .group-item, .result__item, ' +
+          '.ant-select-item, .ant-select-item-option, .el-select-dropdown__item, .rc-virtual-list-holder .rc-select-item'
+        );
+        if (hasOpt) return true;
+      } catch (_) { /* ignore */ }
+    }
+    return false;
+  }
+
+  /**
+   * Ожидание появления панели опций рядом с триггером (медленные dropdown после AJAX/рендера).
+   * @param {number} clickTs — Date.now() в момент клика (общий дедлайн clickTs + maxTotalMs).
+   */
+  async waitForDropdownPanelNearTrigger(element, clickTs, maxTotalMs) {
+    const cap = Number(maxTotalMs) > 0 ? Number(maxTotalMs) : this.dropdownOpenProbeMaxMs;
+    const deadline = clickTs + cap;
+    const step = Number(this.dropdownOpenProbeIntervalMs) > 0 ? Number(this.dropdownOpenProbeIntervalMs) : 160;
+    const probe = () =>
+      !!(element &&
+        element.isConnected &&
+        (this.isDropdownElement(element, null) || this.detectOpenedDropdownPanelNearElement(element)));
+    if (probe()) return true;
+    while (Date.now() < deadline) {
+      await this.delay(step);
+      if (!element || !element.isConnected) return false;
+      if (probe()) return true;
+    }
+    return probe();
   }
 
 
@@ -1447,7 +1522,20 @@ class ImprovedActionRecorder {
     const pending = this.pendingClickAction;
     this.pendingClickAction = null;
     try {
-      await this.recordClickAction(pending.element, 'click', pending.isDropdown, pending.timestamp);
+      let isDd = pending.isDropdown;
+      const el = pending.element;
+      if (el && el.isConnected) {
+        await this.delay(50);
+        isDd = this.isDropdownElement(el, null);
+        if (!isDd && this.detectOpenedDropdownPanelNearElement(el)) isDd = true;
+        if (!isDd && pending.maybeSlowDropdownOpen) {
+          const flushBudget = Math.min(900, this.dropdownOpenProbeMaxMs);
+          isDd = await this.waitForDropdownPanelNearTrigger(el, pending.timestamp, flushBudget);
+        }
+      }
+      const root = el && el.isConnected ? this.resolveToDropdownRoot(el) : null;
+      const elOut = root && (isDd || this.isDropdownElement(root, null) || pending.isDropdown) ? root : el;
+      await this.recordClickAction(elOut, 'click', isDd, pending.timestamp);
     } catch (e) {
       console.warn('⚠️ [Recorder] flushPendingClickIfAny:', e?.message || e);
     }
@@ -1742,10 +1830,14 @@ class ImprovedActionRecorder {
     return false;
   }
 
-  sanitizeDropdownDetectedValue(value, dropdownElement) {
+  /**
+   * @param {boolean} [directOptionRow=false] Клик по строке опции: getElementText иногда даёт текст,
+   * в котором как подстроки встречаются другие опции — тогда isCompositeDropdownValueText ложно обнуляет value.
+   */
+  sanitizeDropdownDetectedValue(value, dropdownElement, directOptionRow = false) {
     const text = String(value || '').trim();
     if (!text) return '';
-    if (this.isCompositeDropdownValueText(text, dropdownElement)) {
+    if (!directOptionRow && this.isCompositeDropdownValueText(text, dropdownElement)) {
       // Составной текст списка не является выбранным значением поля.
       return '';
     }
@@ -1952,9 +2044,6 @@ class ImprovedActionRecorder {
 
   // Остальные методы остаются без изменений...
   async checkState() {
-    // Код метода checkState из оригинального recorder.js
-    await this.delay(500);
-    
     let attempts = 0;
     const maxAttempts = 10;
     
@@ -1976,8 +2065,10 @@ class ImprovedActionRecorder {
         const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
         if (response && response.success && response.state.isRecording && !response.state.isPlaying) {
           console.log('🔄 Восстанавливаю запись после навигации');
+          // Индикатор сразу (не ждём waitForPageLoad / startRecording — иначе после F5 пустой экран 1–2 с)
+          this.addRecordingIndicator();
 
-          await this.waitForPageLoad();
+          await this.waitForPageLoad(true);
 
           await this.startRecording(response.state.currentTestId);
 
@@ -3199,6 +3290,16 @@ class ImprovedActionRecorder {
         }
       }
     }
+
+    // Медленное открытие списка (2–3 с): только для известных виджетов select/combobox — не тормозим все клики
+    const maybeSlowDropdownOpen = !!(
+      isDropdown ||
+      element.getAttribute?.('role') === 'combobox' ||
+      String(element.getAttribute?.('aria-haspopup') || '').toLowerCase() === 'listbox' ||
+      element.closest?.(
+        '.ant-select, .ant-select-selector, .el-select, app-select, ng-select, mat-select, p-dropdown, v-select, .select2-container, [class*="select-group"], [elementid]'
+      )
+    );
     
     // Генерируем все возможные селекторы
     const allSelectors = this.selectorEngine.generateAllSelectors(element);
@@ -3269,19 +3370,53 @@ class ImprovedActionRecorder {
     }
 
     // Сохраняем данные нового клика и запускаем таймер
-    this.pendingClickAction = { element, isDropdown, elementInfo, selector, timestamp: Date.now() };
-    if (isDropdown) {
-    }
+    this.pendingClickAction = {
+      element,
+      isDropdown,
+      elementInfo,
+      selector,
+      timestamp: Date.now(),
+      maybeSlowDropdownOpen
+    };
     
     // Запускаем новый таймер
     this.pendingClickTimeout = setTimeout(async () => {
       if (this.pendingClickAction) {
         console.log('🖱️ [Recorder] Клик подтверждён (timeout), записываю...');
+        let isDropdownResolved = this.pendingClickAction.isDropdown;
+        const pending = this.pendingClickAction;
+        const el = pending.element;
+        if (el && el.isConnected) {
+          try {
+            await this.delay(90);
+            isDropdownResolved = this.isDropdownElement(el, null);
+            if (!isDropdownResolved && this.detectOpenedDropdownPanelNearElement(el)) {
+              isDropdownResolved = true;
+              console.log('📋 [Recorder] После паузы обнаружена открытая панель опций рядом с кликом — шаг как dropdown');
+            }
+            if (!isDropdownResolved && pending.maybeSlowDropdownOpen) {
+              const opened = await this.waitForDropdownPanelNearTrigger(
+                el,
+                pending.timestamp,
+                this.dropdownOpenProbeMaxMs
+              );
+              if (opened) {
+                isDropdownResolved = true;
+                console.log('📋 [Recorder] Панель опций появилась с задержкой — шаг как dropdown');
+              }
+            }
+          } catch (_) { /* ignore */ }
+        }
+        const root = el && el.isConnected ? this.resolveToDropdownRoot(el) : null;
+        const elOut =
+          root && (isDropdownResolved || this.isDropdownElement(root, null) || pending.isDropdown)
+            ? root
+            : el;
         await this.recordClickAction(
-          this.pendingClickAction.element, 
-          'click', 
-          this.pendingClickAction.isDropdown,
-          this.pendingClickAction.timestamp
+          elOut,
+          'click',
+          isDropdownResolved,
+          pending.timestamp
         );
         this.pendingClickAction = null;
         this.pendingClickTimeout = null;
@@ -4559,11 +4694,6 @@ class ImprovedActionRecorder {
    */
   async recordDropdownOptionSelection(dropdownElement, optionText, optionElement, sourceTimestamp = null) {
     try {
-      optionText = this.sanitizeDropdownDetectedValue(optionText, dropdownElement);
-      if (!optionText) {
-        console.warn('⚠️ [Dropdown] Пропуск записи input: обнаружено составное/пустое значение');
-        return;
-      }
       if (optionElement && this.isNonOptionControlElement(optionElement)) {
         console.log(`📝 [Dropdown] Клик по button-like элементу — записываю как click, не dropdown-combobox`);
         await this.recordClickAction(optionElement, 'click', false, sourceTimestamp);
@@ -4575,6 +4705,11 @@ class ImprovedActionRecorder {
         return;
       }
       const isDirectOptionClick = !!(optionElement && this.isDropdownOption(optionElement));
+      optionText = this.sanitizeDropdownDetectedValue(optionText, dropdownElement, isDirectOptionClick);
+      if (!optionText) {
+        console.warn('⚠️ [Dropdown] Пропуск записи input: обнаружено составное/пустое значение');
+        return;
+      }
       if (!isDirectOptionClick && this.shouldDeferImplicitDropdownSelection(dropdownElement, optionElement)) {
         console.warn(`⚠️ [Dropdown] Пропуск записи input: "${optionText}" выглядит предварительным значением (dropdown открыт)`);
         return;
@@ -5492,18 +5627,23 @@ class ImprovedActionRecorder {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async waitForPageLoad() {
+  /**
+   * @param {boolean} [fast=false] — короткая стабилизация после reload (восстановление записи): индикатор уже показан, ускоряем доход до startRecording.
+   */
+  async waitForPageLoad(fast = false) {
+    const settleMs = fast ? 120 : 1000;
+    const maxWaitMs = fast ? 2200 : 5000;
     return new Promise((resolve) => {
       if (document.readyState === 'complete') {
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, settleMs);
         return;
       }
       
       window.addEventListener('load', () => {
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, settleMs);
       }, { once: true });
       
-      setTimeout(resolve, 5000);
+      setTimeout(resolve, maxWaitMs);
     });
   }
 

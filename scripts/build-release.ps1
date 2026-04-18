@@ -20,9 +20,11 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 # Exclude dev / junk; mirror extension root into staging (Chrome Web Store–friendly: no CI, no build helpers)
 $excludeDirs = @(
   '.git', '.github', '.cursor', 'node_modules', 'dist', 'temp_kr', 'temp_kr2', 'temp_kr_studio',
-  'test-pages', 'scripts', 'CWS', 'browser-mcp', 'docs', 'tasks'
+  'test-pages', 'scripts', 'CWS', 'browser-mcp', 'docs', 'tasks', 'release-notes'
 )
-$excludeRootFiles = @('.gitignore', 'build-sw.sh')
+$excludeRootFiles = @(
+  '.gitignore', 'build-sw.sh', 'changes.md', 'versions.txt', 'CHANGELOG.md', 'CHANGELOG_EN.md', 'debug.log'
+)
 Get-ChildItem -Path $root -Force | ForEach-Object {
   $name = $_.Name
   if ($_.PSIsContainer -and ($excludeDirs -contains $name)) { return }

@@ -271,7 +271,9 @@ class TestEditor {
         if (selectedStep && selectedStep.previousElementSibling) {
           selectedStep.classList.remove('selected');
           selectedStep.previousElementSibling.classList.add('selected');
-          selectedStep.previousElementSibling.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          const prevEl = selectedStep.previousElementSibling;
+          const scrollRet = prevEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          if (scrollRet && typeof scrollRet.catch === 'function') scrollRet.catch(() => {});
         } else if (!selectedStep) {
           const firstStep = document.querySelector('.action-item');
           if (firstStep) firstStep.classList.add('selected');
@@ -286,7 +288,9 @@ class TestEditor {
         if (selectedStep && selectedStep.nextElementSibling) {
           selectedStep.classList.remove('selected');
           selectedStep.nextElementSibling.classList.add('selected');
-          selectedStep.nextElementSibling.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          const nextEl = selectedStep.nextElementSibling;
+          const scrollRet2 = nextEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          if (scrollRet2 && typeof scrollRet2.catch === 'function') scrollRet2.catch(() => {});
         } else if (!selectedStep) {
           const firstStep = document.querySelector('.action-item');
           if (firstStep) firstStep.classList.add('selected');

@@ -28,9 +28,17 @@ rsync -a \
   --exclude='test-pages/' \
   --exclude='CWS/' \
   --exclude='browser-mcp/' \
+  --exclude='docs/' \
+  --exclude='tasks/' \
+  --exclude='release-notes/' \
   --exclude='scripts/' \
   --exclude='.gitignore' \
   --exclude='build-sw.sh' \
+  --exclude='changes.md' \
+  --exclude='versions.txt' \
+  --exclude='CHANGELOG.md' \
+  --exclude='CHANGELOG_EN.md' \
+  --exclude='debug.log' \
   "$ROOT/" "$STAGING/"
 
 OUT="$DIST/autotest-recorder-${VER}.zip"

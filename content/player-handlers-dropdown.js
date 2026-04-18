@@ -87,14 +87,18 @@ TestPlayer.prototype._describeDropdownDebugNode = function(el) {
 
 TestPlayer.prototype._logDropdownOpenDebug = function(stage, data = {}) {
   try {
-    console.log(`🧭 [DropdownOpenDebug] ${stage}`, data);
-    const safe = JSON.stringify(data, (key, value) => {
+    const enriched = {
+      stepIndex: Number.isFinite(this.currentActionIndex) ? this.currentActionIndex : undefined,
+      testId: this.currentTest?.id || undefined,
+      ...data
+    };
+    const safe = JSON.stringify(enriched, (key, value) => {
       if (value instanceof Element) return this._describeDropdownDebugNode(value);
       if (value instanceof Node) return `[node:${value.nodeName || 'unknown'}]`;
       if (typeof value === 'function') return '[function]';
       return value;
     });
-    console.log(`🧭 [DropdownOpenDebug] ${stage}::json ${safe}`);
+    console.log(`🧭 [DropdownPlayback] ${stage} ${safe}`);
   } catch (_) {}
 };
 
@@ -139,6 +143,19 @@ TestPlayer.prototype._isLikelyApplicationMenuPanel = function(panel) {
   return false;
 };
 
+/** Список опций внутри app-autocomplete (не overlay): не отбрасывать из‑за пустого id / __result. */
+TestPlayer.prototype._isAutocompleteInlineOptionContainer = function(ownerRoot, panel) {
+  if (!ownerRoot || !panel || !(panel instanceof Element)) return false;
+  if (String(ownerRoot.tagName || '').toLowerCase() !== 'app-autocomplete') return false;
+  if (!ownerRoot.contains(panel)) return false;
+  const cls = String(panel.className || '').toLowerCase();
+  if (panel.getAttribute && panel.getAttribute('role') === 'listbox') return true;
+  if (cls.includes('options-list')) return true;
+  if (cls.includes('options-list-container')) return true;
+  if (cls.includes('dropdown-panel')) return true;
+  return false;
+};
+
 TestPlayer.prototype._isPanelRelevantForBoundDropdown = function(panel, targetEl, elementId = '', options = {}) {
   if (!panel || !(panel instanceof Element)) return false;
   const expectedValue = String(options?.expectedValue || '').trim();
@@ -159,10 +176,12 @@ TestPlayer.prototype._isPanelRelevantForBoundDropdown = function(panel, targetEl
 
   const panelId = String(panel.id || '').toLowerCase();
   const panelCls = String(panel.className || '').toLowerCase();
-  const ownerRoot = targetEl?.closest?.('app-select, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
+  const ownerRoot = targetEl?.closest?.('app-select, app-autocomplete, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
   if (ownerRoot && ownerRoot.contains(panel)) {
-    if (!panelId || panelId.endsWith('__result') || (elementNeedle && panelId.includes(`${elementNeedle}__result`))) {
-      return false;
+    if (!this._isAutocompleteInlineOptionContainer(ownerRoot, panel)) {
+      if (!panelId || panelId.endsWith('__result') || (elementNeedle && panelId.includes(`${elementNeedle}__result`))) {
+        return false;
+      }
     }
   }
 
@@ -252,7 +271,9 @@ TestPlayer.prototype._findNearbyOpenDropdownPanel = function(targetEl, elementId
     '.menu',
     '[class*="menu"]',
     '[class*="dropdown-panel"]',
-    '[class*="content-list"]'
+    '[class*="content-list"]',
+    '[class*="options-list"]',
+    '.options-list-container'
   ].join(',');
   const rootRect = (targetEl && targetEl.getBoundingClientRect) ? targetEl.getBoundingClientRect() : null;
   const rootCx = rootRect ? (rootRect.left + rootRect.width / 2) : 0;
@@ -260,12 +281,12 @@ TestPlayer.prototype._findNearbyOpenDropdownPanel = function(targetEl, elementId
   const needle = String(elementId || '').toLowerCase();
   let best = null;
   let bestScore = -Infinity;
-  const ownerRoot = targetEl?.closest?.('app-select, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
+  const ownerRoot = targetEl?.closest?.('app-select, app-autocomplete, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
   const panels = Array.from(document.querySelectorAll(panelSelector)).filter(isVisible);
   for (const panel of panels) {
     if (!this._isPanelRelevantForBoundDropdown(panel, targetEl, elementId, options)) continue;
     // Важно: не используем локальный display/result контейнер самого поля как "панель опций".
-    if (ownerRoot && ownerRoot.contains(panel)) {
+    if (ownerRoot && ownerRoot.contains(panel) && !this._isAutocompleteInlineOptionContainer(ownerRoot, panel)) {
       const panelIdLocal = String(panel.id || '');
       if (!panelIdLocal || panelIdLocal.endsWith('__result') || panelIdLocal.includes(`${elementId}__result`)) {
         continue;
@@ -311,10 +332,10 @@ TestPlayer.prototype._findPanelByValueAffinity = function(targetEl, targetValue,
   if (!value) return null;
   const expected = this.normalizeTextValue(value);
   const expectedTokens = expected.split(/\s+/).filter(token => token.length >= 4);
-  const ownerRoot = targetEl?.closest?.('app-select, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
+  const ownerRoot = targetEl?.closest?.('app-select, app-autocomplete, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || null;
   const rootRect = targetEl?.getBoundingClientRect?.() || null;
   const optionSelector = '[role="option"], .option, .group-item, .mat-option, .ng-option, .ant-select-item-option, .result__item, .menu__item, [class*="menu__item"], [data-value], li[role="option"]';
-  const panelSelector = '.cdk-overlay-pane, [role="listbox"], [id*="__result"], .ng-dropdown-panel, .mat-select-panel, .ant-select-dropdown, .el-select-dropdown, .menu, [class*="menu"], [class*="dropdown-panel"], [class*="content-list"]';
+  const panelSelector = '.cdk-overlay-pane, [role="listbox"], [id*="__result"], .ng-dropdown-panel, .mat-select-panel, .ant-select-dropdown, .el-select-dropdown, .menu, [class*="menu"], [class*="dropdown-panel"], [class*="content-list"], [class*="options-list"], .options-list-container';
   const isVisible = (el) => {
     if (!el || !el.isConnected) return false;
     const st = window.getComputedStyle(el);
@@ -342,9 +363,9 @@ TestPlayer.prototype._findPanelByValueAffinity = function(targetEl, targetValue,
     })) {
       continue;
     }
-    if (ownerRoot && ownerRoot.contains(panel)) continue;
+    if (ownerRoot && ownerRoot.contains(panel) && !this._isAutocompleteInlineOptionContainer(ownerRoot, panel)) continue;
     const panelId = String(panel.id || '');
-    if (panelId && panelId.endsWith('__result') && ownerRoot && ownerRoot.contains(panel)) continue;
+    if (panelId && panelId.endsWith('__result') && ownerRoot && ownerRoot.contains(panel) && !this._isAutocompleteInlineOptionContainer(ownerRoot, panel)) continue;
 
     const options = Array.from(panel.querySelectorAll(optionSelector)).filter(isVisible);
     if (!options.length) continue;
@@ -441,7 +462,7 @@ TestPlayer.prototype._getBoundDropdownOpenTriggers = function(action, targetEl, 
   const preferred = this.resolvePreferredDropdownTrigger?.(action, targetEl) || targetEl;
   if (isVisible(preferred)) pushUnique(preferred);
 
-  const root = targetEl?.closest?.('app-select, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || targetEl;
+  const root = targetEl?.closest?.('app-select, app-autocomplete, [elementid], [ng-reflect-element-id], [role="combobox"], [class*="select"], [class*="dropdown"]') || targetEl;
   pickFromRoot(root);
 
   if (elementId) {
@@ -563,6 +584,8 @@ TestPlayer.prototype._openBoundDropdownPanel = async function(action, targetEl, 
     elementId,
     target: this._describeDropdownDebugNode(targetEl),
     fieldLabel: action?.fieldLabel || null,
+    expectedValue: expectedValue || null,
+    phase: options?.phase || null,
     forceReopenWhenNoOptions
   });
   let panel = this._findBoundDropdownPanel(elementId);
@@ -762,7 +785,8 @@ TestPlayer.prototype._tryStrongBindingAdaptiveFallback = async function(targetEl
   // 1) Пытаемся открыть именно связанный dropdown и выбрать из уже раскрытой панели.
   await this._openBoundDropdownPanel(action, container || targetEl, elementId, {
     forceReopenWhenNoOptions: true,
-    expectedValue: val
+    expectedValue: val,
+    phase: 'strong-binding-fallback-open'
   });
   try {
     const boundPick = await this._selectFromBoundDropdownPanel(container || targetEl, val, action);
@@ -839,7 +863,8 @@ TestPlayer.prototype._selectFromBoundDropdownPanel = async function(targetEl, ta
   if (!elementId) return { success: false, reason: 'no elementid' };
   let panel = await this._openBoundDropdownPanel(action, targetEl, elementId, {
     forceReopenWhenNoOptions: true,
-    expectedValue: value
+    expectedValue: value,
+    phase: 'bound-panel-initial-open'
   });
   if (!panel) panel = this._findNearbyOpenDropdownPanel(targetEl, elementId, { expectedValue: value, maxDistance: 420 });
   if (!panel) {
@@ -896,7 +921,8 @@ TestPlayer.prototype._selectFromBoundDropdownPanel = async function(targetEl, ta
     await this.delay(140);
     panel = await this._openBoundDropdownPanel(action, targetEl, elementId, {
       forceReopenWhenNoOptions: true,
-      expectedValue: value
+      expectedValue: value,
+      phase: 'bound-panel-reopen-no-options'
     });
     if (!panel) panel = this._findNearbyOpenDropdownPanel(targetEl, elementId, { expectedValue: value, maxDistance: 420 });
     options = panel ? getVisibleOptions() : [];
@@ -1192,13 +1218,19 @@ TestPlayer.prototype._isDropdownSelectionCommitted = async function(targetEl, ex
     (String(root?.tagName || '').toLowerCase() === 'app-autocomplete') ||
     /autocomplete|suggest/i.test(String(root?.className || ''))
   );
+  // app-select часто показывает составную подпись ("ФИО — организация"), а в модели/reflect
+  // может быть другой вариант той же сущности — при strict нужно допускать взаимное вхождение.
+  const isCompositeLabelControl = !!(
+    root?.closest?.('app-select') ||
+    (String(root?.tagName || '').toLowerCase() === 'app-select')
+  );
   const matchesExpected = (value) => {
     const current = this.normalizeTextValue(String(value || ''));
     if (!current || !expected) return false;
     if (current === expected || normalizeCompact(value) === expectedCompact) return true;
     // Для autocomplete контролов значение часто расширяется суффиксом:
     // "ФИО — Организация". Это валидный commit даже при strict режиме.
-    if (strict && isAutocompleteContext && (current.includes(expected) || expected.includes(current))) return true;
+    if (strict && (isAutocompleteContext || isCompositeLabelControl) && (current.includes(expected) || expected.includes(current))) return true;
     if (!strict && (current.includes(expected) || expected.includes(current))) return true;
     return false;
   };
@@ -1215,7 +1247,7 @@ TestPlayer.prototype._isDropdownSelectionCommitted = async function(targetEl, ex
     }
   } catch (_) {}
   try {
-    const host = root?.closest?.('app-select') || root;
+    const host = root?.closest?.('app-select') || root?.closest?.('app-autocomplete') || root;
     const reflect = this.normalizeTextValue(
       host?.getAttribute?.('ng-reflect-model') ||
       host?.getAttribute?.('ng-reflect-value') ||
@@ -1227,6 +1259,28 @@ TestPlayer.prototype._isDropdownSelectionCommitted = async function(targetEl, ex
     }
   } catch (_) {}
   return false;
+};
+
+/** Дождаться, пока Angular обновит DOM после клика по опции (иначе идут лишние open/fallback). */
+TestPlayer.prototype._pollUntilDropdownCommitted = async function(isCommittedFn, options = {}) {
+  const maxMs = Number.isFinite(options?.maxMs) ? options.maxMs : 900;
+  const intervalMs = Number.isFinite(options?.intervalMs) ? options.intervalMs : 100;
+  const deadline = Date.now() + maxMs;
+  try {
+    if (await isCommittedFn()) return true;
+  } catch (_) {}
+  while (Date.now() < deadline) {
+    if (this.isPlaying === false) return false;
+    await this.delay(intervalMs);
+    try {
+      if (await isCommittedFn()) return true;
+    } catch (_) {}
+  }
+  try {
+    return await isCommittedFn();
+  } catch (_) {
+    return false;
+  }
 };
 
 TestPlayer.prototype.selectDropdownAdaptiveValue = async function(targetEl, targetValue, action = {}) {
@@ -1257,14 +1311,39 @@ TestPlayer.prototype.selectDropdownAdaptiveValue = async function(targetEl, targ
     }
   } catch (_) {}
 
+  try {
+    const readSelected = this.getSelectedDropdownValue(container || targetEl) || '';
+    this._logDropdownOpenDebug('adaptive-selection-start', {
+      elementId: this._getDropdownElementId(action, container || targetEl) || null,
+      fieldLabel: action?.fieldLabel || null,
+      targetValue: val,
+      readSelectedValue: readSelected || null,
+      strictCommitCheck,
+      hasStrongBinding
+    });
+  } catch (_) {}
+
+  const confirmAfterPick = async (pollOpts) => this._pollUntilDropdownCommitted(confirmed, pollOpts || { maxMs: 900, intervalMs: 100 });
+
+  // app-autocomplete с elementId: панель часто без id "__result" — сначала пробуем уже открытый overlay.
+  const acHostEarly = (container || targetEl)?.closest?.('app-autocomplete') ||
+    (String((container || targetEl)?.tagName || '').toLowerCase() === 'app-autocomplete' ? (container || targetEl) : null);
+  if (hasStrongBinding && acHostEarly && typeof this.trySelectOptionInRevealedPanels === 'function') {
+    try {
+      const earlyAc = await this.trySelectOptionInRevealedPanels(val, container || targetEl);
+      if (earlyAc?.success && await confirmAfterPick({ maxMs: 1000, intervalMs: 100 })) {
+        return { success: true, method: 'revealed-panels-autocomplete-early' };
+      }
+    } catch (_) {}
+  }
+
   // При цепочке "шаг 1: открыть dropdown" -> "шаг 2: выбрать значение"
   // приоритетно выбираем из уже раскрытой панели и не трогаем trigger повторно.
   if (!hasStrongBinding && action?.inputAfterClick === true && typeof this.trySelectOptionInRevealedPanels === 'function') {
     try {
       const fromOpened = await this.trySelectOptionInRevealedPanels(val, container || targetEl);
       if (fromOpened?.success) {
-        await this.delay(80);
-        if (await confirmed()) return { success: true, method: 'opened-panel-inputAfterClick' };
+        if (await confirmAfterPick({ maxMs: 800, intervalMs: 80 })) return { success: true, method: 'opened-panel-inputAfterClick' };
       }
     } catch (_) {}
   }
@@ -1274,8 +1353,7 @@ TestPlayer.prototype.selectDropdownAdaptiveValue = async function(targetEl, targ
     try {
       const directAny = await this.trySelectOptionInRevealedPanels(val, container || targetEl);
       if (directAny?.success) {
-        await this.delay(80);
-        if (await confirmed()) return { success: true, method: 'revealed-panels-any' };
+        if (await confirmAfterPick({ maxMs: 800, intervalMs: 80 })) return { success: true, method: 'revealed-panels-any' };
       }
     } catch (_) {}
   }
@@ -1288,19 +1366,19 @@ TestPlayer.prototype.selectDropdownAdaptiveValue = async function(targetEl, targ
     // чтобы не кликнуть опции из другого поля.
     if (hasStrongBinding) {
       const boundFirst = await this._selectFromBoundDropdownPanel(container || targetEl, val, action);
-      if (boundFirst?.success && await confirmed()) return { success: true, method: boundFirst.method || 'bound-panel' };
+      if (boundFirst?.success && await confirmAfterPick({ maxMs: 700, intervalMs: 90 })) return { success: true, method: boundFirst.method || 'bound-panel' };
       const scopedFirst = await this._selectFromScopedNearbyPanel(container || targetEl, val);
-      if (scopedFirst?.success && await confirmed()) return { success: true, method: scopedFirst.method || 'scoped-nearby-panel' };
+      if (scopedFirst?.success && await confirmAfterPick({ maxMs: 700, intervalMs: 90 })) return { success: true, method: scopedFirst.method || 'scoped-nearby-panel' };
       // Если панель не была открыта/смонтирована, пробуем открыть именно связанный dropdown.
       await this._openBoundDropdownPanel(action, container || targetEl, this._getDropdownElementId(action, container || targetEl), {
         forceReopenWhenNoOptions: true,
-        expectedValue: val
+        expectedValue: val,
+        phase: 'selectAdaptive-strong-explicit-open'
       });
       if (typeof this.trySelectOptionInRevealedPanels === 'function') {
         const afterOpen = await this.trySelectOptionInRevealedPanels(val, container || targetEl);
         if (afterOpen?.success) {
-          await this.delay(80);
-          if (await confirmed()) return { success: true, method: 'revealed-after-open-strong' };
+          if (await confirmAfterPick({ maxMs: 1200, intervalMs: 100 })) return { success: true, method: 'revealed-after-open-strong' };
         }
       }
     } else {
@@ -1309,12 +1387,11 @@ TestPlayer.prototype.selectDropdownAdaptiveValue = async function(targetEl, targ
       if (typeof this.trySelectOptionInRevealedPanels === 'function') {
         const direct = await this.trySelectOptionInRevealedPanels(val, trigger);
         if (direct?.success) {
-          await this.delay(80);
-          if (await confirmed()) return { success: true, method: 'revealed-panels' };
+          if (await confirmAfterPick({ maxMs: 900, intervalMs: 90 })) return { success: true, method: 'revealed-panels' };
         }
       }
       const bound = await this._selectFromBoundDropdownPanel(container || targetEl, val, action);
-      if (bound?.success && await confirmed()) return { success: true, method: bound.method || 'bound-panel' };
+      if (bound?.success && await confirmAfterPick({ maxMs: 700, intervalMs: 90 })) return { success: true, method: bound.method || 'bound-panel' };
     }
   } catch (e) {
     // Продолжаем по fallback-pipeline ниже.
@@ -3328,6 +3405,12 @@ TestPlayer.prototype.getSelectedDropdownValue = function(appSelect) {
   if (!appSelect) return '';
   const placeholderTexts = ['выберите', 'select', 'choose', 'placeholder'];
   const hasPlaceholder = (text) => placeholderTexts.some(ph => text.toLowerCase().includes(ph.toLowerCase()));
+  const isLikelyFloatingFieldCaption = (raw) => {
+    const n = this.normalizeTextValue(String(raw || '').trim().toLowerCase());
+    if (!n || n.length > 48) return false;
+    const generic = new Set(['сотрудник', 'организация', 'подразделение', 'должность', 'фио', 'пользователь', 'поиск', 'search', 'выберите', 'select', 'choose', 'placeholder']);
+    return generic.has(n);
+  };
   const isLikelyOptionsContainer = (el, text) => {
     if (!el || !(el instanceof Element)) return false;
     const cls = (el.className || '').toString().toLowerCase();
@@ -3347,6 +3430,7 @@ TestPlayer.prototype.getSelectedDropdownValue = function(appSelect) {
     const raw = String(text || '').trim();
     if (!raw) return '';
     if (hasPlaceholder(raw)) return '';
+    if (isLikelyFloatingFieldCaption(raw)) return '';
     if (isLikelyOptionsContainer(sourceEl, raw)) {
       if (typeof this.parseSelectedOptionFromText === 'function') {
         const parsed = this.parseSelectedOptionFromText(raw, '');
@@ -3360,6 +3444,22 @@ TestPlayer.prototype.getSelectedDropdownValue = function(appSelect) {
     }
     return raw;
   };
+
+  const acHost = String(appSelect.tagName || '').toLowerCase() === 'app-autocomplete'
+    ? appSelect
+    : (appSelect.closest && appSelect.closest('app-autocomplete'));
+  if (acHost) {
+    for (const attr of ['ng-reflect-model', 'ng-reflect-value', 'ng-reflect-selected-value']) {
+      try {
+        const v = acHost.getAttribute(attr);
+        if (v) {
+          const stripped = String(v).trim();
+          const normalized = normalizeCandidate(stripped, acHost);
+          if (normalized) return normalized;
+        }
+      } catch (_) {}
+    }
+  }
   
   // Ищем скрытый input
   const hiddenInput = appSelect.querySelector('input[type="hidden"]');
@@ -3420,13 +3520,20 @@ TestPlayer.prototype.getSelectedDropdownValue = function(appSelect) {
     if (normalizedNgValue) return normalizedNgValue;
   }
   
-  // Ищем в дочерних элементах с текстом
+  // Ищем в дочерних элементах: для autocomplete не берём первый короткий фрагмент (часто подпись поля).
   const allChildren = Array.from(appSelect.querySelectorAll('*'));
+  let bestChild = '';
   for (const child of allChildren) {
     const text = child.textContent?.trim() || child.innerText?.trim() || '';
     const normalized = normalizeCandidate(text, child);
-    if (normalized && normalized.length < 100) return normalized;
+    if (!normalized) continue;
+    if (acHost) {
+      if (normalized.length > bestChild.length) bestChild = normalized;
+    } else if (normalized.length < 100) {
+      return normalized;
+    }
   }
+  if (acHost && bestChild) return bestChild;
   
   return '';
 }

@@ -1,23 +1,4 @@
 (() => {
-  var __defProp = Object.defineProperty;
-  var __defProps = Object.defineProperties;
-  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __propIsEnum = Object.prototype.propertyIsEnumerable;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __spreadValues = (a, b) => {
-    for (var prop in b || (b = {}))
-      if (__hasOwnProp.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    if (__getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(b)) {
-        if (__propIsEnum.call(b, prop))
-          __defNormalProp(a, prop, b[prop]);
-      }
-    return a;
-  };
-  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __async = (__this, __arguments, generator) => {
     return new Promise((resolve, reject) => {
       var fulfilled = (value) => {
@@ -69,7 +50,7 @@
     return map[appliedWhen] || appliedWhen;
   }
   function getActionSelectorKey(action) {
-    const selector = action == null ? void 0 : action.selector;
+    const selector = action?.selector;
     if (!selector) return "";
     if (typeof selector === "string") return selector;
     return selector.selector || selector.value || "";
@@ -81,12 +62,12 @@
     return selectorKey ? `selector:${selectorKey}` : "";
   }
   function isSingleTargetSelector(action) {
-    const selector = action == null ? void 0 : action.selector;
+    const selector = action?.selector;
     if (!selector || typeof selector !== "object") return false;
     return selector.isUnique === true || selector.unique === true || selector.matchCount === 1 || selector.matchesCount === 1;
   }
   function isActionSingleTarget(action) {
-    return !!((action == null ? void 0 : action.elementKey) || isSingleTargetSelector(action));
+    return !!(action?.elementKey || isSingleTargetSelector(action));
   }
   function isValueAction(action) {
     return !!(action && (action.type === "input" || action.type === "change") && action.value !== void 0 && action.value !== null);
@@ -139,7 +120,7 @@
     return type;
   }
   function getSelectorValueFromAction(action) {
-    const selector = action == null ? void 0 : action.selector;
+    const selector = action?.selector;
     if (!selector) return "";
     if (typeof selector === "string") return selector.trim();
     return String(selector.selector || selector.value || "").trim();
@@ -171,12 +152,16 @@
     if (!normalizedType) {
       return { ok: false, error: "INVALID_ACTION_PAYLOAD", details: "missing action.type" };
     }
-    if (self.ActionTypes && typeof self.ActionTypes.isActionTypeSupported === "function" && !self.ActionTypes.isActionTypeSupported(normalizedType)) {
-      return { ok: false, error: "UNSUPPORTED_ACTION_TYPE", details: normalizedType };
+    if (self.ActionTypes && typeof self.ActionTypes.isActionTypeSupported === "function") {
+      if (!self.ActionTypes.isActionTypeSupported(normalizedType)) {
+        return { ok: false, error: "UNSUPPORTED_ACTION_TYPE", details: normalizedType };
+      }
     }
     const subtype = typeof action.subtype === "string" ? action.subtype.trim() : action.subtype;
-    if (subtype && self.ActionTypes && typeof self.ActionTypes.isSubtypeSupported === "function" && !self.ActionTypes.isSubtypeSupported(normalizedType, subtype)) {
-      return { ok: false, error: "UNSUPPORTED_ACTION_SUBTYPE", details: `${normalizedType}:${subtype}` };
+    if (subtype && self.ActionTypes && typeof self.ActionTypes.isSubtypeSupported === "function") {
+      if (!self.ActionTypes.isSubtypeSupported(normalizedType, subtype)) {
+        return { ok: false, error: "UNSUPPORTED_ACTION_SUBTYPE", details: `${normalizedType}:${subtype}` };
+      }
     }
     if (isSelectorRequiredTypeForIngress(normalizedType)) {
       const selectorValue = getSelectorValueFromAction(action);
@@ -186,22 +171,22 @@
     }
     return { ok: true, normalizedType };
   }
-  function isDuplicateClientRecordedAction(manager, action) {
-    const clientActionId = String((action == null ? void 0 : action._clientActionId) || "").trim();
+  function isDuplicateClientRecordedAction(manager2, action) {
+    const clientActionId = String(action?._clientActionId || "").trim();
     if (!clientActionId) return false;
-    if (!manager._recordedClientActionIds) {
-      manager._recordedClientActionIds = /* @__PURE__ */ new Set();
-      manager._recordedClientActionOrder = [];
+    if (!manager2._recordedClientActionIds) {
+      manager2._recordedClientActionIds = /* @__PURE__ */ new Set();
+      manager2._recordedClientActionOrder = [];
     }
-    if (manager._recordedClientActionIds.has(clientActionId)) {
+    if (manager2._recordedClientActionIds.has(clientActionId)) {
       return true;
     }
-    manager._recordedClientActionIds.add(clientActionId);
-    manager._recordedClientActionOrder.push(clientActionId);
-    if (manager._recordedClientActionOrder.length > 1200) {
-      const staleId = manager._recordedClientActionOrder.shift();
+    manager2._recordedClientActionIds.add(clientActionId);
+    manager2._recordedClientActionOrder.push(clientActionId);
+    if (manager2._recordedClientActionOrder.length > 1200) {
+      const staleId = manager2._recordedClientActionOrder.shift();
       if (staleId) {
-        manager._recordedClientActionIds.delete(staleId);
+        manager2._recordedClientActionIds.delete(staleId);
       }
     }
     return false;
@@ -211,14 +196,13 @@
       return;
     }
     registry.register("PERFORMANCE_START_MONITORING", ({ message: message2, sender, sendResponse: sendResponse2 }) => {
-      var _a;
       const safeSend = (res) => {
         try {
           sendResponse2(res);
         } catch (e) {
         }
       };
-      if (!((_a = sender.tab) == null ? void 0 : _a.id)) {
+      if (!sender.tab?.id) {
         safeSend({ success: false, error: "No tab ID in sender" });
         return;
       }
@@ -238,14 +222,13 @@
       return true;
     });
     registry.register("PERFORMANCE_MARK_STEP", ({ message: message2, sender, sendResponse: sendResponse2 }) => {
-      var _a;
       const safeSend = (res) => {
         try {
           sendResponse2(res);
         } catch (e) {
         }
       };
-      if (!((_a = sender.tab) == null ? void 0 : _a.id)) {
+      if (!sender.tab?.id) {
         safeSend({ success: false, error: "No tab ID in sender" });
         return;
       }
@@ -255,20 +238,19 @@
         stepType: message2.stepType,
         metadata: message2.metadata || {}
       }).then(() => safeSend({ success: true })).catch((err) => {
-        console.warn("\u26A0\uFE0F [Performance] Mark step failed (content script may have unloaded):", err == null ? void 0 : err.message);
+        console.warn("\u26A0\uFE0F [Performance] Mark step failed (content script may have unloaded):", err?.message);
         safeSend({ success: true });
       });
       return true;
     });
     registry.register("PERFORMANCE_SAVE_PARTIAL", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b, _c;
       try {
-        if (!message2.testId || !((_a = sender.tab) == null ? void 0 : _a.id)) {
+        if (!message2.testId || !sender.tab?.id) {
           sendResponse2({ success: false });
           return;
         }
         const response = yield chrome.tabs.sendMessage(sender.tab.id, { type: "COLLECT_PERFORMANCE_DATA" });
-        if ((response == null ? void 0 : response.success) && ((_c = (_b = response == null ? void 0 : response.data) == null ? void 0 : _b.steps) == null ? void 0 : _c.length) > 0) {
+        if (response?.success && response?.data?.steps?.length > 0) {
           const partialKey = `performanceData_partial_${message2.testId}`;
           yield chrome.storage.local.set({
             [partialKey]: {
@@ -281,12 +263,11 @@
         }
         sendResponse2({ success: true });
       } catch (e) {
-        console.warn("\u26A0\uFE0F [Performance] Save partial failed:", e == null ? void 0 : e.message);
+        console.warn("\u26A0\uFE0F [Performance] Save partial failed:", e?.message);
         sendResponse2({ success: false });
       }
     }));
     registry.register("PERFORMANCE_COLLECT_DATA", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e;
       try {
         console.log("\u{1F4CA} [Performance] Collecting data for test:", message2.testId);
         let performanceData = null;
@@ -294,12 +275,12 @@
           performanceData = message2.data;
           console.log("\u{1F4CA} [Performance] Using data from message (analysis response)");
         }
-        if (!performanceData && ((_a = sender.tab) == null ? void 0 : _a.id)) {
+        if (!performanceData && sender.tab?.id) {
           try {
             const response = yield chrome.tabs.sendMessage(sender.tab.id, {
               type: "COLLECT_PERFORMANCE_DATA"
             });
-            if ((response == null ? void 0 : response.success) && (response == null ? void 0 : response.data)) {
+            if (response?.success && response?.data) {
               performanceData = response.data;
               console.log("\u{1F4CA} [Performance] Using data from content script");
             }
@@ -307,29 +288,23 @@
             console.warn("\u26A0\uFE0F [Performance] Content script collect failed:", e.message);
           }
         }
-        if (((_b = performanceData == null ? void 0 : performanceData.steps) == null ? void 0 : _b.length) >= 0) {
+        if (performanceData?.steps?.length >= 0) {
           const partialKey = `performanceData_partial_${message2.testId}`;
           const stored = yield chrome.storage.local.get(partialKey);
           const partial = stored[partialKey];
-          if (((_d = (_c = partial == null ? void 0 : partial.data) == null ? void 0 : _c.steps) == null ? void 0 : _d.length) > 0) {
+          if (partial?.data?.steps?.length > 0) {
             const partialSteps = partial.data.steps;
             const currentSteps = performanceData.steps || [];
-            const maxPartialIndex = Math.max(...partialSteps.map((s) => {
-              var _a2;
-              return (_a2 = s.stepIndex) != null ? _a2 : -1;
-            }), -1);
+            const maxPartialIndex = Math.max(...partialSteps.map((s) => s.stepIndex ?? -1), -1);
             const mergedSteps = [...partialSteps];
             for (const s of currentSteps) {
-              const idx = (_e = s.stepIndex) != null ? _e : mergedSteps.length;
+              const idx = s.stepIndex ?? mergedSteps.length;
               if (idx > maxPartialIndex) {
                 mergedSteps.push(s);
               }
             }
-            mergedSteps.sort((a, b) => {
-              var _a2, _b2;
-              return ((_a2 = a.stepIndex) != null ? _a2 : 0) - ((_b2 = b.stepIndex) != null ? _b2 : 0);
-            });
-            performanceData = __spreadProps(__spreadValues({}, performanceData), { steps: mergedSteps });
+            mergedSteps.sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
+            performanceData = { ...performanceData, steps: mergedSteps };
             yield chrome.storage.local.remove(partialKey);
             console.log("\u{1F4CA} [Performance] Merged partial + current:", partialSteps.length, "+", currentSteps.length, "->", mergedSteps.length, "steps");
           }
@@ -361,8 +336,7 @@
       }
     }));
     registry.register("PERFORMANCE_STOP_MONITORING", ({ message: message2, sender, sendResponse: sendResponse2 }) => {
-      var _a;
-      if (!((_a = sender.tab) == null ? void 0 : _a.id)) {
+      if (!sender.tab?.id) {
         sendResponse2({ success: false, error: "No tab ID in sender" });
         return;
       }
@@ -372,7 +346,6 @@
       sendResponse2({ success: true });
     });
     registry.register("PERFORMANCE_SAVE_BASELINE", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a;
       const safeSend = (res) => {
         try {
           sendResponse2(res);
@@ -381,7 +354,7 @@
         }
       };
       try {
-        const testId = message2.testId || ((_a = message2.data) == null ? void 0 : _a.testId) || "latest";
+        const testId = message2.testId || message2.data?.testId || "latest";
         console.log("\u{1F4BE} [Performance] Saving baseline for test:", testId);
         if (!message2.data) {
           safeSend({ success: false, error: "No data provided for baseline" });
@@ -405,7 +378,7 @@
         safeSend({ success: true, count: baselines[testId].length });
       } catch (error) {
         console.error("\u274C [Performance] Error saving baseline:", error);
-        safeSend({ success: false, error: (error == null ? void 0 : error.message) || String(error) });
+        safeSend({ success: false, error: error?.message || String(error) });
       }
     }));
     registry.register("PERFORMANCE_LOAD_BASELINES", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
@@ -478,10 +451,9 @@
       }
     }));
     registry.register("GET_TESTS", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
-      var _a, _b;
       try {
         const testsArray = Array.from(manager.tests.values());
-        const groupsArray = Array.from(((_b = (_a = manager.testGroups) == null ? void 0 : _a.values) == null ? void 0 : _b.call(_a)) || []);
+        const groupsArray = Array.from(manager.testGroups?.values?.() || []);
         const license = self.AccessPolicy && self.AccessPolicy.getLicense ? yield self.AccessPolicy.getLicense() : { tier: "free", valid: false };
         const capabilities = self.AccessPolicy && self.AccessPolicy.getCapabilities ? self.AccessPolicy.getCapabilities(license) : { tier: "free" };
         console.log(`\u{1F4CB} \u0417\u0430\u043F\u0440\u043E\u0441 \u0441\u043F\u0438\u0441\u043A\u0430 \u0442\u0435\u0441\u0442\u043E\u0432: \u043D\u0430\u0439\u0434\u0435\u043D\u043E ${testsArray.length} \u0442\u0435\u0441\u0442\u043E\u0432, ${groupsArray.length} \u0433\u0440\u0443\u043F\u043F`);
@@ -500,9 +472,8 @@
       }
     }));
     registry.register("GET_TEST_GROUPS", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
-      var _a, _b;
       try {
-        const groupsArray = Array.from(((_b = (_a = manager.testGroups) == null ? void 0 : _a.values) == null ? void 0 : _b.call(_a)) || []);
+        const groupsArray = Array.from(manager.testGroups?.values?.() || []);
         sendResponse2({ success: true, groups: groupsArray });
       } catch (error) {
         console.error("\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u0438\u0438 \u0433\u0440\u0443\u043F\u043F \u0442\u0435\u0441\u0442\u043E\u0432:", error);
@@ -510,7 +481,6 @@
       }
     }));
     registry.register("UPDATE_TEST_GROUP", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d;
       try {
         const incoming = message2.group || {};
         const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -519,15 +489,15 @@
           id = String(Date.now());
         }
         const existing = manager.testGroups.get(id);
-        const baseCreatedAt = (existing == null ? void 0 : existing.createdAt) || incoming.createdAt || now;
+        const baseCreatedAt = existing?.createdAt || incoming.createdAt || now;
         const group = {
           id,
-          name: incoming.name || (existing == null ? void 0 : existing.name) || `Group ${id}`,
-          description: (_b = (_a = incoming.description) != null ? _a : existing == null ? void 0 : existing.description) != null ? _b : "",
-          testIds: Array.isArray(incoming.testIds) ? incoming.testIds.map(String) : (existing == null ? void 0 : existing.testIds) || [],
+          name: incoming.name || existing?.name || `Group ${id}`,
+          description: incoming.description ?? existing?.description ?? "",
+          testIds: Array.isArray(incoming.testIds) ? incoming.testIds.map(String) : existing?.testIds || [],
           createdAt: baseCreatedAt,
           updatedAt: now,
-          meta: (_d = (_c = incoming.meta) != null ? _c : existing == null ? void 0 : existing.meta) != null ? _d : {}
+          meta: incoming.meta ?? existing?.meta ?? {}
         };
         manager.testGroups.set(id, group);
         yield manager.saveTestGroups();
@@ -563,7 +533,7 @@
         return;
       }
       const actionsCopy = Array.isArray(test.actions) ? [...test.actions] : [];
-      sendResponse2({ success: true, test: __spreadProps(__spreadValues({}, test), { actions: actionsCopy }) });
+      sendResponse2({ success: true, test: { ...test, actions: actionsCopy } });
     }));
     registry.register("GET_ALL_TESTS", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
       const tests = Array.from(manager.tests.values());
@@ -586,7 +556,7 @@
             const beforeLen = Array.isArray(group.testIds) ? group.testIds.length : 0;
             const filtered = (group.testIds || []).filter((id) => String(id) !== testId);
             if (filtered.length !== beforeLen) {
-              manager.testGroups.set(groupId, __spreadProps(__spreadValues({}, group), { testIds: filtered, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }));
+              manager.testGroups.set(groupId, { ...group, testIds: filtered, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
               groupsChanged = true;
             }
           }
@@ -603,14 +573,13 @@
       }
     }));
     registry.register("SAVE_TEST_RUN_HISTORY", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e, _f;
       try {
         console.log("\u{1F4BE} [Background] SAVE_TEST_RUN_HISTORY \u043F\u043E\u043B\u0443\u0447\u0435\u043D:", {
-          testId: (_a = message2.runHistory) == null ? void 0 : _a.testId,
-          hasSteps: !!((_b = message2.runHistory) == null ? void 0 : _b.steps),
-          stepsCount: ((_d = (_c = message2.runHistory) == null ? void 0 : _c.steps) == null ? void 0 : _d.length) || 0,
-          hasStartTime: !!((_e = message2.runHistory) == null ? void 0 : _e.startTime),
-          success: (_f = message2.runHistory) == null ? void 0 : _f.success
+          testId: message2.runHistory?.testId,
+          hasSteps: !!message2.runHistory?.steps,
+          stepsCount: message2.runHistory?.steps?.length || 0,
+          hasStartTime: !!message2.runHistory?.startTime,
+          success: message2.runHistory?.success
         });
         if (!message2.runHistory || !message2.runHistory.testId) {
           console.error("\u274C [Background] \u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u0430\u044F \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u043F\u0440\u043E\u0433\u043E\u043D\u0430:", message2.runHistory);
@@ -626,8 +595,8 @@
           yield manager.saveTestHistory();
           console.log("\u2705 [Background] \u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0432 storage");
         } catch (storageError) {
-          const errorMessage = (storageError == null ? void 0 : storageError.message) || (storageError == null ? void 0 : storageError.toString()) || "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430";
-          if (errorMessage.includes("quota") || errorMessage.includes("QUOTA") || errorMessage.includes("QuotaExceededError")) {
+          const errorMessage = storageError?.message || storageError?.toString() || "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430";
+          if (errorMessage.includes("quota") || errorMessage.includes("QUOTA") || errorMessage.includes("QuotaExceededError") || errorMessage.includes("kQuotaBytes") || errorMessage.includes("Resource::kQuotaBytes")) {
             console.warn("\u26A0\uFE0F \u041F\u0440\u0435\u0432\u044B\u0448\u0435\u043D\u0430 \u043A\u0432\u043E\u0442\u0430 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u043F\u0440\u043E\u0433\u043E\u043D\u0430");
             console.warn("   \u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0432 \u043F\u0430\u043C\u044F\u0442\u0438, \u043D\u043E \u043D\u0435 \u0432 storage \u0438\u0437-\u0437\u0430 \u043A\u0432\u043E\u0442\u044B");
             sendResponse2({
@@ -646,7 +615,7 @@
         }
         sendResponse2({ success: true });
       } catch (error) {
-        const errorMessage = (error == null ? void 0 : error.message) || (error == null ? void 0 : error.toString()) || "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430";
+        const errorMessage = error?.message || error?.toString() || "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430";
         console.error("\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u043F\u0440\u043E\u0433\u043E\u043D\u0430:", errorMessage);
         console.error("\u274C \u0414\u0435\u0442\u0430\u043B\u0438 \u043E\u0448\u0438\u0431\u043A\u0438:", {
           name: error.name,
@@ -662,13 +631,15 @@
       }
     }));
     registry.register("GET_STATE", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
-      var _a;
+      var _a, _b;
+      const playbackTestId = manager.activePlaybackTestId || ((_a = manager.playbackState) == null ? void 0 : _a.test?.id) || ((_b = manager.playbackState) == null ? void 0 : _b.testRefId) || null;
       sendResponse2({
         success: true,
         state: {
           isRecording: manager.isRecording,
           isPlaying: manager.isPlaying,
-          currentTestId: (_a = manager.currentTest) == null ? void 0 : _a.id,
+          isPaused: manager.isPaused === true,
+          currentTestId: manager.currentTest?.id ?? playbackTestId ?? null,
           testsCount: manager.tests.size,
           currentStep: manager.currentStep || 0,
           totalSteps: manager.totalSteps || 0,
@@ -679,6 +650,7 @@
     }));
     registry.register("PAUSE_PLAYBACK", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
       if (manager.isPlaying) {
+        manager.isPaused = true;
         yield manager.broadcast({ type: "PAUSE_PLAYBACK" });
         console.log("\u23F8\uFE0F [Background] \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043F\u0430\u0443\u0437\u044B \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F");
       } else {
@@ -688,6 +660,7 @@
       sendResponse2({ success: true });
     }));
     registry.register("RESUME_PLAYBACK_FROM_PAUSE", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
+      manager.isPaused = false;
       yield manager.broadcast({ type: "RESUME_PLAYBACK_FROM_PAUSE" });
       console.log("\u25B6\uFE0F [Background] \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F");
       sendResponse2({ success: true });
@@ -710,6 +683,8 @@
       }
       if (manager.isPlaying) {
         manager.isPlaying = false;
+        manager.isPaused = false;
+        manager.activePlaybackTestId = null;
         manager.currentStep = 0;
         manager.totalSteps = 0;
         manager.stepType = null;
@@ -743,6 +718,8 @@
       }
       if (manager.isPlaying) {
         manager.isPlaying = false;
+        manager.isPaused = false;
+        manager.activePlaybackTestId = null;
         manager.currentStep = 0;
         manager.totalSteps = 0;
         manager.stepType = null;
@@ -881,10 +858,9 @@
         const tabPromises = [];
         for (let i = 0; i < tabCount; i++) {
           const tabPromise = (() => __async(null, null, function* () {
-            var _a;
             try {
-              const firstAction = (_a = testToPlay.actions) == null ? void 0 : _a.find((a) => a.url);
-              const startUrl = (firstAction == null ? void 0 : firstAction.url) || "about:blank";
+              const firstAction = testToPlay.actions?.find((a) => a.url);
+              const startUrl = firstAction?.url || "about:blank";
               const tab = yield chrome.tabs.create({ url: startUrl });
               yield new Promise((resolve) => {
                 chrome.tabs.onUpdated.addListener(function listener(tabId2, info) {
@@ -924,18 +900,17 @@
         sendResponse2({ success: false, error: error.message });
       }
     }));
-    registry.register("SAVE_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _tab3;
-      if (((_tab3 = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab3.id) != null) {
-        manager.playbackTabId = sender2.tab.id;
+    registry.register("SAVE_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
+      if (sender?.tab?.id != null) {
+        manager.playbackTabId = sender.tab.id;
       }
       console.log("\u{1F4BE} \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F:", {
-        testId: (_a = message2.test) == null ? void 0 : _a.id,
-        testName: (_b = message2.test) == null ? void 0 : _b.name,
+        testId: message2.test?.id,
+        testName: message2.test?.name,
         actionIndex: message2.actionIndex,
         nextUrl: message2.nextUrl,
         hasTest: !!message2.test,
-        testActionsCount: (_d = (_c = message2.test) == null ? void 0 : _c.actions) == null ? void 0 : _d.length
+        testActionsCount: message2.test?.actions?.length
       });
       if (message2.test) {
         const test = message2.test;
@@ -944,7 +919,7 @@
           hasName: !!test.name,
           hasActions: !!test.actions,
           actionsIsArray: Array.isArray(test.actions),
-          actionsCount: (_e = test.actions) == null ? void 0 : _e.length,
+          actionsCount: test.actions?.length,
           hasCreatedAt: !!test.createdAt,
           hasUpdatedAt: !!test.updatedAt
         });
@@ -964,35 +939,76 @@
       } else {
         console.error("\u274C \u041E\u0428\u0418\u0411\u041A\u0410: message.test \u043E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442!");
       }
-      const testToSave = message2.test ? {
+      let testToSave = message2.test ? {
         id: message2.test.id,
         name: message2.test.name,
         actions: message2.test.actions ? [...message2.test.actions] : [],
         createdAt: message2.test.createdAt,
         updatedAt: message2.test.updatedAt
       } : null;
-      const runMode = message2.runMode || ((_f = manager.playbackState) == null ? void 0 : _f.runMode) || "optimized";
-      const prevSteps = ((_g = manager.playbackState) == null ? void 0 : _g.runHistory) && Array.isArray(manager.playbackState.runHistory.steps) ? manager.playbackState.runHistory.steps.length : 0;
+      const runMode = message2.runMode || manager.playbackState?.runMode || "optimized";
+      const prevSteps = manager.playbackState?.runHistory && Array.isArray(manager.playbackState.runHistory.steps) ? manager.playbackState.runHistory.steps.length : 0;
       const incomingSteps = message2.runHistory && Array.isArray(message2.runHistory.steps) ? message2.runHistory.steps.length : 0;
       let effectiveRunHistory = message2.runHistory || null;
-      if (message2.nextUrl === "__AUTO_NAV__" && prevSteps > 0 && incomingSteps === 0) {
-        effectiveRunHistory = manager.playbackState.runHistory || null;
-      }
       const prevState = manager.playbackState;
+      const sameTestEarly = !!(testToSave && prevState?.test && String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || ""));
+      if (sameTestEarly && prevSteps > 0 && incomingSteps === 0) {
+        effectiveRunHistory = manager.playbackState.runHistory || null;
+        if (effectiveRunHistory !== message2.runHistory) {
+          console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F runHistory (\u0432\u0445\u043E\u0434\u044F\u0449\u0430\u044F \u0431\u0435\u0437 \u0448\u0430\u0433\u043E\u0432):", { prevSteps, nextUrl: message2.nextUrl });
+        }
+      }
+      if (testToSave && prevState?.test && Array.isArray(prevState.test.actions) && prevState.test.actions.length > 0 &&
+          (!Array.isArray(testToSave.actions) || testToSave.actions.length === 0) &&
+          String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || "")) {
+        testToSave = __spreadProps(__spreadValues({}, testToSave), {
+          actions: [...prevState.test.actions]
+        });
+        console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B actions \u0438\u0437 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0435\u0433\u043E \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F:", prevState.test.actions.length);
+      }
       const incomingIdx = Number(message2.actionIndex);
       const incomingIdxSafe = Number.isFinite(incomingIdx) ? incomingIdx : 0;
-      const prevIdx = Number(prevState == null ? void 0 : prevState.actionIndex);
+      const prevIdx = Number(prevState?.actionIndex);
       const prevIdxSafe = Number.isFinite(prevIdx) ? prevIdx : 0;
-      const sameTest = !!(testToSave && prevState != null && (prevState.test || prevState.testRefId) && String(testToSave.id) === String((prevState.test == null ? void 0 : prevState.test.id) || prevState.testRefId || ""));
+      const sameTest = !!(testToSave && prevState?.test && String(testToSave.id) === String(prevState.test?.id || prevState.testRefId || ""));
       let mergedActionIndex = incomingIdxSafe;
-      let mergedPlaybackSessionId = message2.playbackSessionId || (prevState == null ? void 0 : prevState.playbackSessionId) || null;
+      let mergedPlaybackSessionId = message2.playbackSessionId || prevState?.playbackSessionId || null;
       if (sameTest) {
         mergedActionIndex = Math.max(incomingIdxSafe, prevIdxSafe);
         if (mergedActionIndex > incomingIdxSafe) {
           mergedPlaybackSessionId = prevState.playbackSessionId || mergedPlaybackSessionId;
-          console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] actionIndex \u043D\u0435 \u0443\u043C\u0435\u043D\u044C\u0448\u0430\u044E:", { incoming: incomingIdxSafe, previous: prevIdxSafe, merged: mergedActionIndex });
+          console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] \u041D\u0435 \u0443\u043C\u0435\u043D\u044C\u0448\u0430\u044E actionIndex (\u0443\u0441\u0442\u0430\u0440\u0435\u0432\u0448\u0435\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043E\u0442\u043A\u043B\u043E\u043D\u0435\u043D\u043E):", {
+            incoming: incomingIdxSafe,
+            previous: prevIdxSafe,
+            merged: mergedActionIndex
+          });
         }
       }
+      const inferMinIndexFromRunHistory = (rh) => {
+        if (!rh || !Array.isArray(rh.steps) || rh.steps.length === 0) return null;
+        let maxDone = -1;
+        for (const st of rh.steps) {
+          if (!st || st.success === false) continue;
+          const ai = Number(st.actionIndex);
+          if (Number.isFinite(ai)) maxDone = Math.max(maxDone, ai);
+        }
+        if (maxDone < 0) return null;
+        return maxDone + 1;
+      };
+      const inferredFromRh = inferMinIndexFromRunHistory(effectiveRunHistory);
+      if (inferredFromRh != null && inferredFromRh > mergedActionIndex) {
+        console.log("\u{1F6E1}\uFE0F [SAVE_PLAYBACK_STATE] actionIndex \u043F\u043E\u0434\u043D\u044F\u0442 \u043F\u043E runHistory:", {
+          inferredFromRh,
+          mergedBefore: mergedActionIndex
+        });
+        mergedActionIndex = inferredFromRh;
+      }
+      const mergedRunFinished = !!(message2.playbackRunFinished || prevState?.playbackRunFinished);
+      let mergedIsPaused = prevState?.isPaused === true;
+      if (message2 && Object.prototype.hasOwnProperty.call(message2, "isPaused")) {
+        mergedIsPaused = message2.isPaused === true;
+      }
+      manager.isPaused = mergedIsPaused;
       manager.playbackState = {
         test: testToSave,
         actionIndex: mergedActionIndex,
@@ -1002,23 +1018,30 @@
         isGroupRun: message2.isGroupRun || false,
         groupRunCurrentIndex: message2.groupRunCurrentIndex,
         groupRunTotal: message2.groupRunTotal,
-        playbackSessionId: mergedPlaybackSessionId
+        playbackSessionId: mergedPlaybackSessionId,
+        playbackRunFinished: mergedRunFinished,
+        isPaused: mergedIsPaused
       };
-      const playbackStateForStorage = __spreadProps(__spreadValues({}, manager.playbackState), {
-        testRefId: (testToSave == null ? void 0 : testToSave.id) || null,
+      if (testToSave?.id != null) {
+        manager.activePlaybackTestId = String(testToSave.id);
+      }
+      const playbackStateForStorage = {
+        ...manager.playbackState,
+        testRefId: testToSave?.id || null,
+        // Храним в storage только метаданные теста, чтобы не выбивать квоту.
         test: testToSave ? {
           id: testToSave.id,
           name: testToSave.name,
           createdAt: testToSave.createdAt,
           updatedAt: testToSave.updatedAt
         } : null
-      });
+      };
       if (!manager.isPlaying) {
         console.log("\u26A0\uFE0F isPlaying \u0431\u044B\u043B false, \u0443\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u044E \u0432 true");
         manager.isPlaying = true;
       }
       const isQuotaError = (e) => {
-        const msg = ((e == null ? void 0 : e.message) || (e == null ? void 0 : e.toString()) || "").toLowerCase();
+        const msg = (e?.message || e?.toString() || "").toLowerCase();
         return msg.includes("quota") || msg.includes("kquotabytes") || msg.includes("resource::");
       };
       try {
@@ -1028,7 +1051,7 @@
         if (verify.playbackState) {
           console.log("\u2705 \u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E \u0438 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E");
           console.log("   \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E:", {
-            testId: (_h = verify.playbackState.test) == null ? void 0 : _h.id,
+            testId: verify.playbackState.test?.id,
             actionIndex: verify.playbackState.actionIndex,
             nextUrl: verify.playbackState.nextUrl
           });
@@ -1040,20 +1063,22 @@
         console.error("   \u0414\u0435\u0442\u0430\u043B\u0438 \u043E\u0448\u0438\u0431\u043A\u0438:", error.message, error.stack);
         if (isQuotaError(error)) {
           try {
-            const trimmed = __spreadValues({}, playbackStateForStorage);
-            if ((trimmed.runHistory == null ? void 0 : trimmed.runHistory.steps) && Array.isArray(trimmed.runHistory.steps)) {
-              trimmed.runHistory = __spreadProps(__spreadValues({}, trimmed.runHistory), {
-                steps: trimmed.runHistory.steps.map((s) => __spreadProps(__spreadValues({}, s), {
+            const trimmed = { ...playbackStateForStorage };
+            if (trimmed.runHistory?.steps?.length) {
+              trimmed.runHistory = {
+                ...trimmed.runHistory,
+                steps: trimmed.runHistory.steps.map((s) => ({
+                  ...s,
                   screenshot: void 0,
                   beforeScreenshot: void 0,
                   afterScreenshot: void 0
                 }))
-              });
+              };
             }
             yield chrome.storage.local.set({ playbackState: trimmed });
             console.warn("\u26A0\uFE0F \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E \u0431\u0435\u0437 \u0441\u043A\u0440\u0438\u043D\u0448\u043E\u0442\u043E\u0432 \u0438\u0437-\u0437\u0430 \u043A\u0432\u043E\u0442\u044B \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430");
           } catch (e2) {
-            console.warn("\u26A0\uFE0F \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0434\u0430\u0436\u0435 \u043E\u0431\u043B\u0435\u0433\u0447\u0451\u043D\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435:", e2 == null ? void 0 : e2.message);
+            console.warn("\u26A0\uFE0F \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0434\u0430\u0436\u0435 \u043E\u0431\u043B\u0435\u0433\u0447\u0451\u043D\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435:", e2?.message);
           }
         }
       }
@@ -1069,34 +1094,38 @@
             state = data.playbackState;
             manager.playbackState = state;
             manager.isPlaying = true;
+            manager.isPaused = state.isPaused === true;
             console.log("\u{1F4E5} \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E playbackState \u0438\u0437 storage (service worker \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0449\u0435\u043D)");
           }
         } catch (e) {
-          console.warn("\u26A0\uFE0F \u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 playbackState \u0438\u0437 storage:", e == null ? void 0 : e.message);
+          console.warn("\u26A0\uFE0F \u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 playbackState \u0438\u0437 storage:", e?.message);
         }
       }
       console.log("\u{1F4E5} \u0417\u0430\u043F\u0440\u043E\u0441 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F:", {
         hasPlaybackState: !!state,
         isPlaying: manager.isPlaying,
-        actionIndex: state == null ? void 0 : state.actionIndex,
-        nextUrl: state == null ? void 0 : state.nextUrl
+        actionIndex: state?.actionIndex,
+        nextUrl: state?.nextUrl
       });
-      const stateHasActions = !!((state == null ? void 0 : state.test) && Array.isArray(state.test.actions));
+      const stateHasActions = !!(state?.test && Array.isArray(state.test.actions));
       if (state && !stateHasActions) {
-        const refId = (state == null ? void 0 : state.testRefId) || ((state == null ? void 0 : state.test) == null ? void 0 : state.test.id);
+        const refId = state?.testRefId || state?.test?.id;
         const fullTest = refId ? getTestById(manager, refId) : null;
         if (fullTest) {
-          state = __spreadProps(__spreadValues({}, state), {
-            test: __spreadProps(__spreadValues({}, fullTest), {
+          state = {
+            ...state,
+            test: {
+              ...fullTest,
               actions: Array.isArray(fullTest.actions) ? [...fullTest.actions] : []
-            })
-          });
+            }
+          };
           manager.playbackState = state;
         }
       }
       if (state && (manager.isPlaying || state.test)) {
         console.log("\u2705 \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u044E \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F");
         const inGroupRun = !!manager.currentGroupId;
+        manager.isPaused = state.isPaused === true;
         sendResponse2({
           success: true,
           isPlaying: true,
@@ -1108,23 +1137,48 @@
           isGroupRun: state.isGroupRun || inGroupRun,
           groupRunCurrentIndex: state.groupRunCurrentIndex,
           groupRunTotal: state.groupRunTotal,
-          playbackSessionId: state.playbackSessionId || null
+          playbackSessionId: state.playbackSessionId || null,
+          playbackRunFinished: state.playbackRunFinished === true,
+          isPaused: state.isPaused === true
         });
       } else {
         console.log("\u2139\uFE0F \u0412\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u043E");
-        sendResponse2({ success: true, isPlaying: false });
+        if (!manager.isPlaying) manager.isPaused = false;
+        sendResponse2({ success: true, isPlaying: false, isPaused: false });
+      }
+    }));
+    registry.register("GET_I18N_TRANSLATIONS", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
+      const lang = message2.lang === "ru" ? "ru" : "en";
+      try {
+        const url = chrome.runtime.getURL(`i18n/${lang}.json`);
+        const resp = yield fetch(url);
+        if (!resp.ok) {
+          sendResponse2({ success: false, error: `HTTP ${resp.status}` });
+          return;
+        }
+        const translations = yield resp.json();
+        let enFallback = null;
+        if (lang !== "en") {
+          try {
+            const enResp = yield fetch(chrome.runtime.getURL("i18n/en.json"));
+            if (enResp.ok) enFallback = yield enResp.json();
+          } catch (_) {
+          }
+        }
+        sendResponse2({ success: true, translations, enFallback });
+      } catch (e) {
+        sendResponse2({ success: false, error: e?.message || String(e) });
       }
     }));
     registry.register("CLEAR_PLAYBACK_STATE", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
       try {
         manager.playbackState = null;
-        manager.isPlaying = false;
         yield chrome.storage.local.remove("playbackState");
         console.log("\u2705 [CLEAR_PLAYBACK_STATE] \u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E\u0447\u0438\u0449\u0435\u043D\u043E");
         sendResponse2({ success: true });
       } catch (e) {
-        console.warn("\u26A0\uFE0F [CLEAR_PLAYBACK_STATE]", e == null ? void 0 : e.message);
-        sendResponse2({ success: false, error: e == null ? void 0 : e.message });
+        console.warn("\u26A0\uFE0F [CLEAR_PLAYBACK_STATE]", e?.message);
+        sendResponse2({ success: false, error: e?.message });
       }
     }));
     registry.register("CLEAR_ALL_SCREENSHOTS", (_0) => __async(null, [_0], function* ({ sendResponse: sendResponse2 }) {
@@ -1272,8 +1326,7 @@
       return test.actions[actionIndex].url || null;
     }
     registry.register("START_RECORDING_INTO_TEST", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a;
-      console.log("\u{1F3AC} \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 START_RECORDING_INTO_TEST...");
+      console.log("\u{1F3AC} \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 START_RECORDING_IN\u0422\u041E_TEST...");
       if (manager.isRecording) {
         sendResponse2({ success: false, error: "\u0417\u0430\u043F\u0438\u0441\u044C \u0443\u0436\u0435 \u0438\u0434\u0435\u0442" });
         return;
@@ -1297,7 +1350,7 @@
         targetUrl = getActionUrl(existingTest, message2.insertAfterIndex);
       }
       if (!targetUrl) {
-        const firstAction = (_a = existingTest.actions) == null ? void 0 : _a.find((a) => a.url);
+        const firstAction = existingTest.actions?.find((a) => a.url);
         if (firstAction) {
           targetUrl = firstAction.url;
         }
@@ -1307,7 +1360,7 @@
       }
       console.log(`\u{1F3AF} \u0426\u0435\u043B\u0435\u0432\u043E\u0439 URL \u0434\u043B\u044F \u0437\u0430\u043F\u0438\u0441\u0438: ${targetUrl}`);
       try {
-        const targetTabId2 = (message2 == null ? void 0 : message2.tabId) ? Number(message2.tabId) : null;
+        const targetTabId2 = message2?.tabId ? Number(message2.tabId) : null;
         if (targetTabId2) {
           let tab = null;
           try {
@@ -1342,12 +1395,7 @@
             fromMarker: true
           });
         }
-        manager.resumePlaybackAfterRecordingStop = !!(
-          message2.tabId != null &&
-          String(message2.tabId).trim() !== "" &&
-          Number.isFinite(Number(message2.tabId)) &&
-          Number(message2.tabId) > 0
-        );
+        manager.resumePlaybackAfterRecordingStop = !!(message2.tabId != null && String(message2.tabId).trim() !== "" && Number.isFinite(Number(message2.tabId)) && Number(message2.tabId) > 0);
         console.log("\u2705 Broadcast \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D, \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u044F\u044E \u043E\u0442\u0432\u0435\u0442...");
         sendResponse2({ success: true, testId: manager.currentTest.id });
         console.log("\u2705 \u041E\u0442\u0432\u0435\u0442 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D \u0443\u0441\u043F\u0435\u0448\u043D\u043E");
@@ -1367,7 +1415,7 @@
           sendResponse2({ success: false, error: "\u0417\u0430\u043F\u0438\u0441\u044C \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u0430" });
           return;
         }
-        const cancelMarkerRecording = !!(message2 == null ? void 0 : message2.cancelMarkerRecording);
+        const cancelMarkerRecording = !!message2?.cancelMarkerRecording;
         manager.isRecording = false;
         if (manager.currentTest) {
           const actionsCountBefore = manager.currentTest.actions.length;
@@ -1380,11 +1428,11 @@
             const middle = manager.currentTest.actions.slice(sortStart, sortEndExclusive);
             const after = manager.currentTest.actions.slice(sortEndExclusive);
             middle.sort((a, b) => {
-              const ta = Number(a == null ? void 0 : a.timestamp) || 0;
-              const tb = Number(b == null ? void 0 : b.timestamp) || 0;
+              const ta = Number(a?.timestamp) || 0;
+              const tb = Number(b?.timestamp) || 0;
               if (ta !== tb) return ta - tb;
-              const oa = Number(a == null ? void 0 : a.__recordArrivalOrder) || 0;
-              const ob = Number(b == null ? void 0 : b.__recordArrivalOrder) || 0;
+              const oa = Number(a?.__recordArrivalOrder) || 0;
+              const ob = Number(b?.__recordArrivalOrder) || 0;
               return oa - ob;
             });
             manager.currentTest.actions = before.concat(middle, after).map(removeInternalRecordMeta);
@@ -1395,24 +1443,24 @@
           }
           if (wasRecordingIntoExisting && cancelMarkerRecording && recordedCount > 0 && manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null) {
             manager.currentTest.actions.splice(manager.recordInsertIndex, recordedCount);
-            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C, \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${recordedCount} \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439, \u0442\u0435\u0441\u0442 \u043E\u0441\u0442\u0430\u043B\u0441\u044F \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439.`);
+            console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C, \u0443\u0434\u0430\u043B\u0435\u043D\u043E ${recordedCount} \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439, \u0442\u0435\u0441\u0442 \u043D\u0435 \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u0441\u0445\u043E\u0434\u043D\u043E\u0433\u043E \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F.`);
           }
           const actionsCountAfter = manager.currentTest.actions.length;
           manager.tests.set(manager.currentTest.id, manager.currentTest);
           yield manager.saveTests();
           if (wasRecordingIntoExisting && manager.recordMarkerActionIndex !== null && manager.recordMarkerActionIndex !== void 0 && !cancelMarkerRecording) {
-            const markerActionIndex2 = manager.recordMarkerActionIndex;
-            if (markerActionIndex2 >= 0 && markerActionIndex2 < manager.currentTest.actions.length) {
-              const markerAction = manager.currentTest.actions[markerActionIndex2];
+            const markerActionIndexClear = manager.recordMarkerActionIndex;
+            if (markerActionIndexClear >= 0 && markerActionIndexClear < manager.currentTest.actions.length) {
+              const markerAction = manager.currentTest.actions[markerActionIndexClear];
               if (markerAction && markerAction.recordMarker === true) {
                 markerAction.recordMarker = false;
-                console.log(`\u{1F534} \u041C\u0430\u0440\u043A\u0435\u0440 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043D\u044F\u0442 \u0441 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F ${markerActionIndex2 + 1}`);
+                console.log(`\u{1F534} \u041C\u0430\u0440\u043A\u0435\u0440 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441\u043D\u044F\u0442 \u0441 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F ${markerActionIndexClear + 1}`);
               }
             }
           }
           if (wasRecordingIntoExisting) {
             if (cancelMarkerRecording) {
-              console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u043E\u0432\u044B\u0445 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
+              console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u043C\u0430\u0440\u043A\u0435\u0440\u0443 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043D\u0438 \u043E\u0434\u043D\u043E\u0433\u043E \u043D\u043E\u0432\u043E\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
             } else {
               console.log(`\u23F9\uFE0F \u0417\u0430\u043F\u0438\u0441\u044C \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430. \u0412 \u0442\u0435\u0441\u0442 "${manager.currentTest.name}" \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E ${recordedCount} \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 (\u0432\u0441\u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439: ${actionsCountAfter})`);
             }
@@ -1453,10 +1501,13 @@
     }));
     registry.register("ADD_ACTION", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
       if (manager.isRecording && manager.currentTest) {
-        const incomingTs = Number((message2 == null ? void 0 : message2.action) ? message2.action.timestamp : void 0);
-        const newAction = __spreadProps(__spreadValues({}, message2.action), {
+        const incomingTs = Number(message2?.action?.timestamp);
+        const newAction = {
+          ...message2.action,
+          // ВАЖНО: сохраняем исходный timestamp события из content script, если он передан.
+          // Иначе порядок шагов может "плавать" из-за задержек доставки сообщений.
           timestamp: Number.isFinite(incomingTs) && incomingTs > 0 ? incomingTs : Date.now()
-        });
+        };
         manager._recordArrivalCounter = (manager._recordArrivalCounter || 0) + 1;
         newAction.__recordArrivalOrder = manager._recordArrivalCounter;
         if (isDuplicateClientRecordedAction(manager, newAction)) {
@@ -1470,6 +1521,14 @@
           return;
         }
         newAction.type = validation.normalizedType || newAction.type;
+        if (newAction.type === "input") {
+          const actions2 = manager.currentTest.actions || [];
+          const last = actions2.length > 0 ? actions2[actions2.length - 1] : null;
+          if (last && (last.type === "click" || last.type === "dblclick")) {
+            newAction.delayBefore = 200;
+            newAction.inputAfterClick = true;
+          }
+        }
         const actions = manager.currentTest.actions || [];
         const hasInsertMode = manager.recordInsertIndex !== void 0 && manager.recordInsertIndex !== null;
         const lastRecordedIndex = hasInsertMode ? manager.recordedActionsCount > 0 ? manager.recordInsertIndex + manager.recordedActionsCount - 1 : -1 : actions.length - 1;
@@ -1490,8 +1549,6 @@
           sendResponse2({ success: true, replacedPreviousValue: true });
           return;
         }
-        // Не заменяем "старые" value-шаги через дальний поиск по диапазону.
-        // Это сохраняет фактическую последовательность пользовательских действий.
         if (hasInsertMode) {
           manager.currentTest.actions.splice(manager.recordInsertIndex + manager.recordedActionsCount, 0, newAction);
           manager.recordedActionsCount++;
@@ -1574,21 +1631,20 @@
       const actionsOrdered = Array.isArray(updatedTest.actions) ? [...updatedTest.actions] : [];
       const prevTest = manager.tests.get(String(updatedTest.id));
       let mergedExt = updatedTest.extensionAssets;
-      if (prevTest != null && prevTest.extensionAssets && typeof prevTest.extensionAssets === "object") {
+      if (prevTest?.extensionAssets && typeof prevTest.extensionAssets === "object") {
         const inc = mergedExt && typeof mergedExt === "object" ? mergedExt : {};
-        mergedExt = __spreadValues(__spreadValues({}, prevTest.extensionAssets), inc);
-        if (inc.visualRegressionBaselines && typeof inc.visualRegressionBaselines === "object" || prevTest.extensionAssets.visualRegressionBaselines) {
-          mergedExt.visualRegressionBaselines = __spreadValues(
-            __spreadValues({}, prevTest.extensionAssets.visualRegressionBaselines || {}),
-            (inc.visualRegressionBaselines || {})
-          );
-        }
+        mergedExt = { ...prevTest.extensionAssets, ...inc };
+        mergedExt.visualRegressionBaselines = {
+          ...prevTest.extensionAssets.visualRegressionBaselines || {},
+          ...inc.visualRegressionBaselines || {}
+        };
       }
-      manager.tests.set(updatedTest.id, __spreadProps(__spreadValues({}, updatedTest), {
+      manager.tests.set(updatedTest.id, {
+        ...updatedTest,
         actions: actionsOrdered,
         extensionAssets: mergedExt,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-      }));
+      });
       yield manager.saveTests();
       yield manager.triggerExcelExport(updatedTest.id, "save");
       sendResponse2({ success: true });
@@ -1608,13 +1664,13 @@
         sendResponse2({ success: false, error: "Test not found" });
         return;
       }
-      test.extensionAssets = __spreadValues({}, test.extensionAssets || {});
+      test.extensionAssets = { ...test.extensionAssets || {} };
       const incoming = assets;
       if (incoming.visualRegressionBaselines && typeof incoming.visualRegressionBaselines === "object") {
-        test.extensionAssets.visualRegressionBaselines = __spreadValues(
-          __spreadValues({}, test.extensionAssets.visualRegressionBaselines || {}),
-          incoming.visualRegressionBaselines
-        );
+        test.extensionAssets.visualRegressionBaselines = {
+          ...test.extensionAssets.visualRegressionBaselines || {},
+          ...incoming.visualRegressionBaselines
+        };
       }
       for (const key of Object.keys(incoming)) {
         if (key !== "visualRegressionBaselines") {
@@ -1626,7 +1682,6 @@
       sendResponse2({ success: true });
     }));
     registry.register("SELECTOR_FOUND_DURING_PLAYBACK", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a;
       try {
         const testId = String(message2.testId);
         const selector = message2.selector;
@@ -1656,7 +1711,7 @@
           const normalizedReceivedSelector = selector.trim();
           if (normalizedActionSelector === normalizedReceivedSelector || normalizedActionSelector.includes(normalizedReceivedSelector) || normalizedReceivedSelector.includes(normalizedActionSelector)) {
             if (action.selectorQuality) {
-              const originalIssuesCount = ((_a = action.selectorQuality.issues) == null ? void 0 : _a.length) || 0;
+              const originalIssuesCount = action.selectorQuality.issues?.length || 0;
               action.selectorQuality.issues = (action.selectorQuality.issues || []).filter(
                 (issue) => !issue.includes("\u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D") && !issue.includes("\u042D\u043B\u0435\u043C\u0435\u043D\u0442 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D")
               );
@@ -1727,7 +1782,7 @@
             const data = keys.length > 0 ? Object.fromEntries(keys.filter((k) => k in response.data).map((k) => [k, response.data[k]])) : response.data;
             sendResponse2({ success: true, data });
           } else {
-            sendResponse2({ success: false, error: (response == null ? void 0 : response.error) || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C localStorage" });
+            sendResponse2({ success: false, error: response?.error || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C localStorage" });
           }
         } catch (scriptError) {
           try {
@@ -1769,9 +1824,10 @@
         const { method, url, headers, body } = message2;
         const fetchOptions = {
           method: method || "GET",
-          headers: __spreadValues({
-            "Content-Type": "application/json"
-          }, headers)
+          headers: {
+            "Content-Type": "application/json",
+            ...headers
+          }
         };
         if (body && ["POST", "PUT", "PATCH"].includes(method)) {
           fetchOptions.body = typeof body === "string" ? body : JSON.stringify(body);
@@ -1779,7 +1835,7 @@
         const response = yield typeof withRetry === "function" ? withRetry(() => fetch(url, fetchOptions), {
           maxAttempts: 3,
           delayMs: 1e3,
-          shouldRetry: (err) => (err == null ? void 0 : err.name) === "TypeError" || (err == null ? void 0 : err.message) && /network|failed|fetch/i.test(err.message)
+          shouldRetry: (err) => err?.name === "TypeError" || err?.message && /network|failed|fetch/i.test(err.message)
         }) : fetch(url, fetchOptions);
         const responseData = yield response.text();
         let parsedData;
@@ -1810,10 +1866,12 @@
         });
       }
     }));
-    registry.register("TEST_STEP_PROGRESS", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
-      var _tab;
-      if (((_tab = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab.id) != null) {
-        manager.playbackTabId = sender2.tab.id;
+    registry.register("TEST_STEP_PROGRESS", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
+      if (sender?.tab?.id != null) {
+        manager.playbackTabId = sender.tab.id;
+      }
+      if (message2.testId != null && message2.testId !== "") {
+        manager.activePlaybackTestId = String(message2.testId);
       }
       manager.currentStep = message2.step;
       manager.totalSteps = message2.total;
@@ -1828,10 +1886,12 @@
       });
       sendResponse2({ success: true });
     }));
-    registry.register("TEST_STEP_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sender: sender2, sendResponse: sendResponse2 }) {
-      var _tab2;
-      if (((_tab2 = sender2 == null ? void 0 : sender2.tab) == null ? void 0 : _tab2.id) != null) {
-        manager.playbackTabId = sender2.tab.id;
+    registry.register("TEST_STEP_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
+      if (sender?.tab?.id != null) {
+        manager.playbackTabId = sender.tab.id;
+      }
+      if (message2.testId != null && message2.testId !== "") {
+        manager.activePlaybackTestId = String(message2.testId);
       }
       if (!manager.completedSteps) {
         manager.completedSteps = /* @__PURE__ */ new Map();
@@ -1873,7 +1933,6 @@
       sendResponse2({ success: true });
     }));
     registry.register("TEST_COMPLETED", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e;
       yield manager.stopVideoRecordingIfActive(message2.testId);
       const runMode = message2.runMode || "optimized";
       const optimizationSummary = message2.optimizationSummary || {};
@@ -1901,7 +1960,7 @@
             test: st.test,
             mode: st.mode,
             debugMode: st.debugMode,
-            groupContext: __spreadValues({}, st.rows[st.index]),
+            groupContext: { ...st.rows[st.index] },
             _fromDataDrivenQueue: true
           }, () => {
           });
@@ -1910,7 +1969,7 @@
         }
         const summary = {
           testId: st.testId,
-          testName: ((_e = manager.tests.get(String(st.testId))) == null ? void 0 : _e.name) || "",
+          testName: manager.tests.get(String(st.testId))?.name || "",
           totalRows: st.rows.length,
           results: st.results.slice(),
           allPassed: st.results.every((r) => r.success)
@@ -1926,7 +1985,7 @@
         suppressCompletionPopup = true;
         const group = manager.testGroups.get(manager.currentGroupId);
         if (group && Array.isArray(group.testIds) && message2.testId === group.testIds[manager.groupRunIndex]) {
-          const testName = message2.testName || ((_a = manager.tests.get(message2.testId)) == null ? void 0 : _a.name) || String(message2.testId);
+          const testName = message2.testName || manager.tests.get(message2.testId)?.name || String(message2.testId);
           const durationMs = typeof message2.durationMs === "number" ? message2.durationMs : 0;
           const stepsCompleted = typeof message2.stepsCompleted === "number" ? message2.stepsCompleted : 0;
           const stepsTotal = typeof message2.stepsTotal === "number" ? message2.stepsTotal : 0;
@@ -1952,7 +2011,7 @@
               testId: nextTestId,
               mode: manager.groupRunMode,
               debugMode: manager.groupDebugMode,
-              groupContext: __spreadValues({}, manager.groupContext),
+              groupContext: { ...manager.groupContext },
               isGroupRun: true,
               groupRunCurrentIndex: manager.groupRunIndex,
               groupRunTotal: group.testIds.length
@@ -1980,7 +2039,7 @@
           summary: { results: results2, totalDurationMs, errors }
         }).catch(() => {
         });
-        const tabId2 = (_b = sender == null ? void 0 : sender.tab) == null ? void 0 : _b.id;
+        const tabId2 = sender?.tab?.id;
         if (tabId2 && results2.length > 0) {
           const summaryPayload = { results: results2, totalDurationMs, errors, success: groupSuccess, error: groupError };
           const GROUP_SUMMARY_DELAY_MS = 2200;
@@ -1994,10 +2053,10 @@
               summary: summaryPayload
             }).catch((e) => {
               if (attempt < MAX_RETRIES) {
-                console.warn(`SHOW_GROUP_SUMMARY \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt} \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C, \u043F\u043E\u0432\u0442\u043E\u0440 \u0447\u0435\u0440\u0435\u0437 ${RETRY_DELAY_MS}ms:`, e == null ? void 0 : e.message);
+                console.warn(`SHOW_GROUP_SUMMARY \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt} \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C, \u043F\u043E\u0432\u0442\u043E\u0440 \u0447\u0435\u0440\u0435\u0437 ${RETRY_DELAY_MS}ms:`, e?.message);
                 setTimeout(sendSummary, RETRY_DELAY_MS);
               } else {
-                console.warn("SHOW_GROUP_SUMMARY \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0432\u043E \u0432\u043A\u043B\u0430\u0434\u043A\u0443 \u043F\u043E\u0441\u043B\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u043E\u0432:", e == null ? void 0 : e.message);
+                console.warn("SHOW_GROUP_SUMMARY \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0432\u043E \u0432\u043A\u043B\u0430\u0434\u043A\u0443 \u043F\u043E\u0441\u043B\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u043E\u0432:", e?.message);
               }
             });
           };
@@ -2005,6 +2064,8 @@
         }
       }
       manager.isPlaying = false;
+      manager.isPaused = false;
+      manager.activePlaybackTestId = null;
       manager.currentStep = 0;
       manager.totalSteps = 0;
       manager.stepType = null;
@@ -2036,17 +2097,15 @@
       const completedTest = manager.tests.get(message2.testId);
       if (completedTest && message2.adaptiveRunResults && Array.isArray(message2.adaptiveRunResults) && completedTest.actions) {
         message2.adaptiveRunResults.forEach((result2, idx) => {
-          var _a2;
-          if (result2 && ((_a2 = completedTest.actions[idx]) == null ? void 0 : _a2.type) === "adaptive") {
+          if (result2 && completedTest.actions[idx]?.type === "adaptive") {
             completedTest.actions[idx]._runHistory = result2._runHistory || [];
             if (result2._statistics) completedTest.actions[idx]._statistics = result2._statistics;
           }
         });
       }
-      if ((completedTest == null ? void 0 : completedTest.actions) && ((_c = message2.actionUrlUpdates) == null ? void 0 : _c.length)) {
+      if (completedTest?.actions && message2.actionUrlUpdates?.length) {
         message2.actionUrlUpdates.forEach(({ index, url }) => {
-          var _a2;
-          if (((_a2 = completedTest.actions[index]) == null ? void 0 : _a2.type) === "analysis" && url) {
+          if (completedTest.actions[index]?.type === "analysis" && url) {
             completedTest.actions[index].url = url;
           }
         });
@@ -2066,7 +2125,7 @@
           completedTest.optimization.lastRemovedCount = optimizationSummary.removedCount;
           completedTest.optimization.lastRemovedIndices = optimizationSummary.removedIndices || optimizationSummary.removedActions || [];
         } else if (!completedTest.optimization.optimizedAvailable) {
-          completedTest.optimization.optimizedAvailable = ((_d = completedTest.actions) == null ? void 0 : _d.some((action) => action.hidden)) || false;
+          completedTest.optimization.optimizedAvailable = completedTest.actions?.some((action) => action.hidden) || false;
         }
         manager.tests.set(completedTest.id, completedTest);
         yield manager.saveTests();
@@ -2080,13 +2139,12 @@
       sendResponse2({ success: true, suppressCompletionPopup });
     }));
     registry.register("REMOVE_INEFFECTIVE_ACTIONS", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a;
       const testToUpdate = manager.tests.get(message2.testId);
       if (!testToUpdate) {
         sendResponse2({ success: false, error: "Test not found" });
         return;
       }
-      if ((_a = testToUpdate.optimization) == null ? void 0 : _a.optimizedApplied) {
+      if (testToUpdate.optimization?.optimizedApplied) {
         console.log(`\u26A0\uFE0F \u041E\u043F\u0442\u0438\u043C\u0438\u0437\u0430\u0446\u0438\u044F \u0434\u043B\u044F \u0442\u0435\u0441\u0442\u0430 ${testToUpdate.name} \u0443\u0436\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043C\u0435\u043D\u0435\u043D\u0430 \u0440\u0430\u043D\u0435\u0435, \u043F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u044E`);
         sendResponse2({
           success: true,
@@ -2106,7 +2164,9 @@
       const detailMap = new Map(actionDetails.map((detail) => [detail.index, detail]));
       const now = (/* @__PURE__ */ new Date()).toISOString();
       const actions = testToUpdate.actions;
-      const getActionText = (action) => String(action?.fieldLabel || action?.description || action?.name || action?.label || action?.value || "").toLowerCase();
+      const getActionText = (action) => String(
+        action?.fieldLabel || action?.description || action?.name || action?.label || action?.value || ""
+      ).toLowerCase();
       const hasExplicitSelector = (action) => {
         const selectorText = String(action?.selector?.selector || action?.selector?.value || action?.selector || "").trim();
         if (!selectorText) return false;
@@ -2236,15 +2296,14 @@
       }
     }));
     registry.register("CAPTURE_FULL_PAGE_SCREENSHOT", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b, _c, _d, _e, _f;
       const safeSend = (res) => {
         try {
           sendResponse2(res);
         } catch (e) {
-          console.warn("CAPTURE_FULL_PAGE_SCREENSHOT sendResponse failed:", e == null ? void 0 : e.message);
+          console.warn("CAPTURE_FULL_PAGE_SCREENSHOT sendResponse failed:", e?.message);
         }
       };
-      const tabId2 = (message2 == null ? void 0 : message2.tabId) || ((_a = sender == null ? void 0 : sender.tab) == null ? void 0 : _a.id);
+      const tabId2 = message2?.tabId || sender?.tab?.id;
       if (!tabId2) {
         safeSend({ success: false, error: "tabId \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D" });
         return;
@@ -2252,11 +2311,11 @@
       try {
         yield chrome.debugger.attach({ tabId: tabId2 }, "1.3");
       } catch (e) {
-        if ((_b = e == null ? void 0 : e.message) == null ? void 0 : _b.includes("Another debugger")) {
+        if (e?.message?.includes("Another debugger")) {
           safeSend({ success: false, error: "DevTools \u0443\u0436\u0435 \u043E\u0442\u043A\u0440\u044B\u0442\u044B. \u0417\u0430\u043A\u0440\u043E\u0439\u0442\u0435 DevTools (Ctrl+Shift+I) \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435. \u041A\u043E\u043C\u0430\u043D\u0434\u0430 \xAB\u0421\u0434\u0435\u043B\u0430\u0442\u044C \u043F\u043E\u043B\u043D\u043E\u0440\u0430\u0437\u043C\u0435\u0440\u043D\u044B\u0439 \u0441\u043A\u0440\u0438\u043D\u0448\u043E\u0442\xBB / \xABCapture full size screenshot\xBB \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 \u043F\u0440\u0438 \u043E\u0442\u043A\u0440\u044B\u0442\u044B\u0445 DevTools." });
           return;
         }
-        safeSend({ success: false, error: (e == null ? void 0 : e.message) || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C debugger" });
+        safeSend({ success: false, error: e?.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C debugger" });
         return;
       }
       const detach = () => {
@@ -2277,9 +2336,9 @@
       try {
         yield sendCmd("Page.enable");
         const metrics = yield sendCmd("Page.getLayoutMetrics");
-        const rect = metrics.cssContentSize || metrics.contentSize || ((_c = metrics.layoutMetrics) == null ? void 0 : _c.contentSize);
-        const rawHeight = (_d = rect == null ? void 0 : rect.height) != null ? _d : 1080;
-        const rawWidth = (_e = rect == null ? void 0 : rect.width) != null ? _e : 1920;
+        const rect = metrics.cssContentSize || metrics.contentSize || metrics.layoutMetrics?.contentSize;
+        const rawHeight = rect?.height ?? 1080;
+        const rawWidth = rect?.width ?? 1920;
         if (rawHeight > 16384 || rawWidth > 16384) {
           detach();
           safeSend({ success: false, error: "\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043F\u0440\u0435\u0432\u044B\u0448\u0430\u0435\u0442 \u043B\u0438\u043C\u0438\u0442 Chrome (16384px). \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0441\u043A\u043B\u0435\u0439\u043A\u0430." });
@@ -2299,23 +2358,22 @@
         safeSend({ success: true, screenshot: "data:image/png;base64," + shot.data });
       } catch (e) {
         detach();
-        const errMsg = (e == null ? void 0 : e.message) || ((_f = e == null ? void 0 : e.toString) == null ? void 0 : _f.call(e)) || "\u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0445\u0432\u0430\u0442\u0430";
+        const errMsg = e?.message || e?.toString?.() || "\u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0445\u0432\u0430\u0442\u0430";
         console.warn("CAPTURE_FULL_PAGE_SCREENSHOT error:", errMsg);
         safeSend({ success: false, error: errMsg });
       }
     }));
     registry.register("TAKE_SCREENSHOT", (_0) => __async(null, [_0], function* ({ sender, sendResponse: sendResponse2 }) {
-      var _a;
       const safeSend = (res) => {
         try {
           sendResponse2(res);
         } catch (e) {
-          console.warn("TAKE_SCREENSHOT sendResponse failed:", e == null ? void 0 : e.message);
+          console.warn("TAKE_SCREENSHOT sendResponse failed:", e?.message);
         }
       };
       let activeTab;
       try {
-        if ((_a = sender == null ? void 0 : sender.tab) == null ? void 0 : _a.id) {
+        if (sender?.tab?.id) {
           activeTab = sender.tab;
         }
         if (!activeTab) {
@@ -2327,7 +2385,7 @@
           return;
         }
         const { pluginSettings } = yield chrome.storage.local.get("pluginSettings");
-        const screenshotSettings = (pluginSettings == null ? void 0 : pluginSettings.screenshots) || {};
+        const screenshotSettings = pluginSettings?.screenshots || {};
         const format = screenshotSettings.format === "png" || screenshotSettings.format === "jpeg" ? screenshotSettings.format : "jpeg";
         const quality = Math.min(100, Math.max(0, Number(screenshotSettings.quality) || 85));
         const captureOptions = { format, quality };
@@ -2345,7 +2403,7 @@
               return;
             }
             const { pluginSettings } = yield chrome.storage.local.get("pluginSettings");
-            const screenshotSettings = (pluginSettings == null ? void 0 : pluginSettings.screenshots) || {};
+            const screenshotSettings = pluginSettings?.screenshots || {};
             const format = screenshotSettings.format === "png" || screenshotSettings.format === "jpeg" ? screenshotSettings.format : "jpeg";
             const quality = Math.min(100, Math.max(0, Number(screenshotSettings.quality) || 85));
             const retryDataUrl = yield chrome.tabs.captureVisibleTab(retryTab.windowId, { format, quality });
@@ -2364,7 +2422,7 @@
               return;
             }
             const { pluginSettings } = yield chrome.storage.local.get("pluginSettings");
-            const screenshotSettings = (pluginSettings == null ? void 0 : pluginSettings.screenshots) || {};
+            const screenshotSettings = pluginSettings?.screenshots || {};
             const format = screenshotSettings.format === "png" || screenshotSettings.format === "jpeg" ? screenshotSettings.format : "jpeg";
             const quality = Math.min(100, Math.max(0, Number(screenshotSettings.quality) || 85));
             const retryDataUrl = yield chrome.tabs.captureVisibleTab(retryTab.windowId, { format, quality });
@@ -2378,7 +2436,6 @@
       }
     }));
     registry.register("SAVE_SCREENSHOT_TO_FILE", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a, _b;
       try {
         const { screenshot, testId, runId, stepNumber, screenshotType, savePath } = message2;
         if (!screenshot || !testId || stepNumber === void 0) {
@@ -2386,7 +2443,7 @@
           return;
         }
         const settings = yield chrome.storage.local.get("pluginSettings");
-        const screenshotSettings = ((_a = settings.pluginSettings) == null ? void 0 : _a.screenshots) || {};
+        const screenshotSettings = settings.pluginSettings?.screenshots || {};
         let screenshotMode = "none";
         if (screenshotSettings.saveToDisk === true) {
           screenshotMode = "download";
@@ -2407,7 +2464,7 @@
         const typeSuffix = screenshotType || "screenshot";
         const stepNumberForFile = String(stepNumber).replace(/\./g, "_");
         const fileLabel = typeSuffix === "screenshot" ? `screenshot_step_${stepNumberForFile}` : `step${stepNumberForFile}_${typeSuffix}`;
-        const mediaBase = (((_b = settings.pluginSettings) == null ? void 0 : _b.mediaSavePath) || screenshotSettings.saveFolder || (screenshotSettings.savePath || "").replace(/\/screenshots\/?$/i, "") || "AutoTestRecorder").trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+        const mediaBase = (settings.pluginSettings?.mediaSavePath || screenshotSettings.saveFolder || (screenshotSettings.savePath || "").replace(/\/screenshots\/?$/i, "") || "AutoTestRecorder").trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
         const baseDir = (mediaBase || "AutoTestRecorder") + "/screenshots";
         const format = screenshotSettings.format === "png" || screenshotSettings.format === "jpeg" ? screenshotSettings.format : "jpeg";
         const ext = format === "jpeg" ? "jpg" : "png";
@@ -2445,7 +2502,7 @@
         sendResponse2({ success: true, filename });
       } catch (error) {
         console.error("\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u0432\u0438\u0434\u0435\u043E:", error);
-        sendResponse2({ success: false, error: (error == null ? void 0 : error.message) || String(error) });
+        sendResponse2({ success: false, error: error?.message || String(error) });
       } finally {
         if (chrome.offscreen && typeof chrome.offscreen.closeDocument === "function") {
           chrome.offscreen.closeDocument().catch(() => {
@@ -2454,9 +2511,8 @@
       }
     }));
     registry.register("CLOSE_DIALOG_MAIN", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b;
       try {
-        const tabId2 = (message2 == null ? void 0 : message2.tabId) || ((_a = sender == null ? void 0 : sender.tab) == null ? void 0 : _a.id) || ((_b = (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]) == null ? void 0 : _b.id);
+        const tabId2 = message2?.tabId || sender?.tab?.id || (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
         if (!tabId2) {
           sendResponse2({ closed: false, error: "no tab" });
           return;
@@ -2535,21 +2591,20 @@
             return false;
           }
         });
-        const closed = results2 == null ? void 0 : results2.some((r) => (r == null ? void 0 : r.result) === true);
+        const closed = results2?.some((r) => r?.result === true);
         sendResponse2({ closed });
       } catch (e) {
-        sendResponse2({ closed: false, error: e == null ? void 0 : e.message });
+        sendResponse2({ closed: false, error: e?.message });
       }
     }));
     registry.register("EXECUTE_JS", (_0) => __async(null, [_0], function* ({ message, sendResponse }) {
-      var _a;
       try {
         const { script, tabId } = message;
         if (!script || typeof script !== "string") {
           sendResponse({ success: false, error: "\u0421\u043A\u0440\u0438\u043F\u0442 \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D \u0438\u043B\u0438 \u0438\u043C\u0435\u0435\u0442 \u043D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442" });
           return;
         }
-        const targetTabId = tabId || ((_a = (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]) == null ? void 0 : _a.id);
+        const targetTabId = tabId || (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
         if (!targetTabId) {
           sendResponse({ success: false, error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C tabId \u0434\u043B\u044F \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F \u0441\u043A\u0440\u0438\u043F\u0442\u0430" });
           return;
@@ -2585,29 +2640,25 @@
       }
     }));
     registry.register("SWITCH_TAB", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a;
       try {
         const { switchTab } = message2;
-        const mode = (switchTab == null ? void 0 : switchTab.mode) || "index";
-        let currentWindowId = (_a = sender == null ? void 0 : sender.tab) == null ? void 0 : _a.windowId;
+        const mode = switchTab?.mode || "index";
+        let currentWindowId = sender?.tab?.windowId;
         if (!currentWindowId) {
           const win = yield chrome.windows.getCurrent();
-          currentWindowId = win == null ? void 0 : win.id;
+          currentWindowId = win?.id;
         }
         const tabs = yield chrome.tabs.query({
           windowId: currentWindowId,
           windowType: "normal"
         });
         const filteredTabs = tabs.filter((t) => t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://") && !t.url.startsWith("edge://"));
-        const sortedTabs = filteredTabs.sort((a, b) => {
-          var _a2, _b;
-          return ((_a2 = a.index) != null ? _a2 : 0) - ((_b = b.index) != null ? _b : 0);
-        });
+        const sortedTabs = filteredTabs.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
         let targetTab = null;
         if (mode === "index") {
-          const idx = Math.max(0, parseInt(switchTab == null ? void 0 : switchTab.tabIndex, 10) || 0);
+          const idx = Math.max(0, parseInt(switchTab?.tabIndex, 10) || 0);
           targetTab = sortedTabs[idx] || null;
-        } else if (mode === "url" && (switchTab == null ? void 0 : switchTab.urlPattern)) {
+        } else if (mode === "url" && switchTab?.urlPattern) {
           const pattern = switchTab.urlPattern.trim();
           const isRegex = pattern.length >= 2 && pattern.startsWith("/") && pattern.endsWith("/");
           let re = null;
@@ -2622,7 +2673,7 @@
             if (re) return re.test(t.url || "");
             return (t.url || "").toLowerCase().includes(pattern.toLowerCase());
           }) || null;
-        } else if (mode === "title" && (switchTab == null ? void 0 : switchTab.titlePattern)) {
+        } else if (mode === "title" && switchTab?.titlePattern) {
           const pattern = switchTab.titlePattern.trim();
           const isRegex = pattern.length >= 2 && pattern.startsWith("/") && pattern.endsWith("/");
           let re = null;
@@ -2651,15 +2702,14 @@
       }
     }));
     registry.register("REFRESH_TAB", (_0) => __async(null, [_0], function* ({ message: message2, sender, sendResponse: sendResponse2 }) {
-      var _a, _b;
       try {
-        const tabId2 = (_b = message2.tabId) != null ? _b : (_a = sender == null ? void 0 : sender.tab) == null ? void 0 : _a.id;
+        const tabId2 = message2.tabId ?? sender?.tab?.id;
         if (!tabId2) {
           sendResponse2({ success: false, error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u0432\u043A\u043B\u0430\u0434\u043A\u0443 \u0434\u043B\u044F \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F" });
           return;
         }
         const tab = yield chrome.tabs.get(tabId2);
-        const url = (tab == null ? void 0 : tab.url) || message2.url || "";
+        const url = tab?.url || message2.url || "";
         console.log(`\u{1F504} [Background] \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0432\u043A\u043B\u0430\u0434\u043A\u0438 ${tabId2}, URL: ${url}`);
         yield chrome.tabs.reload(tabId2);
         sendResponse2({ success: true, url });
@@ -2669,10 +2719,9 @@
       }
     }));
     registry.register("CLOSE_TAB", (_0) => __async(null, [_0], function* ({ message: message2, sendResponse: sendResponse2 }) {
-      var _a;
       try {
         const { tabId: tabId2 } = message2;
-        const targetTabId2 = tabId2 || ((_a = (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]) == null ? void 0 : _a.id);
+        const targetTabId2 = tabId2 || (yield chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
         if (!targetTabId2) {
           sendResponse2({ success: false, error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C tabId \u0434\u043B\u044F \u0437\u0430\u043A\u0440\u044B\u0442\u0438\u044F" });
           return;

@@ -293,9 +293,39 @@ class I18n {
     } catch (e) { /* ignore */ }
   }
 
+  async _loadTranslationsViaRuntime(lang) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return null;
+    }
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'GET_I18N_TRANSLATIONS', lang }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response && response.success ? response : null);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
   async _loadTranslations(lang) {
+    const applyBundle = (translations, enFallback) => {
+      this.translations = translations && typeof translations === 'object' ? translations : {};
+      if (lang !== 'en' && enFallback && typeof enFallback === 'object') {
+        this._enFallback = enFallback;
+      } else if (lang !== 'en') {
+        this._enFallback = null;
+      } else {
+        this._enFallback = null;
+      }
+    };
+
     try {
-      // Try to load via fetch (works in popup, options, web_accessible pages)
+      // Try to load via fetch (works in popup, options, extension pages)
       const url = this._getTranslationUrl(lang);
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -314,11 +344,18 @@ class I18n {
         this._enFallback = null;
       }
     } catch (e) {
-      // Fallback: try inline translations for content scripts
-      console.warn(`[i18n] Could not fetch ${lang}.json, trying embedded:`, e.message);
-      if (typeof __i18n_translations !== 'undefined' && __i18n_translations[lang]) {
-        this.translations = __i18n_translations[lang];
+      // Content scripts: fetch(chrome-extension://…) часто обрывается при навигации (logout, редирект) — «Failed to fetch»
+      const rt = await this._loadTranslationsViaRuntime(lang);
+      if (rt && rt.translations && typeof rt.translations === 'object') {
+        applyBundle(rt.translations, rt.enFallback);
+        return;
       }
+      if (typeof __i18n_translations !== 'undefined' && __i18n_translations[lang]) {
+        applyBundle(__i18n_translations[lang], lang !== 'en' ? __i18n_translations.en : null);
+        return;
+      }
+      const detail = e && e.message != null ? e.message : String(e);
+      console.warn(`[i18n] Could not load ${lang}.json (fetch aborted or blocked; no runtime/embedded bundle):`, detail);
     }
   }
 

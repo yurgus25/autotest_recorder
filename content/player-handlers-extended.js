@@ -1152,7 +1152,9 @@ TestPlayer.prototype.navigateToUrl = async function(url, actionIndexInOriginalAr
   } catch (e) { /* ignore */ }
 
   this.navigationInitiatedByPlayer = true;
-  await this.savePlaybackState(url, nextActionIndex);
+  const totalOrig = Array.isArray(this.currentTest?.actions) ? this.currentTest.actions.length : 0;
+  const playbackRunFinished = totalOrig > 0 && nextActionIndex >= totalOrig;
+  await this.savePlaybackState(url, nextActionIndex, { playbackRunFinished });
 
   try {
     window.location.replace(url);
@@ -1180,6 +1182,10 @@ TestPlayer.prototype._runHistoryForStorage = function() {
       copy.screenshotComparison = { ...copy.screenshotComparison, diffImage: undefined };
     }
     if (copy.screenshotComparisonView) delete copy.screenshotComparisonView;
+    if (copy.consoleErrors) delete copy.consoleErrors;
+    if (typeof copy.error === 'string' && copy.error.length > 2000) {
+      copy.error = copy.error.slice(0, 2000) + '…';
+    }
     return copy;
   });
   return {
@@ -1198,15 +1204,17 @@ TestPlayer.prototype._runHistoryForStorage = function() {
   };
 }
 
-TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex) {
+TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex, saveOpts = null) {
   if (this.isPlaying && this.currentTest) {
+    const _so = saveOpts && typeof saveOpts === 'object' ? saveOpts : {};
     console.log('💾 Сохраняю состояние воспроизведения:', {
       testId: this.currentTest.id,
       testName: this.currentTest.name,
       actionIndex: nextActionIndex,
       nextUrl: nextUrl,
       isPlaying: this.isPlaying,
-      hasTest: !!this.currentTest
+      hasTest: !!this.currentTest,
+      playbackRunFinished: !!_so.playbackRunFinished
     });
     let runHistoryForStorage = this._runHistoryForStorage();
     const buildPayload = (rh) => ({
@@ -1219,7 +1227,9 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
       isGroupRun: this.isGroupRun,
       groupRunCurrentIndex: this.groupRunCurrentIndex,
       groupRunTotal: this.groupRunTotal,
-      playbackSessionId: this.playbackSessionId || null
+      playbackSessionId: this.playbackSessionId || null,
+      playbackRunFinished: !!_so.playbackRunFinished,
+      isPaused: typeof _so.isPaused === 'boolean' ? _so.isPaused : (this.isPaused === true)
     });
     const slimRunHistory = (rh) => {
       if (!rh || typeof rh !== 'object') return rh;
@@ -1230,8 +1240,39 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
       if (Array.isArray(out.transcript) && out.transcript.length > 40) {
         out.transcript = out.transcript.slice(-40);
       }
+      if (Array.isArray(out.steps)) {
+        out.steps = out.steps.map((s) => {
+          if (!s || typeof s !== 'object') return s;
+          const t = { ...s };
+          if (t.consoleErrors) delete t.consoleErrors;
+          if (typeof t.error === 'string' && t.error.length > 1200) {
+            t.error = t.error.slice(0, 1200) + '…';
+          }
+          return t;
+        });
+      }
       return out;
     };
+    const buildPayloadMicro = () => ({
+      type: 'SAVE_PLAYBACK_STATE',
+      test: this.currentTest ? {
+        id: this.currentTest.id,
+        name: this.currentTest.name,
+        actions: [],
+        createdAt: this.currentTest.createdAt,
+        updatedAt: this.currentTest.updatedAt
+      } : null,
+      actionIndex: nextActionIndex,
+      nextUrl: nextUrl,
+      runMode: this.playMode,
+      runHistory: null,
+      isGroupRun: this.isGroupRun,
+      groupRunCurrentIndex: this.groupRunCurrentIndex,
+      groupRunTotal: this.groupRunTotal,
+      playbackSessionId: this.playbackSessionId || null,
+      playbackRunFinished: !!_so.playbackRunFinished,
+      isPaused: typeof _so.isPaused === 'boolean' ? _so.isPaused : (this.isPaused === true)
+    });
     try {
       let response = await chrome.runtime.sendMessage(buildPayload(runHistoryForStorage));
       if (response && response.success) {
@@ -1242,10 +1283,19 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
         response = await chrome.runtime.sendMessage(buildPayload(slimmer));
         if (response && response.success) {
           console.log('✅ Состояние сохранено после повтора с укороченной runHistory');
+        } else if (response == null) {
+          await this.delay(80);
+          response = await chrome.runtime.sendMessage(buildPayloadMicro());
+          if (response && response.success) {
+            console.log('✅ Состояние сохранено после микро-payload (actions/runHistory урезаны; SW восстановит actions)');
+          } else {
+            const detail = response == null
+              ? 'нет ответа от service worker (канал закрыт, SW перезапуск или сообщение слишком большое)'
+              : (response.error || JSON.stringify(response));
+            console.error('❌ Ошибка при сохранении состояния:', detail);
+          }
         } else {
-          const detail = response == null
-            ? 'нет ответа от service worker (канал закрыт, SW перезапуск или сообщение слишком большое)'
-            : (response.error || JSON.stringify(response));
+          const detail = response.error || JSON.stringify(response);
           console.error('❌ Ошибка при сохранении состояния:', detail);
         }
       } else {
@@ -1273,7 +1323,7 @@ TestPlayer.prototype.savePlaybackState = async function(nextUrl, nextActionIndex
   }
 }
 
-TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mode = 'optimized', savedRunHistory = null, playbackSessionId = null) {
+TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mode = 'optimized', savedRunHistory = null, playbackSessionId = null, playbackRunFinishedFromState = false, isPausedFromState = false) {
   if (this.isPlaying) {
     if (this.currentTest?.id === test?.id) {
       if (this.debugMode) console.log('ℹ️ [Resume] Тест уже воспроизводится на этой вкладке, пропуск дубликата');
@@ -1288,6 +1338,8 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     this.runHistoryCleanupTimer = null;
   }
   this.isPlaying = true;
+  this.pausedState = null;
+  this.isPaused = !!isPausedFromState;
   this.currentTest = test;
   if (playbackSessionId != null && String(playbackSessionId).trim() !== '') {
     this.playbackSessionId = playbackSessionId;
@@ -1484,6 +1536,40 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
   } else {
     console.log('💾 [History] runHistory уже существует, продолжаю использовать его');
   }
+
+  // После клика/навигации с полной перезагрузкой вкладки в storage может остаться заниженный
+  // actionIndex (unload до обновления), при этом runHistory уже содержит успешные шаги —
+  // иначе при следующей загрузке тест «начинается заново» вместо отчёта о завершении.
+  let resolvedStartIndex = Number(startActionIndex);
+  if (!Number.isFinite(resolvedStartIndex) || resolvedStartIndex < 0) resolvedStartIndex = 0;
+  const totalActionsForResume = Array.isArray(test?.actions) ? test.actions.length : 0;
+  const rhStepsForClamp = this.runHistory?.steps;
+  if (Array.isArray(rhStepsForClamp) && rhStepsForClamp.length > 0 && totalActionsForResume > 0) {
+    let maxDoneActionIdx = -1;
+    for (const st of rhStepsForClamp) {
+      if (!st || st.success === false) continue;
+      const ai = Number(st.actionIndex);
+      if (Number.isFinite(ai)) maxDoneActionIdx = Math.max(maxDoneActionIdx, ai);
+    }
+    if (maxDoneActionIdx >= 0) {
+      const inferredStart = Math.min(maxDoneActionIdx + 1, totalActionsForResume);
+      if (inferredStart > resolvedStartIndex) {
+        console.log(`🛡️ [Resume] Точка старта поднята по runHistory: ${resolvedStartIndex} → ${inferredStart} (max actionIndex успешных шагов: ${maxDoneActionIdx})`);
+        resolvedStartIndex = inferredStart;
+      }
+    }
+  }
+  if (totalActionsForResume > 0 && resolvedStartIndex >= totalActionsForResume) {
+    console.log('✅ [Resume] Все действия уже выполнены (индекс ≥ числа шагов); очищаю playbackState и отправляю завершение теста');
+    try {
+      await chrome.runtime.sendMessage({ type: 'CLEAR_PLAYBACK_STATE' });
+    } catch (_) {}
+    // Отчёт (popup) только если прогон был помечен как завершённый до unload (иначе — тихий TEST_COMPLETED)
+    this.notifyCompletion(true, null, null, { showCompletionReport: playbackRunFinishedFromState === true });
+    this.stopPlaying();
+    return;
+  }
+  startActionIndex = resolvedStartIndex;
 
   this.addPlayingIndicator();
   
@@ -1705,6 +1791,12 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     }
     
     console.log('🚀 Продолжаю выполнение действий...');
+    if (isPausedFromState) {
+      try {
+        await this.savePlaybackState(window.location.href, actualStartIndex, {});
+      } catch (_) {}
+      this.updatePlayingIndicator('⏸️ ПАУЗА');
+    }
     // Передаем: remainingActions, allActions, startStepNumber=0 (для корректной нумерации), startActionIndex (для stepIndex)
     await this.executeActions(remainingActions, test.actions, 0, actualStartIndex);
     const hasStepErrors = this.runHistory?.steps?.some(step => step.success === false);
@@ -1740,10 +1832,10 @@ TestPlayer.prototype.resumePlayback = async function(test, startActionIndex, mod
     }
 
     await this._handleOpenDialogIfAny(3);
-    this.notifyCompletion(!hasStepErrors, hasStepErrors ? (this.runHistory?.error || 'Ошибки в шагах') : null);
+    this.notifyCompletion(!hasStepErrors, hasStepErrors ? (this.runHistory?.error || 'Ошибки в шагах') : null, null, { showCompletionReport: true });
   } catch (error) {
     console.error('❌ Ошибка при выполнении теста:', error);
-    this.notifyCompletion(false, error.message);
+    this.notifyCompletion(false, error.message, null, { showCompletionReport: false });
   } finally {
     this.stopPlaying();
   }
@@ -1908,7 +2000,7 @@ TestPlayer.prototype.stopPlaying = function() {
 /**
  * Ставит воспроизведение на паузу
  */
-TestPlayer.prototype.pausePlayback = function() {
+TestPlayer.prototype.pausePlayback = async function() {
   if (!this.isPlaying || this.isPaused) {
     console.warn('⚠️ [Player] Нельзя поставить на паузу: тест не воспроизводится или уже на паузе');
     return;
@@ -1920,9 +2012,16 @@ TestPlayer.prototype.pausePlayback = function() {
   
   // Обновляем индикатор
   this.updatePlayingIndicator('⏸️ ПАУЗА');
-  
-  // Состояние будет сохранено в checkAndSavePauseState при следующей проверке
-  console.log('💾 [Player] Состояние паузы будет сохранено при следующей проверке цикла');
+
+  try {
+    await this.delay(80);
+    const pauseIdx = (this.pausedState && this.pausedState.actionIndex != null)
+      ? this.pausedState.actionIndex
+      : this.currentActionIndex;
+    await this.savePlaybackState(window.location.href, pauseIdx, {});
+  } catch (e) {
+    console.warn('⚠️ [Player] Не удалось сразу сохранить состояние паузы:', e?.message || e);
+  }
 }
 
 /**
@@ -1942,6 +2041,10 @@ TestPlayer.prototype.resumePlaybackFromPause = async function() {
   
   // Обновляем индикатор
   this.updatePlayingIndicator('▶️ ВОСПРОИЗВЕДЕНИЕ');
+
+  try {
+    await this.savePlaybackState(window.location.href, this.currentActionIndex, {});
+  } catch (_) {}
   
   console.log('✅ [Player] Флаг паузы снят, цикл продолжит выполнение');
 }
@@ -1964,13 +2067,16 @@ TestPlayer.prototype.updatePlayingIndicator = function(text) {
 /**
  * Проверяет, нужно ли поставить на паузу, и сохраняет состояние
  */
-TestPlayer.prototype.checkAndSavePauseState = async function(visibleActions, allActions, startStepNumber, currentIndex) {
+TestPlayer.prototype.checkAndSavePauseState = async function(visibleActions, allActions, startStepNumber, currentIndex, stepIndexInFullTest = null) {
   if (this.isPaused) {
     // Сохраняем состояние для возобновления (только один раз)
     if (!this.pausedState) {
+      const resolvedActionIndex = (stepIndexInFullTest != null && Number.isFinite(Number(stepIndexInFullTest)))
+        ? Number(stepIndexInFullTest)
+        : this.currentActionIndex;
       this.pausedState = {
         test: this.currentTest,
-        actionIndex: this.currentActionIndex,
+        actionIndex: resolvedActionIndex,
         mode: this.playMode,
         visibleActions: visibleActions,
         allActions: allActions,
@@ -2224,7 +2330,8 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
     '.select-group',
     '[class*="select-group"]',
     '[id*="__result"]',
-    '[class*="options"]'
+    '[class*="options"]',
+    '[class*="options-list"]'
   ].join(',');
   const optionSelector = '.option, .option.cutted-text, .result__content, .result__item, [role="option"], [data-value], .mat-option';
   const targetNorm = this.normalizeTextValue(targetValue);
@@ -2306,6 +2413,18 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
   try {
     const roots = document.querySelectorAll(rootsSelector);
     const visibleRoots = Array.from(roots).filter(r => isVisible(r));
+    // Списки app-autocomplete часто ренерятся внутри хоста, а не в overlay — добавляем локальные корни.
+    if (contextElement) {
+      try {
+        const ac = contextElement.closest && contextElement.closest('app-autocomplete');
+        if (ac) {
+          const inlineSel = '.options-list-container, [class*="options-list"], [role="listbox"]';
+          for (const p of ac.querySelectorAll(inlineSel)) {
+            if (isVisible(p) && visibleRoots.indexOf(p) === -1) visibleRoots.push(p);
+          }
+        }
+      } catch (_) {}
+    }
     const candidates = [];
     for (const root of visibleRoots) {
       const options = root.querySelectorAll(optionSelector);
@@ -2378,7 +2497,7 @@ TestPlayer.prototype.trySelectOptionInRevealedPanels = async function(targetValu
     for (const opt of allOptions) {
       if (!isVisible(opt)) continue;
       if (!textMatches(opt)) continue;
-      const panel = opt.closest('[class*="overlay"], [class*="panel"], .select-group, [class*="select-group"], [role="listbox"]');
+      const panel = opt.closest('[class*="overlay"], [class*="panel"], .select-group, [class*="select-group"], [role="listbox"], [class*="options-list"], .options-list-container');
       if (!panel || !isVisible(panel)) continue;
       fallbackCandidates.push({ panel, opt });
     }
@@ -2445,12 +2564,25 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
     return { element: null, usedSelector: this.formatSelector(selectorData) };
   }
 
+  // Страница редактора расширения (Angular): DOM и app-select появляются после ready; короткие ретраи дают ложный «не найден».
+  let maxRetriesEff = maxRetries;
+  let delayMsEff = delayMs;
+  try {
+    const href = String(window.location?.href || '');
+    const extEditor = href.startsWith('chrome-extension://') && /\/editor\//i.test(href);
+    if (extEditor && this.isPlaying) {
+      maxRetriesEff = Math.max(Number(maxRetries) || 5, 12);
+      delayMsEff = Math.max(Number(delayMs) || 200, 280);
+      console.log('🧭 [Player] Расширенные ретраи поиска для editor-страницы:', { maxRetriesEff, delayMsEff });
+    }
+  } catch (_) { /* ignore */ }
+
   // === ИСПОЛЬЗОВАНИЕ ЭКСПОНЕНЦИАЛЬНОГО BACKOFF ИЗ ОПТИМИЗАТОРА ===
   if (this.optimizer?.settings?.exponentialBackoffRetry) {
     const result = await this.optimizer.findElementWithExponentialBackoff(selectorData, {
-      maxRetries,
-      initialDelay: Math.min(delayMs, 500),
-      maxDelay: delayMs * 2,
+      maxRetries: maxRetriesEff,
+      initialDelay: Math.min(delayMsEff, 500),
+      maxDelay: delayMsEff * 2,
       useMutationObserver: this.optimizer.settings.useMutationObserver
     });
     
@@ -2492,7 +2624,7 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
     const selectorInfo = selectorData.selector || JSON.stringify(selectorData);
     let currentSelector = selectorData;
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (let attempt = 1; attempt <= maxRetriesEff; attempt++) {
       const element = this.selectorEngine.findElementSync(currentSelector);
       
       if (element) {
@@ -2534,10 +2666,10 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
       }
       
       // Если элемент не найден и это не последняя попытка, просто ждем
-      if (attempt < maxRetries && !element) {
-        console.log(`⏳ Попытка ${attempt}/${maxRetries}: элемент не найден (${selectorInfo}), жду и пробую снова...`);
+      if (attempt < maxRetriesEff && !element) {
+        console.log(`⏳ Попытка ${attempt}/${maxRetriesEff}: элемент не найден (${selectorInfo}), жду и пробую снова...`);
         // Увеличиваем задержку с каждой попыткой (экспоненциальный backoff)
-        const backoffDelay = Math.min(delayMs * Math.pow(1.5, attempt - 1), 1000);
+        const backoffDelay = Math.min(delayMsEff * Math.pow(1.5, attempt - 1), 1000);
         await this.delay(backoffDelay);
         
       }
@@ -2564,7 +2696,7 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
       usedSelector: `${this.formatSelector(selectorData)} [fallback]`,
       source: 'fallback-selector',
       selectorLookupMiss: true,
-      attempt: maxRetries,
+      attempt: maxRetriesEff,
       selectorType: selectorData?.type || null
     };
     if (typeof this.setReplayFindEvidence === 'function') {
@@ -2574,13 +2706,13 @@ TestPlayer.prototype.findElementWithRetry = async function(selectorData, maxRetr
   }
   
   const selectorInfo = selectorData.selector || JSON.stringify(selectorData);
-  console.warn(`⚠️ Элемент не найден по основному селектору после ${maxRetries} попыток: ${selectorInfo}`);
+  console.warn(`⚠️ Элемент не найден по основному селектору после ${maxRetriesEff} попыток: ${selectorInfo}`);
   const proof = {
     element: null,
     usedSelector: this.formatSelector(selectorData),
     source: 'not-found',
     selectorLookupMiss: true,
-    attempt: maxRetries,
+    attempt: maxRetriesEff,
     selectorType: selectorData?.type || null
   };
   if (typeof this.setReplayFindEvidence === 'function') {
@@ -3301,7 +3433,7 @@ TestPlayer.prototype.resumePlaybackAfterRecording = async function(markerActionI
 
   if (nextActionIndex === -1) {
     console.log('✅ После маркера нет следующих действий, тест завершен');
-    this.notifyCompletion(true);
+    this.notifyCompletion(true, null, null, { showCompletionReport: true });
     return;
   }
 
@@ -3421,11 +3553,12 @@ TestPlayer.prototype.executeActionsFromArray = async function(actions, startInde
   
   // Если дошли до конца без маркеров, завершаем тест
   console.log('✅ Все действия выполнены, тест завершен');
-  this.notifyCompletion(true);
+  this.notifyCompletion(true, null, null, { showCompletionReport: true });
   this.stopPlaying();
 }
 
-TestPlayer.prototype.notifyCompletion = function(success, error = null, optimizationSummary = null) {
+TestPlayer.prototype.notifyCompletion = function(success, error = null, optimizationSummary = null, opts = null) {
+  const showCompletionReport = !!(opts && opts.showCompletionReport === true);
   const adaptiveRunResults = [];
   if (this.currentTest?.actions) {
     this.currentTest.actions.forEach((action) => {
@@ -3457,6 +3590,21 @@ TestPlayer.prototype.notifyCompletion = function(success, error = null, optimiza
   }
   const rh = this.runHistory || {};
   const steps = rh.steps || [];
+  const hasStepErrors = steps.some(s => s.success === false);
+  const effectiveSuccess = hasStepErrors ? false : success;
+  let reportError = error;
+  if (hasStepErrors && !reportError) {
+    const firstFailed = steps.find(s => s.success === false);
+    reportError = firstFailed?.error || 'Ошибки в шагах';
+  }
+  if (this.runHistory && Array.isArray(this.runHistory.steps)) {
+    const stMs = this.runHistory.startTime ? new Date(this.runHistory.startTime).getTime() : null;
+    if (stMs && (!this.runHistory.totalDuration || this.runHistory.totalDuration <= 0)) {
+      this.runHistory.totalDuration = Date.now() - stMs;
+    }
+    this.runHistory.success = !hasStepErrors;
+    this.runHistory.error = hasStepErrors ? (reportError || null) : null;
+  }
   const expectedTotal = this.getRuntimeActions(this.currentTest?.actions || []).length;
   const stepsTotal = expectedTotal > 0 ? expectedTotal : steps.length;
   let stepsCompleted = steps.filter(s => s.success !== false).length;
@@ -3471,8 +3619,8 @@ TestPlayer.prototype.notifyCompletion = function(success, error = null, optimiza
     type: 'TEST_COMPLETED',
     testId: this.currentTest?.id,
     testName: this.currentTest?.name,
-    success,
-    error,
+    success: effectiveSuccess,
+    error: reportError,
     runMode: this.playMode,
     stepsCompleted,
     stepsTotal,
@@ -3483,9 +3631,11 @@ TestPlayer.prototype.notifyCompletion = function(success, error = null, optimiza
     updatedVariables: Object.keys(updatedVariables).length ? updatedVariables : undefined
   }).then((response) => {
     if (response?.suppressCompletionPopup) return;
-    this.showCompletionPopup(success, error);
+    if (!showCompletionReport) return;
+    this.showCompletionPopup(effectiveSuccess, reportError);
   }).catch(() => {
-    this.showCompletionPopup(success, error);
+    if (!showCompletionReport) return;
+    this.showCompletionPopup(effectiveSuccess, reportError);
   });
 
   // Очищаем информацию о шаге
@@ -3807,6 +3957,10 @@ TestPlayer.prototype.checkIfValueSelected = async function(selectBoxElement, exp
     if (!expectedLower) return true;
     if (val === expectedLower || normalizeCompact(val) === expectedCompact) return true;
     if (!strict && (val.includes(expectedLower) || expectedLower.includes(val))) return true;
+    if (strict) {
+      const compositeRoot = selectBoxElement?.closest?.('app-select, app-autocomplete, [class*="autocomplete"], [class*="suggest"]');
+      if (compositeRoot && (val.includes(expectedLower) || expectedLower.includes(val))) return true;
+    }
     return false;
   };
   
@@ -3827,9 +3981,9 @@ TestPlayer.prototype.checkIfValueSelected = async function(selectBoxElement, exp
     }
   }
   
-  const appSelect = selectBoxElement.closest('app-select');
+  const appSelect = selectBoxElement.closest('app-select, app-autocomplete');
   if (appSelect) {
-    const selectBox = appSelect.querySelector('.select-box, [class*="select-box"]');
+    const selectBox = appSelect.querySelector('.select-box, [class*="select-box"], .result, [class*="result"]');
     if (selectBox) {
       const boxLower = this.normalizeTextValue(selectBox.textContent);
       if (isMeaningful(boxLower) && matchesExpected(boxLower)) {

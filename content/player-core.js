@@ -619,7 +619,9 @@ class TestPlayer {
             playbackSessionId: response.playbackSessionId ?? null,
             isGroupRun: response.isGroupRun,
             groupRunCurrentIndex: response.groupRunCurrentIndex,
-            groupRunTotal: response.groupRunTotal
+            groupRunTotal: response.groupRunTotal,
+            playbackRunFinished: response.playbackRunFinished === true,
+            isPaused: response.isPaused === true
           } : null))
         : null;
       if (state) {
@@ -628,13 +630,47 @@ class TestPlayer {
         // Обратная совместимость: если nextUrl не задан (старые сохранения), считаем __AUTO_NAV__
         const nextUrl = state.nextUrl ?? '__AUTO_NAV__';
         const actionIndex = (state.actionIndex != null && state.actionIndex >= 0) ? state.actionIndex : 0;
+        const actionsLen = Array.isArray(state.test?.actions) ? state.test.actions.length : 0;
+        // Последний шаг сохранил nextIndex === длина теста (прогон завершён), но страница перезагрузилась
+        // до notifyCompletion — не запускать resume с пустым хвостом и не повторять сценарий.
+        if (actionsLen > 0 && actionIndex >= actionsLen) {
+          const wantDeferredReport = state.playbackRunFinished === true;
+          console.log(
+            wantDeferredReport
+              ? '✅ [Resume] Прогон завершён до перезагрузки (playbackRunFinished): очищаю состояние и показываю отложенный отчёт'
+              : '✅ [Resume] Сохранённый actionIndex за концом теста — только очищаю playbackState (без отчёта и без повторного прогона)'
+          );
+          await chrome.runtime.sendMessage({ type: 'CLEAR_PLAYBACK_STATE' });
+          if (wantDeferredReport && state.test?.id) {
+            this.currentTest = state.test;
+            if (!Array.isArray(this.currentTest.actions) || this.currentTest.actions.length === 0) {
+              try {
+                const gt = await chrome.runtime.sendMessage({ type: 'GET_TEST', testId: state.test.id });
+                if (gt?.success && gt.test) this.currentTest = gt.test;
+              } catch (_) {}
+            }
+            this.playMode = state.runMode || 'optimized';
+            this.runHistory = state.runHistory || null;
+            this.notifyCompletion(true, null, null, { showCompletionReport: true });
+            this.stopPlaying();
+          }
+          return;
+        }
 
         if (nextUrl === '__AUTO_NAV__') {
           await chrome.runtime.sendMessage({ type: 'CLEAR_PLAYBACK_STATE' });
           this.isGroupRun = state.isGroupRun || false;
           this.groupRunCurrentIndex = state.groupRunCurrentIndex;
           this.groupRunTotal = state.groupRunTotal;
-          this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory, state.playbackSessionId ?? null);
+          this.resumePlayback(
+            state.test,
+            actionIndex,
+            state.runMode || 'optimized',
+            state.runHistory,
+            state.playbackSessionId ?? null,
+            state.playbackRunFinished === true,
+            state.isPaused === true
+          );
           return;
         }
 
@@ -650,7 +686,15 @@ class TestPlayer {
             this.isGroupRun = state.isGroupRun || false;
             this.groupRunCurrentIndex = state.groupRunCurrentIndex;
             this.groupRunTotal = state.groupRunTotal;
-            this.resumePlayback(state.test, actionIndex, state.runMode || 'optimized', state.runHistory, state.playbackSessionId ?? null);
+            this.resumePlayback(
+              state.test,
+              actionIndex,
+              state.runMode || 'optimized',
+              state.runHistory,
+              state.playbackSessionId ?? null,
+              state.playbackRunFinished === true,
+              state.isPaused === true
+            );
           } else {
             console.log(`⚠️ URL не совпадает: текущий=${currentUrl}, ожидаемый=${nextUrl}`);
           }
@@ -1109,6 +1153,26 @@ class TestPlayer {
       }
     }
 
+    // 2b) После валидации Angular снимает .ng-invalid — тот же путь с записанным селектором иначе не находится при resume
+    const rawPrimary = action.selector?.selector || action.selector?.value || '';
+    if (rawPrimary && /(^|\s)\.ng-invalid(?=\s|$)/.test(rawPrimary)) {
+      const relaxed = String(rawPrimary).replace(/(^|\s)\.ng-invalid(?=\s|$)/g, '$1').replace(/\s{2,}/g, ' ').trim();
+      if (relaxed && relaxed !== rawPrimary) {
+        try {
+          const base = typeof action.selector === 'object' && action.selector ? action.selector : { type: 'css', selector: relaxed, value: relaxed };
+          const relaxedSel = { ...base, selector: relaxed, value: relaxed };
+          const elNg = this.selectorEngine?.findElementSync?.(relaxedSel);
+          if (elNg && elNg instanceof Element) {
+            console.log('✅ Элемент найден по селектору без .ng-invalid (форма уже валидна)');
+            this.setReplayFindEvidence({ element: elNg, usedSelector: this.formatSelector(relaxedSel), source: 'ng-invalid-relaxed' });
+            return elNg;
+          }
+        } catch (e) {
+          // следующий
+        }
+      }
+    }
+
     // 3) Альтернативные селекторы из action.selector.alternatives (в т.ч. isParent)
     if (selectorData.alternatives && Array.isArray(selectorData.alternatives)) {
       for (const alt of selectorData.alternatives) {
@@ -1227,6 +1291,7 @@ class TestPlayer {
     }
 
     this.isPlaying = true;
+    this.isPaused = false;
     this.playbackSessionId = (playbackSessionId != null && String(playbackSessionId).trim() !== '')
       ? String(playbackSessionId).trim()
       : null;
@@ -1364,10 +1429,10 @@ class TestPlayer {
       }
 
       await this._handleOpenDialogIfAny(3);
-      this.notifyCompletion(!hasStepErrors, hasStepErrors ? (this.runHistory?.error || 'Ошибки в шагах') : null);
+      this.notifyCompletion(!hasStepErrors, hasStepErrors ? (this.runHistory?.error || 'Ошибки в шагах') : null, null, { showCompletionReport: true });
     } catch (error) {
       console.error('❌ Ошибка при выполнении теста:', error);
-      this.notifyCompletion(false, error.message);
+      this.notifyCompletion(false, error.message, null, { showCompletionReport: false });
     } finally {
       // При паузе по маркеру не завершаем тест и не шлём TEST_COMPLETED
       if (!this.pausedOnRecordMarker) {
@@ -1499,8 +1564,8 @@ class TestPlayer {
         continue;
       }
 
-      // Проверяем паузу (для runtime-индекса)
-      await this.checkAndSavePauseState(actions, allActions, startStepNumber, i);
+      // Проверяем паузу (для runtime-индекса); stepIndexInFullTest — до обновления currentActionIndex
+      await this.checkAndSavePauseState(actions, allActions, startStepNumber, i, stepIndexInTest);
       this.currentActionIndex = stepIndexInTest;
       this.navigationInitiatedByPlayer = false;
 
@@ -1583,7 +1648,9 @@ class TestPlayer {
       const mayCauseUnload = action?.type === 'click' || action?.type === 'navigate' || action?.type === 'navigation';
       if (mayCauseUnload) {
         const nextActionIndex = stepIndexInTest + 1;
-        await this.savePlaybackState('__AUTO_NAV__', nextActionIndex).catch(() => {});
+        const totalAll = Array.isArray(allActions) ? allActions.length : 0;
+        const playbackRunFinished = totalAll > 0 && nextActionIndex >= totalAll;
+        await this.savePlaybackState('__AUTO_NAV__', nextActionIndex, { playbackRunFinished }).catch(() => {});
         // Для клика заранее подтверждаем шаг: страница может уйти в unload раньше финального TEST_STEP_COMPLETED.
         if (action?.type === 'click') {
           try {
@@ -1839,13 +1906,14 @@ class TestPlayer {
         this.runHistory.transcript.push(this.getStepDescription(action, realStepNumber, totalSteps));
       }
 
-      // Если шаг с навигацией — она перезагрузит страницу, прерываемся
+      // Если шаг с навигацией — она перезагрузит страницу, прерываемся.
+      // Нельзя полагаться только на window.location.href !== lastKnownUrl: сразу после
+      // location.replace() href часто ещё совпадает с lastKnownUrl, цикл уходил на следующий шаг
+      // (скриншоты / findElement) и «зависал» в UI на этом шаге; resume на новой странице не подхватывался.
       if (action?.type === 'navigate' || action?.type === 'navigation') {
-        const urlBefore = this.lastKnownUrl;
-        // navigateToUrl уже вызвана внутри executeAction
-        // После навигации страница перезагрузится и resumePlayback подхватит
-        if (window.location.href !== urlBefore) {
-          // Сохраняем частичные данные до навигации для merge при завершении теста
+        const urlChanged = window.location.href !== this.lastKnownUrl;
+        const hardNav = this.navigationInitiatedByPlayer === true;
+        if (hardNav || urlChanged) {
           const hasPerf = this.currentTest?.actions?.some(
             a => a.type === 'analysis' && a.subtype === 'analysis-performance'
           );
@@ -1857,8 +1925,8 @@ class TestPlayer {
               });
             } catch (e) { /* ignore */ }
           }
-          console.log('🔄 Навигация выполнена, ожидаю перезагрузки...');
-          return; // Выходим, resumePlayback подхватит
+          console.log('🔄 Навигация выполнена, ожидаю перезагрузки...', { hardNav, urlChanged });
+          return;
         }
       }
 
